@@ -1,0 +1,23 @@
+{
+    "name": "parus_exchange_service",
+    "version": "1.0.0",
+    "description": "Parus 8 and WEB API integration platform",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/CITKParus/ExchangeService.git"
+    },
+    "author": "CITK Parus",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/CITKParus/ExchangeService/issues"
+    },
+    "homepage": "https://github.com/CITKParus/ExchangeService#readme",
+    "dependencies": {
+        "oracledb": "^2.3.0"
+    }
+}
