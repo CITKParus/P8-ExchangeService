@@ -18,6 +18,12 @@
     },
     "homepage": "https://github.com/CITKParus/ExchangeService#readme",
     "dependencies": {
+        "lodash": "^4.17.11",
+        "module-alias": "^2.1.0",
         "oracledb": "^2.3.0"
+    },
+    "_moduleAliases": {
+        "@core": "core",
+        "@modules": "modules"
     }
 }

@@ -1,62 +1,78 @@
-var oracledb = require("oracledb");
-var dbConfig = require("./config.js");
+/*
+  Сервис интеграции ПП Парус 8 с WEB API
+  Точка входа в сервер приложений
+*/
+require("module-alias/register");
+const cfg = require("./config.js");
+const { Logger } = require("@core/logger.js");
+const db = require("@core/db_connector.js");
+const { ServerError } = require("@core/server_errors.js");
+const parus = require("@modules/parus_db.js");
+const utls = require("@core/utils.js");
 
-// Get a non-pooled connection
-oracledb.getConnection(
-    {
-        user: dbConfig.user,
-        password: dbConfig.password,
-        connectString: dbConfig.connectString
-    },
-    function(err, connection) {
-        if (err) {
-            console.error(err.message);
-            return;
-        }
-        connection.execute(
-            // The statement to execute
-            "SELECT rn, agnabbr FROM agnlist WHERE rn = :id",
+let a = new db.DBConnector(cfg.dbConnect);
+a.connect()
+    .then(res => {
+        console.log(res);
+        setTimeout(() => {
+            a.disconnect()
+                .then(res => {
+                    console.log("DISCONNECTED");
+                })
+                .catch(e => {
+                    console.log(e.code + ": " + e.message);
+                });
+        }, 2000);
+    })
+    .catch(e => {
+        console.log(e.code + ": " + e.message);
+    });
 
-            // The "bind value" 180 for the bind variable ":id"
-            [1431890],
+/*
 
-            // execute() options argument.  Since the query only returns one
-            // row, we can optimize memory usage by reducing the default
-            // maxRows value.  For the complete list of other options see
-            // the documentation.
-            {
-                maxRows: 1
-                //, outFormat: oracledb.OBJECT  // query result format
-                //, extendedMetaData: true      // get extra metadata
-                //, fetchArraySize: 100         // internal buffer allocation size for tuning
-            },
+const log = new Logger();
+log.error("Это ошибка");
+log.warn("Предупреждение это");
+log.info("Просто информация");
 
-            // The callback function handles the SQL execution results
-            function(err, result) {
-                if (err) {
-                    console.error(err.message);
-                    setTimeout(() => {
-                        doRelease(connection);
-                    }, 2000);
-                    return;
-                }
-                console.log(result.metaData); // [ { name: 'DEPARTMENT_ID' }, { name: 'DEPARTMENT_NAME' } ]
-                console.log(result.rows); // [ [ 180, 'Construction' ] ]
-                setTimeout(() => {
-                    doRelease(connection);
-                }, 2000);
-            }
-        );
-    }
-);
 
-// Note: connections should always be released when not needed
-function doRelease(connection) {
-    connection.close(function(err) {
-        if (err) {
-            console.log("Connection closed with erros: " + err.message);
+
+const test = async prms => {
+    return new Promise((resolve, reject) => {
+        if (prms == 0) {
+            reject(new ServerError(1234, "Ошибка!"));
         } else {
-            console.log("Connection closed - no erros");
+            setTimeout(() => {
+                resolve(prms + 1);
+            }, 1000);
         }
     });
-}
+};
+
+const callTest = async prms => {
+    try {
+        console.log("in async before");
+        let a = await test(prms);
+        console.log("in async after " + a);
+        return a;
+    } catch (e) {
+        console.log("in async I'm here: " + e.code + " - " + e.message);
+        throw e;
+    }
+};
+
+process.on("unhandledRejection", err => {
+    console.error("PROCESS ERROR: " + err.code + " - " + err.message);
+    process.exit(0);
+});
+
+console.log("BEFORE");
+callTest(0)
+    .then(result => {
+        console.log("MAIN RESULT: " + result);
+    })
+    .catch(err => {
+        console.error("MAIN ERROR: " + err.code + " - " + err.message);
+    });
+console.log("AFTER");
+*/
