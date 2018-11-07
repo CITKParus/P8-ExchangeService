@@ -59,6 +59,48 @@ const checkModuleInterface = (module, interface) => {
     return res;
 };
 
+//Проверка корректности полей объекта
+const checkObject = (obj, interface) => {
+    //Объявим результат
+    let res = "";
+    //Если есть что проверять
+    if (obj && interface) {
+        //Eсли есть список полей для проверки
+        if (interface.fields) {
+            if (Array.isArray(interface.fields)) {
+                let noFields = [];
+                let noValues = [];
+                //Обходим проверяемые поля
+                interface.fields.forEach(fld => {
+                    //Проверим наличие поля в объекте
+                    if (!(fld.name in obj)) {
+                        //Поля нет
+                        noFields.push(fld.name);
+                    } else {
+                        //Поле есть, проверим наличие значения
+                        if (fld.required && !obj[fld.name])
+                            //Обязательное поле не содержит значения
+                            noValues.push(fld.name);
+                    }
+                });
+                //Сформируем итоговое сообщение
+                if (noFields.length > 0) res = "Объект не содержит полей: " + noFields.join(", ");
+                if (noValues.length > 0)
+                    res +=
+                        (res == "" ? "" : "; ") + "Обязательные поля объекта не имеют значений: " + noValues.join(", ");
+            } else {
+                res = "Список проверяемых полей объекта не является массивом";
+            }
+        } else {
+            res = "Не указан список проверяемых полей объекта";
+        }
+    } else {
+        res = "Не указан проверяемый объект и/или его интерфейс";
+    }
+    //Вернем результат
+    return res;
+};
+
 //Формирование полного пути к подключаемому модулю
 const makeModuleFullPath = moduleName => {
     if (moduleName) {
@@ -75,4 +117,5 @@ const makeModuleFullPath = moduleName => {
 exports.isFunction = isFunction;
 exports.haveFunctions = haveFunctions;
 exports.checkModuleInterface = checkModuleInterface;
+exports.checkObject = checkObject;
 exports.makeModuleFullPath = makeModuleFullPath;

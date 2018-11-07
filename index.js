@@ -2,6 +2,11 @@
   Сервис интеграции ПП Парус 8 с WEB API
   Точка входа в сервер приложений
 */
+
+//----------------------
+// Подключение библиотек
+//----------------------
+
 require("module-alias/register");
 const cfg = require("./config.js");
 const { Logger } = require("@core/logger.js");
@@ -10,19 +15,39 @@ const { ServerError } = require("@core/server_errors.js");
 const parus = require("@modules/parus_db.js");
 const utls = require("@core/utils.js");
 
+//------------
+// Тело модуля
+//------------
+
 let a = new db.DBConnector(cfg.dbConnect);
 a.connect()
     .then(res => {
-        console.log(res);
-        setTimeout(() => {
-            a.disconnect()
-                .then(res => {
-                    console.log("DISCONNECTED");
-                })
-                .catch(e => {
-                    console.log(e.code + ": " + e.message);
-                });
-        }, 2000);
+        console.log("CONNECTED");
+        a.getServices()
+            .then(res => {
+                console.log(res);
+                setTimeout(() => {
+                    a.disconnect()
+                        .then(res => {
+                            console.log("DISCONNECTED");
+                        })
+                        .catch(e => {
+                            console.log(e.code + ": " + e.message);
+                        });
+                }, 10000);
+            })
+            .catch(e => {
+                console.log(e.code + ": " + e.message);
+                setTimeout(() => {
+                    a.disconnect()
+                        .then(res => {
+                            console.log("DISCONNECTED");
+                        })
+                        .catch(e => {
+                            console.log(e.code + ": " + e.message);
+                        });
+                }, 10000);
+            });
     })
     .catch(e => {
         console.log(e.code + ": " + e.message);

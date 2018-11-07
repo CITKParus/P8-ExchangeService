@@ -9,7 +9,7 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const glConst = require("@core/constants.js"); //Глобальные константы
-const { checkModuleInterface, makeModuleFullPath } = require("@core/utils.js"); //Вспомогательные функции
+const { checkModuleInterface, makeModuleFullPath, checkObject } = require("@core/utils.js"); //Вспомогательные функции
 const { ServerError } = require("@core/server_errors.js"); //Типовая ошибка
 
 //------------
@@ -19,26 +19,55 @@ const { ServerError } = require("@core/server_errors.js"); //Типовая ош
 class DBConnector {
     //Конструктор
     constructor(dbConnect) {
-        //Проверяем наличие модуля для работы с БД в настройках подключения
-        if (dbConnect.module) {
-            //Подключим модуль
-            this.connector = require(makeModuleFullPath(dbConnect.module));
-            //Проверим его интерфейс
-            if (!checkModuleInterface(this.connector, { functions: ["connect", "disconnect", "execute"] })) {
+        //Проверяем структуру переданного объекта для подключения
+        let checkResult = checkObject(dbConnect, {
+            fields: [
+                { name: "user", required: true },
+                { name: "password", required: true },
+                { name: "connectString", required: true },
+                { name: "module", required: false }
+            ]
+        });
+        //Если структура объекта в норме
+        if (!checkResult) {
+            //Проверяем наличие модуля для работы с БД в настройках подключения
+            if (dbConnect.module) {
+                //Подключим модуль
+                this.connector = require(makeModuleFullPath(dbConnect.module));
+                //Проверим его интерфейс
+                if (
+                    !checkModuleInterface(this.connector, {
+                        functions: [
+                            "connect",
+                            "disconnect",
+                            "getServices",
+                            "log",
+                            "getQueueOutgoing",
+                            "putQueueIncoming",
+                            "setQueueValue"
+                        ]
+                    })
+                ) {
+                    throw new ServerError(
+                        glConst.ERR_MODULES_BAD_INTERFACE,
+                        "Модуль " + dbConnect.module + " реализует неверный интерфейс!"
+                    );
+                }
+                //Всё успешно - сохраним настройки подключения
+                this.connectSettings = {};
+                _.extend(this.connectSettings, dbConnect);
+                //Инициализируем остальные свойства
+                this.connection = {};
+            } else {
                 throw new ServerError(
-                    glConst.ERR_MODULES_BAD_INTERFACE,
-                    "Модуль " + dbConnect.module + " реализует неверный интерфейс!"
+                    glConst.ERR_MODULES_NO_MODULE_SPECIFIED,
+                    "Не указано имя подключаемого модуля-коннектора!"
                 );
             }
-            //Всё успешно - сохраним настройки подключения
-            this.connectSettings = {};
-            _.extend(this.connectSettings, dbConnect);
-            //Инициализируем остальные свойства
-            this.connection = {};
         } else {
             throw new ServerError(
-                glConst.ERR_MODULES_NO_MODULE_SPECIFIED,
-                "Не указано имя подключаемого модуля-коннектора!"
+                glConst.ERR_OBJECT_BAD_INTERFACE,
+                "Объект имеет недопустимый интерфейс: " + checkResult
             );
         }
     }
@@ -62,7 +91,14 @@ class DBConnector {
         }
     }
     //Исполнить запрос
-    async execute() {}
+    async getServices() {
+        try {
+            let res = await this.connector.getServices(this.connection);
+            return res;
+        } catch (e) {
+            throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
+        }
+    }
 }
 
 //-----------------
