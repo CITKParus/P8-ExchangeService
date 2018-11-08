@@ -26,27 +26,37 @@ a.connect()
         a.getServices()
             .then(res => {
                 console.log(res);
-                setTimeout(() => {
-                    a.disconnect()
-                        .then(res => {
-                            console.log("DISCONNECTED");
-                        })
-                        .catch(e => {
-                            console.log(e.code + ": " + e.message);
-                        });
-                }, 10000);
+                a.putLog("Сервер приложений подключен")
+                    .then(res => {
+                        console.log(res);
+                        a.disconnect()
+                            .then(res => {
+                                console.log("DISCONNECTED");
+                            })
+                            .catch(e => {
+                                console.log(e.code + ": " + e.message);
+                            });
+                    })
+                    .catch(e => {
+                        console.log(e.code + ": " + e.message);
+                        a.disconnect()
+                            .then(res => {
+                                console.log("DISCONNECTED");
+                            })
+                            .catch(e => {
+                                console.log(e.code + ": " + e.message);
+                            });
+                    });
             })
             .catch(e => {
                 console.log(e.code + ": " + e.message);
-                setTimeout(() => {
-                    a.disconnect()
-                        .then(res => {
-                            console.log("DISCONNECTED");
-                        })
-                        .catch(e => {
-                            console.log(e.code + ": " + e.message);
-                        });
-                }, 10000);
+                a.disconnect()
+                    .then(res => {
+                        console.log("DISCONNECTED");
+                    })
+                    .catch(e => {
+                        console.log(e.code + ": " + e.message);
+                    });
             });
     })
     .catch(e => {

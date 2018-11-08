@@ -90,10 +90,19 @@ class DBConnector {
             throw new ServerError(glConst.ERR_DB_DISCONNECT, e.message);
         }
     }
-    //Исполнить запрос
+    //Получить список сервисов
     async getServices() {
         try {
             let res = await this.connector.getServices(this.connection);
+            return res;
+        } catch (e) {
+            throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
+        }
+    }
+    //Запись в журнал работы
+    async putLog(msg, queueID) {
+        try {
+            let res = await this.connector.log(this.connection, msg, queueID);
             return res;
         } catch (e) {
             throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
