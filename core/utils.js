@@ -15,7 +15,8 @@ const { MODULES_PATH_EX } = require("@core/constants.js"); //Глобавльн�
 
 //Проверка на функцию
 const isFunction = functionToCheck => {
-    return functionToCheck && {}.toString.call(functionToCheck) === "[object Function]";
+    let fnStr = {}.toString.call(functionToCheck);
+    return functionToCheck && (fnStr === "[object Function]" || fnStr === "[object AsyncFunction]");
 };
 
 //Проверка объекта на наличие списка функций
