@@ -12,56 +12,61 @@ const cfg = require("./config.js");
 const { Logger } = require("@core/logger.js");
 const db = require("@core/db_connector.js");
 const { ServerError } = require("@core/server_errors.js");
-const parus = require("@modules/parus_db.js");
 const utls = require("@core/utils.js");
 
 //------------
 // Тело модуля
 //------------
 
-let a = new db.DBConnector(cfg.dbConnect);
-a.connect()
-    .then(res => {
-        console.log("CONNECTED");
-        a.getServices()
-            .then(res => {
-                console.log(res);
-                a.putLog("Сервер приложений подключен")
-                    .then(res => {
-                        console.log(res);
-                        a.disconnect()
-                            .then(res => {
-                                console.log("DISCONNECTED");
-                            })
-                            .catch(e => {
-                                console.log(e.code + ": " + e.message);
-                            });
-                    })
-                    .catch(e => {
-                        console.log(e.code + ": " + e.message);
-                        a.disconnect()
-                            .then(res => {
-                                console.log("DISCONNECTED");
-                            })
-                            .catch(e => {
-                                console.log(e.code + ": " + e.message);
-                            });
-                    });
-            })
-            .catch(e => {
-                console.log(e.code + ": " + e.message);
-                a.disconnect()
-                    .then(res => {
-                        console.log("DISCONNECTED");
-                    })
-                    .catch(e => {
-                        console.log(e.code + ": " + e.message);
-                    });
-            });
-    })
-    .catch(e => {
-        console.log(e.code + ": " + e.message);
-    });
+try {
+    let a = new db.DBConnector(cfg.dbConnect);
+    a.connect()
+        .then(res => {
+            console.log("CONNECTED");
+            a.getServices()
+                .then(res => {
+                    console.log(res);
+                    a.putLog(db.NLOG_STATE_WRN, "Сервер приложений подключен")
+                        .then(res => {
+                            console.log(res);
+                            a.disconnect()
+                                .then(res => {
+                                    console.log("DISCONNECTED");
+                                })
+                                .catch(e => {
+                                    console.log(e.code + ": " + e.message);
+                                });
+                        })
+                        .catch(e => {
+                            console.log(e.code + ": " + e.message);
+                            setTimeout(() => {
+                                a.disconnect()
+                                    .then(res => {
+                                        console.log("DISCONNECTED");
+                                    })
+                                    .catch(e => {
+                                        console.log(e.code + ": " + e.message);
+                                    });
+                            }, 10000);
+                        });
+                })
+                .catch(e => {
+                    console.log(e.code + ": " + e.message);
+                    a.disconnect()
+                        .then(res => {
+                            console.log("DISCONNECTED");
+                        })
+                        .catch(e => {
+                            console.log(e.code + ": " + e.message);
+                        });
+                });
+        })
+        .catch(e => {
+            console.log(e.code + ": " + e.message);
+        });
+} catch (e) {
+    console.log(e.code + ": " + e.message);
+}
 
 /*
 

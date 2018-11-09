@@ -12,6 +12,15 @@ const glConst = require("@core/constants.js"); //Глобальные конст
 const { checkModuleInterface, makeModuleFullPath, checkObject } = require("@core/utils.js"); //Вспомогательные функции
 const { ServerError } = require("@core/server_errors.js"); //Типовая ошибка
 
+//----------
+// Константы
+//----------
+
+//Состояния записей журнала работы сервиса
+const NLOG_STATE_INF = 0; //Информация
+const NLOG_STATE_WRN = 1; //Предупреждение
+const NLOG_STATE_ERR = 2; //Ошибка
+
 //------------
 // Тело модуля
 //------------
@@ -41,6 +50,7 @@ class DBConnector {
                             "connect",
                             "disconnect",
                             "getServices",
+                            "getServiceFunctions",
                             "log",
                             "getQueueOutgoing",
                             "putQueueIncoming",
@@ -93,16 +103,26 @@ class DBConnector {
     //Получить список сервисов
     async getServices() {
         try {
-            let res = await this.connector.getServices(this.connection);
+            let srvs = await this.connector.getServices(this.connection);
+            let srvsFuncs = srvs.map(async srv => {
+                const response = await this.connector.getServiceFunctions(this.connection, srv.NRN);
+                let tmp = {};
+                _.extend(tmp, srv, { FN: [] });
+                response.map(f => {
+                    tmp.FN.push(f);
+                });
+                return tmp;
+            });
+            let res = await Promise.all(srvsFuncs);
             return res;
         } catch (e) {
             throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
         }
     }
     //Запись в журнал работы
-    async putLog(msg, queueID) {
+    async putLog(msgType, msg, queueID) {
         try {
-            let res = await this.connector.log(this.connection, msg, queueID);
+            let res = await this.connector.log(this.connection, msgType, msg, queueID);
             return res;
         } catch (e) {
             throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
@@ -114,4 +134,7 @@ class DBConnector {
 // Интерфейс модуля
 //-----------------
 
+exports.NLOG_STATE_INF = NLOG_STATE_INF;
+exports.NLOG_STATE_WRN = NLOG_STATE_WRN;
+exports.NLOG_STATE_ERR = NLOG_STATE_ERR;
 exports.DBConnector = DBConnector;
