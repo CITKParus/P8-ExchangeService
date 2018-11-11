@@ -14,9 +14,17 @@ let dbConnect = {
     //Пароль пользователя БД
     password: "parus",
     //Строка подключения к БД
-    connectString: "DEMOP_CITKSERV",
+    connectString: "DEMOP_CITKSERV_WAN",
     //Модуль обслуживания БД
-    module: "parus_db.js"
+    module: "parus_oracle_db.js"
+};
+
+//Параметры обработки очереди исходящих сообщений
+let outgoing = {
+    //Размер блока одновременно обрабатываемых исходящих сообщений
+    portionSize: 1,
+    //Скорость проверки наличия исходящих сообщений (мс)
+    checkTimeout: 500
 };
 
 //-----------------
@@ -24,5 +32,6 @@ let dbConnect = {
 //-----------------
 
 module.exports = {
-    dbConnect
+    dbConnect,
+    outgoing
 };

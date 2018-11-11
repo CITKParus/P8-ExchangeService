@@ -23,10 +23,16 @@ try {
     a.connect()
         .then(res => {
             console.log("CONNECTED");
-            a.getServices()
+            a.getOutgoing(cfg.outgoing.portionSize)
                 .then(res => {
-                    console.log(res);
-                    a.putLog(db.NLOG_STATE_WRN, "Сервер приложений подключен")
+                    if (res.length > 0) {
+                        res.map(r => {
+                            console.log(r);
+                        });
+                    } else {
+                        console.log("NO MESSAGES IN QUEUE!!!");
+                    }
+                    a.putLog(db.MSG_TYPE_INF, "Сервер приложений подключен")
                         .then(res => {
                             console.log(res);
                             a.disconnect()

@@ -17,9 +17,9 @@ const { ServerError } = require("@core/server_errors.js"); //Типовая ош
 //----------
 
 //Состояния записей журнала работы сервиса
-const NLOG_STATE_INF = 0; //Информация
-const NLOG_STATE_WRN = 1; //Предупреждение
-const NLOG_STATE_ERR = 2; //Ошибка
+const MSG_TYPE_INF = 0; //Информация
+const MSG_TYPE_WRN = 1; //Предупреждение
+const MSG_TYPE_ERR = 2; //Ошибка
 
 //------------
 // Тело модуля
@@ -84,7 +84,11 @@ class DBConnector {
     //Подключиться к БД
     async connect() {
         try {
-            this.connection = await this.connector.connect(this.connectSettings);
+            this.connection = await this.connector.connect(
+                this.connectSettings.user,
+                this.connectSettings.password,
+                this.connectSettings.connectString
+            );
             return this.connection;
         } catch (e) {
             throw new ServerError(glConst.ERR_DB_CONNECT, e.message);
@@ -128,13 +132,22 @@ class DBConnector {
             throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
         }
     }
+    //Считать очередную порцию исходящих сообщений
+    async getOutgoing(portionSize) {
+        try {
+            let res = await this.connector.getQueueOutgoing(this.connection, portionSize);
+            return res;
+        } catch (e) {
+            throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
+        }
+    }
 }
 
 //-----------------
 // Интерфейс модуля
 //-----------------
 
-exports.NLOG_STATE_INF = NLOG_STATE_INF;
-exports.NLOG_STATE_WRN = NLOG_STATE_WRN;
-exports.NLOG_STATE_ERR = NLOG_STATE_ERR;
+exports.MSG_TYPE_INF = MSG_TYPE_INF;
+exports.MSG_TYPE_WRN = MSG_TYPE_WRN;
+exports.MSG_TYPE_ERR = MSG_TYPE_ERR;
 exports.DBConnector = DBConnector;

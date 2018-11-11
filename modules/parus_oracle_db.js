@@ -38,12 +38,12 @@ const SLOG_STATE_ERR = "ERR"; //Ошибка (строковый код)
 //------------
 
 //Подключение к БД
-const connect = async prms => {
+const connect = async (user, password, connectString) => {
     try {
         const conn = await oracledb.getConnection({
-            user: prms.user,
-            password: prms.password,
-            connectString: prms.connectString
+            user,
+            password,
+            connectString
         });
         return conn;
     } catch (e) {
@@ -170,7 +170,40 @@ const log = (connection, logState, msg, queueID) => {
 };
 
 //Считывание очередной порции исходящих сообщений из очереди
-const getQueueOutgoing = prms => {};
+const getQueueOutgoing = (connection, portionSize) => {
+    return new Promise((resolve, reject) => {
+        if (connection) {
+            connection.execute(
+                "BEGIN PKG_EXS.QUEUE_OUT_GET(NPORTION => :NPORTION, RCQUEUES => :RCQUEUES); END;",
+                {
+                    NPORTION: portionSize,
+                    RCQUEUES: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+                },
+                { outFormat: oracledb.OBJECT, autoCommit: true, fetchInfo: { BMSG: { type: oracledb.BUFFER } } },
+                (err, result) => {
+                    if (err) {
+                        reject(new Error(err.message));
+                    } else {
+                        let cursor = result.outBinds.RCQUEUES;
+                        let queryStream = cursor.toQueryStream();
+                        let rows = [];
+                        queryStream.on("data", row => {
+                            rows.push(row);
+                        });
+                        queryStream.on("error", err => {
+                            reject(new Error(err.message));
+                        });
+                        queryStream.on("close", () => {
+                            resolve(rows);
+                        });
+                    }
+                }
+            );
+        } else {
+            reject(new Error("Не указано подключение"));
+        }
+    });
+};
 
 //Помещение очередного входящего сообщения в очередь
 const putQueueIncoming = prms => {};
