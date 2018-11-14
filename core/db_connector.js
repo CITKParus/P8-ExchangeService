@@ -87,7 +87,8 @@ class DBConnector {
             this.connection = await this.connector.connect(
                 this.connectSettings.user,
                 this.connectSettings.password,
-                this.connectSettings.connectString
+                this.connectSettings.connectString,
+                this.connectSettings.moduleName
             );
             return this.connection;
         } catch (e) {

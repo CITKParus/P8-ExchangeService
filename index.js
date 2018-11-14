@@ -35,13 +35,15 @@ try {
                     a.putLog(db.MSG_TYPE_INF, "Сервер приложений подключен")
                         .then(res => {
                             console.log(res);
-                            a.disconnect()
-                                .then(res => {
-                                    console.log("DISCONNECTED");
-                                })
-                                .catch(e => {
-                                    console.log(e.code + ": " + e.message);
-                                });
+                            setTimeout(() => {
+                                a.disconnect()
+                                    .then(res => {
+                                        console.log("DISCONNECTED");
+                                    })
+                                    .catch(e => {
+                                        console.log(e.code + ": " + e.message);
+                                    });
+                            }, 10000);
                         })
                         .catch(e => {
                             console.log(e.code + ": " + e.message);

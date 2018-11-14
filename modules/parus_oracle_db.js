@@ -38,13 +38,14 @@ const SLOG_STATE_ERR = "ERR"; //Ошибка (строковый код)
 //------------
 
 //Подключение к БД
-const connect = async (user, password, connectString) => {
+const connect = async (user, password, connectString, moduleName) => {
     try {
         const conn = await oracledb.getConnection({
             user,
             password,
             connectString
         });
+        conn.module = moduleName;
         return conn;
     } catch (e) {
         throw new Error(e.message);
@@ -174,9 +175,10 @@ const getQueueOutgoing = (connection, portionSize) => {
     return new Promise((resolve, reject) => {
         if (connection) {
             connection.execute(
-                "BEGIN PKG_EXS.QUEUE_OUT_GET(NPORTION => :NPORTION, RCQUEUES => :RCQUEUES); END;",
+                "BEGIN PKG_EXS.QUEUE_GET(NPORTION => :NPORTION, NSRV_TYPE => :NSRV_TYPE, RCQUEUES => :RCQUEUES); END;",
                 {
                     NPORTION: portionSize,
+                    NSRV_TYPE: NSRV_TYPE_SEND,
                     RCQUEUES: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
                 },
                 { outFormat: oracledb.OBJECT, autoCommit: true, fetchInfo: { BMSG: { type: oracledb.BUFFER } } },
