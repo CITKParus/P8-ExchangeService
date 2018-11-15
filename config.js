@@ -16,9 +16,9 @@ let dbConnect = {
     //Строка подключения к БД
     connectString: "DEMOP_CITKSERV_WAN",
     //Наименование модуля (для сессии БД)
-    moduleName: "PARUS$ExchangeServer",
+    sessionModuleName: "PARUS$ExchangeServer",
     //Подключаемый модуль обслуживания БД (низкоуровневые функции работы с СУБД)
-    module: "parus_oracle_db.js"
+    connectorModule: "parus_oracle_db.js"
 };
 
 //Параметры обработки очереди исходящих сообщений

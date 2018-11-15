@@ -34,15 +34,16 @@ class DBConnector {
                 { name: "user", required: true },
                 { name: "password", required: true },
                 { name: "connectString", required: true },
-                { name: "module", required: false }
+                { name: "sessionModuleName", required: true },
+                { name: "connectorModule", required: false }
             ]
         });
         //Если структура объекта в норме
         if (!checkResult) {
             //Проверяем наличие модуля для работы с БД в настройках подключения
-            if (dbConnect.module) {
+            if (dbConnect.connectorModule) {
                 //Подключим модуль
-                this.connector = require(makeModuleFullPath(dbConnect.module));
+                this.connector = require(makeModuleFullPath(dbConnect.connectorModule));
                 //Проверим его интерфейс
                 if (
                     !checkModuleInterface(this.connector, {
@@ -88,7 +89,7 @@ class DBConnector {
                 this.connectSettings.user,
                 this.connectSettings.password,
                 this.connectSettings.connectString,
-                this.connectSettings.moduleName
+                this.connectSettings.sessionModuleName
             );
             return this.connection;
         } catch (e) {
