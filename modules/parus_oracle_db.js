@@ -175,7 +175,7 @@ const getQueueOutgoing = (connection, portionSize) => {
     return new Promise((resolve, reject) => {
         if (connection) {
             connection.execute(
-                "BEGIN PKG_EXS.QUEUE_GET(NPORTION => :NPORTION, NSRV_TYPE => :NSRV_TYPE, RCQUEUES => :RCQUEUES); END;",
+                "BEGIN PKG_EXS.QUEUE_NEXT_GET(NPORTION => :NPORTION, NSRV_TYPE => :NSRV_TYPE, RCQUEUES => :RCQUEUES); END;",
                 {
                     NPORTION: portionSize,
                     NSRV_TYPE: NSRV_TYPE_SEND,
