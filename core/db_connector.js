@@ -17,9 +17,9 @@ const { ServerError } = require("@core/server_errors.js"); //Типовая ош
 //----------
 
 //Состояния записей журнала работы сервиса
-const MSG_TYPE_INF = 0; //Информация
-const MSG_TYPE_WRN = 1; //Предупреждение
-const MSG_TYPE_ERR = 2; //Ошибка
+const NLOG_STATE_INF = 0; //Информация
+const NLOG_STATE_WRN = 1; //Предупреждение
+const NLOG_STATE_ERR = 2; //Ошибка
 
 //------------
 // Тело модуля
@@ -27,23 +27,23 @@ const MSG_TYPE_ERR = 2; //Ошибка
 
 class DBConnector {
     //Конструктор
-    constructor(dbConnect) {
+    constructor(prms) {
         //Проверяем структуру переданного объекта для подключения
-        let checkResult = checkObject(dbConnect, {
+        let checkResult = checkObject(prms, {
             fields: [
-                { name: "user", required: true },
-                { name: "password", required: true },
-                { name: "connectString", required: true },
-                { name: "sessionModuleName", required: true },
-                { name: "connectorModule", required: false }
+                { name: "sUser", required: true },
+                { name: "sPassword", required: true },
+                { name: "sConnectString", required: true },
+                { name: "sSessionModuleName", required: true },
+                { name: "sConnectorModule", required: false }
             ]
         });
         //Если структура объекта в норме
         if (!checkResult) {
             //Проверяем наличие модуля для работы с БД в настройках подключения
-            if (dbConnect.connectorModule) {
+            if (prms.sConnectorModule) {
                 //Подключим модуль
-                this.connector = require(makeModuleFullPath(dbConnect.connectorModule));
+                this.connector = require(makeModuleFullPath(prms.sConnectorModule));
                 //Проверим его интерфейс
                 if (
                     !checkModuleInterface(this.connector, {
@@ -61,12 +61,12 @@ class DBConnector {
                 ) {
                     throw new ServerError(
                         glConst.ERR_MODULES_BAD_INTERFACE,
-                        "Модуль " + dbConnect.module + " реализует неверный интерфейс!"
+                        "Модуль " + prms.sConnectorModule + " реализует неверный интерфейс!"
                     );
                 }
                 //Всё успешно - сохраним настройки подключения
                 this.connectSettings = {};
-                _.extend(this.connectSettings, dbConnect);
+                _.extend(this.connectSettings, prms);
                 //Инициализируем остальные свойства
                 this.connection = {};
             } else {
@@ -85,12 +85,12 @@ class DBConnector {
     //Подключиться к БД
     async connect() {
         try {
-            this.connection = await this.connector.connect(
-                this.connectSettings.user,
-                this.connectSettings.password,
-                this.connectSettings.connectString,
-                this.connectSettings.sessionModuleName
-            );
+            this.connection = await this.connector.connect({
+                sUser: this.connectSettings.sUser,
+                sPassword: this.connectSettings.sPassword,
+                sConnectString: this.connectSettings.sConnectString,
+                sSessionModuleName: this.connectSettings.sSessionModuleName
+            });
             return this.connection;
         } catch (e) {
             throw new ServerError(glConst.ERR_DB_CONNECT, e.message);
@@ -99,7 +99,7 @@ class DBConnector {
     //Отключиться от БД
     async disconnect() {
         try {
-            await this.connector.disconnect(this.connection);
+            await this.connector.disconnect({ connection: this.connection });
             this.connection = {};
             return;
         } catch (e) {
@@ -109,9 +109,12 @@ class DBConnector {
     //Получить список сервисов
     async getServices() {
         try {
-            let srvs = await this.connector.getServices(this.connection);
+            let srvs = await this.connector.getServices({ connection: this.connection });
             let srvsFuncs = srvs.map(async srv => {
-                const response = await this.connector.getServiceFunctions(this.connection, srv.NRN);
+                const response = await this.connector.getServiceFunctions({
+                    connection: this.connection,
+                    ddd: srv.NRN
+                });
                 let tmp = {};
                 _.extend(tmp, srv, { FN: [] });
                 response.map(f => {
@@ -126,21 +129,61 @@ class DBConnector {
         }
     }
     //Запись в журнал работы
-    async putLog(msgType, msg, queueID) {
-        try {
-            let res = await this.connector.log(this.connection, msgType, msg, queueID);
-            return res;
-        } catch (e) {
-            throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
+    async putLog(prms) {
+        //Проверяем структуру переданного объекта для подключения
+        let checkResult = checkObject(prms, {
+            fields: [
+                { name: "nLogState", required: true },
+                { name: "sMsg", required: false },
+                { name: "nServiceId", required: false },
+                { name: "nServiceFnId", required: false },
+                { name: "nQueueId", required: false }
+            ]
+        });
+        //Если структура объекта в норме
+        if (!checkResult) {
+            try {
+                let res = await this.connector.log({
+                    connection: this.connection,
+                    nLogState: prms.nLogState,
+                    sMsg: prms.sMsg,
+                    nServiceId: prms.nServiceId,
+                    nServiceFnId: prms.nServiceFnId,
+                    nQueueId: prms.nQueueId
+                });
+                return res;
+            } catch (e) {
+                throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
+            }
+        } else {
+            throw new ServerError(
+                glConst.ERR_OBJECT_BAD_INTERFACE,
+                "qqqОбъект имеет недопустимый интерфейс: " + checkResult
+            );
         }
     }
     //Считать очередную порцию исходящих сообщений
-    async getOutgoing(portionSize) {
-        try {
-            let res = await this.connector.getQueueOutgoing(this.connection, portionSize);
-            return res;
-        } catch (e) {
-            throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
+    async getOutgoing(prms) {
+        //Проверяем структуру переданного объекта для подключения
+        let checkResult = checkObject(prms, {
+            fields: [{ name: "nPortionSize", required: true }]
+        });
+        //Если структура объекта в норме
+        if (!checkResult) {
+            try {
+                let res = await this.connector.getQueueOutgoing({
+                    connection: this.connection,
+                    nPortionSize: prms.nPortionSize
+                });
+                return res;
+            } catch (e) {
+                throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
+            }
+        } else {
+            throw new ServerError(
+                glConst.ERR_OBJECT_BAD_INTERFACE,
+                "Объект имеет недопустимый интерфейс: " + checkResult
+            );
         }
     }
 }
@@ -149,7 +192,7 @@ class DBConnector {
 // Интерфейс модуля
 //-----------------
 
-exports.MSG_TYPE_INF = MSG_TYPE_INF;
-exports.MSG_TYPE_WRN = MSG_TYPE_WRN;
-exports.MSG_TYPE_ERR = MSG_TYPE_ERR;
+exports.NLOG_STATE_INF = NLOG_STATE_INF;
+exports.NLOG_STATE_WRN = NLOG_STATE_WRN;
+exports.NLOG_STATE_ERR = NLOG_STATE_ERR;
 exports.DBConnector = DBConnector;

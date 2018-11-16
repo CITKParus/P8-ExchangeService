@@ -10,23 +10,23 @@
 //Параметры подключения к БД
 let dbConnect = {
     //Пользователь БД
-    user: "parus",
+    sUser: "parus",
     //Пароль пользователя БД
-    password: "parus",
+    sPassword: "parus",
     //Строка подключения к БД
-    connectString: "DEMOP_CITKSERV_WAN",
+    sConnectString: "DEMOP_CITKSERV_WAN",
     //Наименование модуля (для сессии БД)
-    sessionModuleName: "PARUS$ExchangeServer",
+    sSessionModuleName: "PARUS$ExchangeServer",
     //Подключаемый модуль обслуживания БД (низкоуровневые функции работы с СУБД)
-    connectorModule: "parus_oracle_db.js"
+    sConnectorModule: "parus_oracle_db.js"
 };
 
 //Параметры обработки очереди исходящих сообщений
 let outgoing = {
     //Размер блока одновременно обрабатываемых исходящих сообщений
-    portionSize: 1,
+    nPortionSize: 1,
     //Скорость проверки наличия исходящих сообщений (мс)
-    checkTimeout: 500
+    nCheckTimeout: 500
 };
 
 //-----------------

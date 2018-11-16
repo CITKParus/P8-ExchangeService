@@ -38,39 +38,45 @@ const SLOG_STATE_ERR = "ERR"; //Ошибка (строковый код)
 //------------
 
 //Подключение к БД
-const connect = async (user, password, connectString, moduleName) => {
+const connect = async prms => {
     try {
-        const conn = await oracledb.getConnection({
-            user,
-            password,
-            connectString
-        });
-        conn.module = moduleName;
-        return conn;
+        if (prms && prms.sUser && prms.sPassword && prms.sConnectString) {
+            const conn = await oracledb.getConnection({
+                user: prms.sUser,
+                password: prms.sPassword,
+                connectString: prms.sConnectString
+            });
+            if (prms.sSessionModuleName) conn.module = prms.sSessionModuleName;
+            return conn;
+        } else {
+            throw new Error(
+                "Не указаны параметры подключения (отсутствует одно из полей: sUser, sPassword, sConnectString)"
+            );
+        }
     } catch (e) {
         throw new Error(e.message);
     }
 };
 
 //Отключение от БД
-const disconnect = async connection => {
-    if (connection) {
+const disconnect = async prms => {
+    if (prms && prms.connection) {
         try {
-            const conn = await connection.close();
+            const conn = await prms.connection.close();
             return;
         } catch (e) {
             throw new Error(e.message);
         }
     } else {
-        throw new Error("Не указано подключение");
+        throw new Error("Не указано подключение (отсутствует поле: connection)");
     }
 };
 
 //Получение списка сервисов
-const getServices = async connection => {
+const getServices = prms => {
     return new Promise((resolve, reject) => {
-        if (connection) {
-            connection.execute(
+        if (prms && prms.connection) {
+            prms.connection.execute(
                 "BEGIN PKG_EXS.SERVICE_GET(RCSERVICES => :RCSERVICES); END;",
                 { RCSERVICES: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT } },
                 { outFormat: oracledb.OBJECT },
@@ -94,115 +100,129 @@ const getServices = async connection => {
                 }
             );
         } else {
-            reject(new Error("Не указано подключение"));
+            reject(new Error("Не указано подключение (отсутствует поле: connection)"));
         }
     });
 };
 
 //Получение списка функций сервиса
-const getServiceFunctions = (connection, serviceID) => {
+const getServiceFunctions = prms => {
     return new Promise((resolve, reject) => {
-        if (connection) {
-            connection.execute(
-                "BEGIN PKG_EXS.SERVICEFN_GET(NSERVICE => :NSERVICE, RCSERVICEFNS => :RCSERVICEFNS); END;",
-                { NSERVICE: serviceID, RCSERVICEFNS: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT } },
-                { outFormat: oracledb.OBJECT },
-                (err, result) => {
-                    if (err) {
-                        reject(new Error(err.message));
-                    } else {
-                        let cursor = result.outBinds.RCSERVICEFNS;
-                        let queryStream = cursor.toQueryStream();
-                        let rows = [];
-                        queryStream.on("data", row => {
-                            rows.push(row);
-                        });
-                        queryStream.on("error", err => {
+        if (prms && prms.connection) {
+            if (prms.nServiceId) {
+                prms.connection.execute(
+                    "BEGIN PKG_EXS.SERVICEFN_GET(NSERVICE => :NSERVICE, RCSERVICEFNS => :RCSERVICEFNS); END;",
+                    { NSERVICE: prms.nServiceId, RCSERVICEFNS: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT } },
+                    { outFormat: oracledb.OBJECT },
+                    (err, result) => {
+                        if (err) {
                             reject(new Error(err.message));
-                        });
-                        queryStream.on("close", () => {
-                            resolve(rows);
-                        });
+                        } else {
+                            let cursor = result.outBinds.RCSERVICEFNS;
+                            let queryStream = cursor.toQueryStream();
+                            let rows = [];
+                            queryStream.on("data", row => {
+                                rows.push(row);
+                            });
+                            queryStream.on("error", err => {
+                                reject(new Error(err.message));
+                            });
+                            queryStream.on("close", () => {
+                                resolve(rows);
+                            });
+                        }
                     }
-                }
-            );
+                );
+            } else {
+                reject(new Error("Не указан идентификатор сервиса"));
+            }
         } else {
-            reject(new Error("Не указано подключение"));
+            reject(new Error("Не указано подключение (отсутствует поле: connection)"));
         }
     });
 };
 
 //Запись в протокол работы
-const log = (connection, logState, msg, queueID) => {
+const log = prms => {
     return new Promise((resolve, reject) => {
-        if (connection) {
-            connection.execute(
-                "BEGIN PKG_EXS.LOG_PUT(NLOG_STATE => :NLOG_STATE, SMSG => :SMSG, NEXSQUEUE => :NEXSQUEUE, RCLOG => :RCLOG); END;",
-                {
-                    NLOG_STATE: logState,
-                    SMSG: msg,
-                    NEXSQUEUE: queueID,
-                    RCLOG: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
-                },
-                { outFormat: oracledb.OBJECT, autoCommit: true },
-                (err, result) => {
-                    if (err) {
-                        reject(new Error(err.message));
-                    } else {
-                        let cursor = result.outBinds.RCLOG;
-                        let queryStream = cursor.toQueryStream();
-                        let rows = [];
-                        queryStream.on("data", row => {
-                            rows.push(row);
-                        });
-                        queryStream.on("error", err => {
+        if (prms && prms.connection) {
+            if (!(prms.nLogState === "undefined")) {
+                prms.connection.execute(
+                    "BEGIN PKG_EXS.LOG_PUT(NLOG_STATE => :NLOG_STATE, SMSG => :SMSG, NEXSSERVICE => :NEXSSERVICE, NEXSSERVICEFN => :NEXSSERVICEFN, NEXSQUEUE => :NEXSQUEUE, RCLOG => :RCLOG); END;",
+                    {
+                        NLOG_STATE: prms.nLogState,
+                        SMSG: prms.sMsg,
+                        NEXSSERVICE: prms.nServiceId,
+                        NEXSSERVICEFN: prms.nServiceFnId,
+                        NEXSQUEUE: prms.nQueueId,
+                        RCLOG: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+                    },
+                    { outFormat: oracledb.OBJECT, autoCommit: true },
+                    (err, result) => {
+                        if (err) {
                             reject(new Error(err.message));
-                        });
-                        queryStream.on("close", () => {
-                            resolve(rows[0]);
-                        });
+                        } else {
+                            let cursor = result.outBinds.RCLOG;
+                            let queryStream = cursor.toQueryStream();
+                            let rows = [];
+                            queryStream.on("data", row => {
+                                rows.push(row);
+                            });
+                            queryStream.on("error", err => {
+                                reject(new Error(err.message));
+                            });
+                            queryStream.on("close", () => {
+                                resolve(rows[0]);
+                            });
+                        }
                     }
-                }
-            );
+                );
+            } else {
+                reject(new Error("Не указан тип сообщения журнала (отсутствует поле: nLogState)"));
+            }
         } else {
-            reject(new Error("Не указано подключение"));
+            reject(new Error("Не указано подключение (отсутствует поле: connection)"));
         }
     });
 };
 
 //Считывание очередной порции исходящих сообщений из очереди
-const getQueueOutgoing = (connection, portionSize) => {
+const getQueueOutgoing = prms => {
     return new Promise((resolve, reject) => {
-        if (connection) {
-            connection.execute(
-                "BEGIN PKG_EXS.QUEUE_NEXT_GET(NPORTION => :NPORTION, NSRV_TYPE => :NSRV_TYPE, RCQUEUES => :RCQUEUES); END;",
-                {
-                    NPORTION: portionSize,
-                    NSRV_TYPE: NSRV_TYPE_SEND,
-                    RCQUEUES: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
-                },
-                { outFormat: oracledb.OBJECT, autoCommit: true, fetchInfo: { BMSG: { type: oracledb.BUFFER } } },
-                (err, result) => {
-                    if (err) {
-                        reject(new Error(err.message));
-                    } else {
-                        let cursor = result.outBinds.RCQUEUES;
-                        let queryStream = cursor.toQueryStream();
-                        let rows = [];
-                        queryStream.on("data", row => {
-                            rows.push(row);
-                        });
-                        queryStream.on("error", err => {
+        if (prms && prms.connection) {
+            if (prms.nPortionSize) {
+                prms.connection.execute(
+                    "BEGIN PKG_EXS.QUEUE_NEXT_GET(NPORTION_SIZE => :NPORTION_SIZE, NSRV_TYPE => :NSRV_TYPE, RCQUEUES => :RCQUEUES); END;",
+                    {
+                        NPORTION_SIZE: prms.nPortionSize,
+                        NSRV_TYPE: NSRV_TYPE_SEND,
+                        RCQUEUES: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+                    },
+                    { outFormat: oracledb.OBJECT, autoCommit: true, fetchInfo: { bMsg: { type: oracledb.BUFFER } } },
+                    (err, result) => {
+                        if (err) {
                             reject(new Error(err.message));
-                        });
-                        queryStream.on("close", () => {
-                            resolve(rows);
-                        });
+                        } else {
+                            let cursor = result.outBinds.RCQUEUES;
+                            let queryStream = cursor.toQueryStream();
+                            let rows = [];
+                            queryStream.on("data", row => {
+                                rows.push(row);
+                            });
+                            queryStream.on("error", err => {
+                                reject(new Error(err.message));
+                            });
+                            queryStream.on("close", () => {
+                                resolve(rows);
+                            });
+                        }
                     }
-                }
-            );
+                );
+            } else {
+                reject(new Error("Не указан размер извлекаемой порции сообщений (отсутствует поле: nPortionSize)"));
+            }
         } else {
-            reject(new Error("Не указано подключение"));
+            reject(new Error("Не указано подключение (отсутствует поле: connection)"));
         }
     });
 };

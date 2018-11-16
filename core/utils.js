@@ -73,13 +73,16 @@ const checkObject = (obj, interface) => {
                 let noValues = [];
                 //Обходим проверяемые поля
                 interface.fields.forEach(fld => {
-                    //Проверим наличие поля в объекте
-                    if (!(fld.name in obj)) {
+                    //Проверим наличие поля в объекте (только для обязательных)
+                    if (fld.required && !(fld.name in obj)) {
                         //Поля нет
                         noFields.push(fld.name);
                     } else {
                         //Поле есть, проверим наличие значения
-                        if (fld.required && !obj[fld.name])
+                        if (
+                            fld.required &&
+                            (obj[fld.name] === "undefined" || obj[fld.name] === null || obj[fld.name] === "")
+                        )
                             //Обязательное поле не содержит значения
                             noValues.push(fld.name);
                     }

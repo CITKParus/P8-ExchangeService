@@ -23,7 +23,7 @@ try {
     a.connect()
         .then(res => {
             console.log("CONNECTED");
-            a.getOutgoing(cfg.outgoing.portionSize)
+            a.getOutgoing({ nPortionSize: cfg.outgoing.nPortionSize })
                 .then(res => {
                     if (res.length > 0) {
                         res.map(r => {
@@ -32,7 +32,7 @@ try {
                     } else {
                         console.log("NO MESSAGES IN QUEUE!!!");
                     }
-                    a.putLog(db.MSG_TYPE_INF, "Сервер приложений подключен")
+                    a.putLog({ nLogState: db.NLOG_STATE_INF, sMsg: "Сервер приложений подключен" })
                         .then(res => {
                             console.log(res);
                             setTimeout(() => {
