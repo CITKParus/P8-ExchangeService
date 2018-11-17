@@ -8,9 +8,9 @@
 //----------------------
 
 const _ = require("lodash"); //Работа с массивами и объектами
-const glConst = require("@core/constants.js"); //Глобальные константы
-const { checkModuleInterface, makeModuleFullPath, checkObject } = require("@core/utils.js"); //Вспомогательные функции
-const { ServerError } = require("@core/server_errors.js"); //Типовая ошибка
+const glConst = require("../core/constants.js"); //Глобальные константы
+const { ServerError } = require("../core/server_errors.js"); //Типовая ошибка
+const { checkModuleInterface, makeModuleFullPath, checkObject } = require("../core/utils.js"); //Вспомогательные функции
 
 //----------
 // Константы
@@ -29,17 +29,17 @@ class DBConnector {
     //Конструктор
     constructor(prms) {
         //Проверяем структуру переданного объекта для подключения
-        let checkResult = checkObject(prms, {
+        let sCheckResult = checkObject(prms, {
             fields: [
-                { name: "sUser", required: true },
-                { name: "sPassword", required: true },
-                { name: "sConnectString", required: true },
-                { name: "sSessionModuleName", required: true },
-                { name: "sConnectorModule", required: false }
+                { sName: "sUser", bRequired: true },
+                { sName: "sPassword", bRequired: true },
+                { sName: "sConnectString", bRequired: true },
+                { sName: "sSessionModuleName", bRequired: true },
+                { sName: "sConnectorModule", bRequired: false }
             ]
         });
         //Если структура объекта в норме
-        if (!checkResult) {
+        if (!sCheckResult) {
             //Проверяем наличие модуля для работы с БД в настройках подключения
             if (prms.sConnectorModule) {
                 //Подключим модуль
@@ -60,7 +60,7 @@ class DBConnector {
                     })
                 ) {
                     throw new ServerError(
-                        glConst.ERR_MODULES_BAD_INTERFACE,
+                        glConst.SERR_MODULES_BAD_INTERFACE,
                         "Модуль " + prms.sConnectorModule + " реализует неверный интерфейс!"
                     );
                 }
@@ -69,121 +69,167 @@ class DBConnector {
                 _.extend(this.connectSettings, prms);
                 //Инициализируем остальные свойства
                 this.connection = {};
+                this.bConnected = false;
             } else {
                 throw new ServerError(
-                    glConst.ERR_MODULES_NO_MODULE_SPECIFIED,
+                    glConst.SERR_MODULES_NO_MODULE_SPECIFIED,
                     "Не указано имя подключаемого модуля-коннектора!"
                 );
             }
         } else {
             throw new ServerError(
-                glConst.ERR_OBJECT_BAD_INTERFACE,
-                "Объект имеет недопустимый интерфейс: " + checkResult
+                glConst.SERR_OBJECT_BAD_INTERFACE,
+                "Объект имеет недопустимый интерфейс: " + sCheckResult
             );
         }
     }
     //Подключиться к БД
     async connect() {
         try {
-            this.connection = await this.connector.connect({
-                sUser: this.connectSettings.sUser,
-                sPassword: this.connectSettings.sPassword,
-                sConnectString: this.connectSettings.sConnectString,
-                sSessionModuleName: this.connectSettings.sSessionModuleName
-            });
+            this.connection = await this.connector.connect(this.connectSettings);
+            this.bConnected = true;
             return this.connection;
         } catch (e) {
-            throw new ServerError(glConst.ERR_DB_CONNECT, e.message);
+            throw new ServerError(glConst.SERR_DB_CONNECT, e.message);
         }
     }
     //Отключиться от БД
     async disconnect() {
-        try {
-            await this.connector.disconnect({ connection: this.connection });
-            this.connection = {};
-            return;
-        } catch (e) {
-            throw new ServerError(glConst.ERR_DB_DISCONNECT, e.message);
+        if (this.bConnected) {
+            try {
+                await this.connector.disconnect({ connection: this.connection });
+                this.connection = {};
+                this.bConnected = false;
+                return;
+            } catch (e) {
+                throw new ServerError(glConst.SERR_DB_DISCONNECT, e.message);
+            }
         }
     }
     //Получить список сервисов
     async getServices() {
-        try {
-            let srvs = await this.connector.getServices({ connection: this.connection });
-            let srvsFuncs = srvs.map(async srv => {
-                const response = await this.connector.getServiceFunctions({
-                    connection: this.connection,
-                    ddd: srv.NRN
+        if (this.bConnected) {
+            try {
+                let srvs = await this.connector.getServices({ connection: this.connection });
+                let srvsFuncs = srvs.map(async srv => {
+                    const response = await this.connector.getServiceFunctions({
+                        connection: this.connection,
+                        nServiceId: srv.nId
+                    });
+                    let tmp = {};
+                    _.extend(tmp, srv, { functions: [] });
+                    response.map(f => {
+                        tmp.functions.push(f);
+                    });
+                    return tmp;
                 });
-                let tmp = {};
-                _.extend(tmp, srv, { FN: [] });
-                response.map(f => {
-                    tmp.FN.push(f);
-                });
-                return tmp;
-            });
-            let res = await Promise.all(srvsFuncs);
-            return res;
-        } catch (e) {
-            throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
+                let res = await Promise.all(srvsFuncs);
+                return res;
+            } catch (e) {
+                throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+            }
+        } else {
+            throw new ServerError(glConst.SERR_DB_EXECUTE, "Нет подключения к БД");
         }
     }
     //Запись в журнал работы
     async putLog(prms) {
-        //Проверяем структуру переданного объекта для подключения
-        let checkResult = checkObject(prms, {
-            fields: [
-                { name: "nLogState", required: true },
-                { name: "sMsg", required: false },
-                { name: "nServiceId", required: false },
-                { name: "nServiceFnId", required: false },
-                { name: "nQueueId", required: false }
-            ]
-        });
-        //Если структура объекта в норме
-        if (!checkResult) {
-            try {
-                let res = await this.connector.log({
-                    connection: this.connection,
-                    nLogState: prms.nLogState,
-                    sMsg: prms.sMsg,
-                    nServiceId: prms.nServiceId,
-                    nServiceFnId: prms.nServiceFnId,
-                    nQueueId: prms.nQueueId
-                });
-                return res;
-            } catch (e) {
-                throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
+        if (this.bConnected) {
+            //Проверяем структуру переданного объекта для подключения
+            let sCheckResult = checkObject(prms, {
+                fields: [
+                    { sName: "nLogState", bRequired: true },
+                    { sName: "sMsg", bRequired: false },
+                    { sName: "nServiceId", bRequired: false },
+                    { sName: "nServiceFnId", bRequired: false },
+                    { sName: "nQueueId", bRequired: false }
+                ]
+            });
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                try {
+                    let logData = { connection: this.connection };
+                    _.extend(logData, prms);
+                    let res = await this.connector.log(logData);
+                    return res;
+                } catch (e) {
+                    throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(
+                    glConst.SERR_OBJECT_BAD_INTERFACE,
+                    "Объект имеет недопустимый интерфейс: " + sCheckResult
+                );
             }
         } else {
-            throw new ServerError(
-                glConst.ERR_OBJECT_BAD_INTERFACE,
-                "qqqОбъект имеет недопустимый интерфейс: " + checkResult
-            );
+            throw new ServerError(glConst.SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Запись информации в журнал работы
+    async putLogInf(sMsg, prms) {
+        let logData = {};
+        _.extend(logData, prms);
+        logData.nLogState = NLOG_STATE_INF;
+        logData.sMsg = sMsg;
+        try {
+            let res = await this.putLog(logData);
+            return res;
+        } catch (e) {
+            throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+        }
+    }
+    //Запись предупреждения в журнал работы
+    async putLogWrn(sMsg, prms) {
+        let logData = {};
+        _.extend(logData, prms);
+        logData.nLogState = NLOG_STATE_WRN;
+        logData.sMsg = sMsg;
+        try {
+            let res = await this.putLog(logData);
+            return res;
+        } catch (e) {
+            throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+        }
+    }
+    //Запись ошибки в журнал работы
+    async putLogErr(sMsg, prms) {
+        let logData = {};
+        _.extend(logData, prms);
+        logData.nLogState = NLOG_STATE_ERR;
+        logData.sMsg = sMsg;
+        try {
+            let res = await this.putLog(logData);
+            return res;
+        } catch (e) {
+            throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
         }
     }
     //Считать очередную порцию исходящих сообщений
     async getOutgoing(prms) {
-        //Проверяем структуру переданного объекта для подключения
-        let checkResult = checkObject(prms, {
-            fields: [{ name: "nPortionSize", required: true }]
-        });
-        //Если структура объекта в норме
-        if (!checkResult) {
-            try {
-                let res = await this.connector.getQueueOutgoing({
-                    connection: this.connection,
-                    nPortionSize: prms.nPortionSize
-                });
-                return res;
-            } catch (e) {
-                throw new ServerError(glConst.ERR_DB_EXECUTE, e.message);
+        if (this.bConnected) {
+            //Проверяем структуру переданного объекта для подключения
+            let sCheckResult = checkObject(prms, {
+                fields: [{ sName: "nPortionSize", bRequired: true }]
+            });
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                try {
+                    let res = await this.connector.getQueueOutgoing({
+                        connection: this.connection,
+                        nPortionSize: prms.nPortionSize
+                    });
+                    return res;
+                } catch (e) {
+                    throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(
+                    glConst.SERR_OBJECT_BAD_INTERFACE,
+                    "Объект имеет недопустимый интерфейс: " + sCheckResult
+                );
             }
         } else {
-            throw new ServerError(
-                glConst.ERR_OBJECT_BAD_INTERFACE,
-                "Объект имеет недопустимый интерфейс: " + checkResult
-            );
+            throw new ServerError(glConst.SERR_DB_EXECUTE, "Нет подключения к БД");
         }
     }
 }

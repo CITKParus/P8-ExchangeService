@@ -7,63 +7,63 @@
 // Подключение библиотек
 //----------------------
 
-const { MODULES_PATH_EX } = require("@core/constants.js"); //Глобавльные константы системы
+const { SMODULES_PATH_EX } = require("../core/constants.js"); //Глобавльные константы системы
 
 //------------
 // Тело модуля
 //------------
 
 //Проверка на функцию
-const isFunction = functionToCheck => {
-    let fnStr = {}.toString.call(functionToCheck);
-    return functionToCheck && (fnStr === "[object Function]" || fnStr === "[object AsyncFunction]");
+const isFunction = fnToCheck => {
+    let sFn = {}.toString.call(fnToCheck);
+    return fnToCheck && (sFn === "[object Function]" || sFn === "[object AsyncFunction]");
 };
 
 //Проверка объекта на наличие списка функций
 const haveFunctions = (obj, list) => {
     //Объявим результат
-    let res = true;
+    let bRes = true;
     //Если есть что проверять
     if (obj && list) {
         //И если пришел массив наименований функций
         if (Array.isArray(list)) {
-            list.forEach(fn => {
-                if (!isFunction(obj[fn])) res = false;
+            list.forEach(sFnName => {
+                if (!isFunction(obj[sFnName])) bRes = false;
             });
         } else {
-            res = false;
+            bRes = false;
         }
     } else {
-        res = false;
+        bRes = false;
     }
     //Вернем результат
-    return res;
+    return bRes;
 };
 
 //Проверка корректности интерфейса модуля
 const checkModuleInterface = (module, interface) => {
     //Объявим результат
-    let res = true;
+    let bRes = true;
     //Если есть что проверять
     if (module && interface) {
         //Eсли есть список функций
         if (interface.functions) {
             //Проверим их наличие
-            res = haveFunctions(module, interface.functions);
+            bRes = haveFunctions(module, interface.functions);
         } else {
-            res = false;
+            bRes = false;
         }
     } else {
-        res = false;
+        bRes = false;
     }
     //Вернем результат
-    return res;
+    return bRes;
 };
 
 //Проверка корректности полей объекта
 const checkObject = (obj, interface) => {
     //Объявим результат
-    let res = "";
+    let sRes = "";
     //Если есть что проверять
     if (obj && interface) {
         //Eсли есть список полей для проверки
@@ -74,41 +74,43 @@ const checkObject = (obj, interface) => {
                 //Обходим проверяемые поля
                 interface.fields.forEach(fld => {
                     //Проверим наличие поля в объекте (только для обязательных)
-                    if (fld.required && !(fld.name in obj)) {
+                    if (fld.bRequired && !(fld.sName in obj)) {
                         //Поля нет
-                        noFields.push(fld.name);
+                        noFields.push(fld.sName);
                     } else {
                         //Поле есть, проверим наличие значения
                         if (
-                            fld.required &&
-                            (obj[fld.name] === "undefined" || obj[fld.name] === null || obj[fld.name] === "")
+                            fld.bRequired &&
+                            (obj[fld.sName] === "undefined" || obj[fld.sName] === null || obj[fld.sName] === "")
                         )
                             //Обязательное поле не содержит значения
-                            noValues.push(fld.name);
+                            noValues.push(fld.sName);
                     }
                 });
                 //Сформируем итоговое сообщение
-                if (noFields.length > 0) res = "Объект не содержит полей: " + noFields.join(", ");
+                if (noFields.length > 0) sRes = "Объект не содержит полей: " + noFields.join(", ");
                 if (noValues.length > 0)
-                    res +=
-                        (res == "" ? "" : "; ") + "Обязательные поля объекта не имеют значений: " + noValues.join(", ");
+                    sRes +=
+                        (sRes == "" ? "" : "; ") +
+                        "Обязательные поля объекта не имеют значений: " +
+                        noValues.join(", ");
             } else {
-                res = "Список проверяемых полей объекта не является массивом";
+                sRes = "Список проверяемых полей объекта не является массивом";
             }
         } else {
-            res = "Не указан список проверяемых полей объекта";
+            sRes = "Не указан список проверяемых полей объекта";
         }
     } else {
-        res = "Не указан проверяемый объект и/или его интерфейс";
+        sRes = "Не указан проверяемый объект и/или его интерфейс";
     }
     //Вернем результат
-    return res;
+    return sRes;
 };
 
 //Формирование полного пути к подключаемому модулю
-const makeModuleFullPath = moduleName => {
-    if (moduleName) {
-        return MODULES_PATH_EX + "/" + moduleName;
+const makeModuleFullPath = sModuleName => {
+    if (sModuleName) {
+        return SMODULES_PATH_EX + "/" + sModuleName;
     } else {
         return "";
     }

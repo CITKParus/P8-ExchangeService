@@ -134,7 +134,7 @@ const getServiceFunctions = prms => {
                     }
                 );
             } else {
-                reject(new Error("Не указан идентификатор сервиса"));
+                reject(new Error("Не указан идентификатор сервиса (отсутствует поле: nServiceId)"));
             }
         } else {
             reject(new Error("Не указано подключение (отсутствует поле: connection)"));

@@ -1,6 +1,6 @@
 /*
   Сервис интеграции ПП Парус 8 с WEB API
-  Точка входа в сервер приложений
+  Песочница для тестов
 */
 
 //----------------------
@@ -9,15 +9,54 @@
 
 require("module-alias/register");
 const cfg = require("./config.js");
-const { Logger } = require("@core/logger.js");
-const db = require("@core/db_connector.js");
-const { ServerError } = require("@core/server_errors.js");
-const utls = require("@core/utils.js");
+const { Logger } = require("./core/logger.js");
+const db = require("./core/db_connector.js");
+const { ServerError } = require("./core/server_errors.js");
+const utls = require("./core/utils.js");
 
 //------------
 // Тело модуля
 //------------
 
+const tests = async () => {
+    let a = new db.DBConnector(cfg.dbConnect);
+    let l = new Logger();
+    l.setDBConnector(a);
+    try {
+        //await l.warn("CONNECTING...");
+        await a.connect();
+        //await l.info("CONNECTED!");
+        //await l.warn("READING SERVICES...");
+        let srv = await a.getServices();
+        //await l.info(srv);
+        console.log("1");
+        await l.warn("DISCONNECTING...");
+        console.log("2");
+        await a.disconnect();
+        console.log("3");
+        await l.error("DISCONNECTED!");
+        console.log("4");
+    } catch (e) {
+        await l.error("DISCONNECTING ON ERROR: " + e.message + "...");
+        await a.disconnect();
+        await l.error("DISCONNECTED!");
+        throw e;
+    }
+};
+
+tests()
+    .then(r => {
+        if (r) console.log(r);
+        else console.log("SUCCESS!!!");
+    })
+    .catch(e => {
+        if (e instanceof ServerError) {
+            console.log("ServerError ERROR: " + e.sMessage);
+        } else {
+            console.log("ERROR: " + e.message);
+        }
+    });
+/*
 try {
     let a = new db.DBConnector(cfg.dbConnect);
     a.connect()
@@ -32,7 +71,7 @@ try {
                     } else {
                         console.log("NO MESSAGES IN QUEUE!!!");
                     }
-                    a.putLog({ nLogState: db.NLOG_STATE_INF, sMsg: "Сервер приложений подключен" })
+                    a.putLogErr()
                         .then(res => {
                             console.log(res);
                             setTimeout(() => {

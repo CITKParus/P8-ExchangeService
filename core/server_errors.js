@@ -10,9 +10,10 @@
 //Общая ошибка системы
 class ServerError extends Error {
     //Конструктор
-    constructor(code, message) {
-        super(message);
-        this.code = code;
+    constructor(sCode, sMessage) {
+        super(sMessage);
+        this.sMessage = sMessage;
+        this.sCode = sCode;
     }
 }
 
