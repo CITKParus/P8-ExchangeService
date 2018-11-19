@@ -51,11 +51,14 @@ class Logger {
             this.bLogDB = true;
         }
     }
+    //Удаление объекта для протоколирования в БД
+    removeDBConnector() {
+        this.dbConnector = "";
+        this.bLogDB = false;
+    }
     //Протоколирование в БД
     async logToDB(loggerMessage) {
         //Если надо протоколировать и есть чем
-        console.log(this.dbConnector.bConnected);
-        console.log("DB LOGGER IN");
         if (this.bLogDB && this.dbConnector && this.dbConnector.bConnected) {
             //Если протоколируем стандартное сообщение
             if (loggerMessage instanceof LoggerMessage) {
@@ -85,7 +88,6 @@ class Logger {
                 await this.dbConnector.putLogInf(loggerMessage);
             }
         }
-        console.log("DB LOGGER OUT");
     }
     //Протоколирование
     async log(loggerMessage) {

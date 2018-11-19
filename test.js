@@ -25,9 +25,10 @@ const tests = async () => {
     try {
         //await l.warn("CONNECTING...");
         await a.connect();
+        for (i = 0; i <= 1000; i++) await l.info(i);
         //await l.info("CONNECTED!");
         //await l.warn("READING SERVICES...");
-        let srv = await a.getServices();
+        //let srv = await a.getServices();
         //await l.info(srv);
         console.log("1");
         await l.warn("DISCONNECTING...");

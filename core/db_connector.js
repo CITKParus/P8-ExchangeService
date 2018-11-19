@@ -8,6 +8,7 @@
 //----------------------
 
 const _ = require("lodash"); //Работа с массивами и объектами
+const EventEmitter = require("events"); //Обработчик пользовательских событий
 const glConst = require("../core/constants.js"); //Глобальные константы
 const { ServerError } = require("../core/server_errors.js"); //Типовая ошибка
 const { checkModuleInterface, makeModuleFullPath, checkObject } = require("../core/utils.js"); //Вспомогательные функции
@@ -21,13 +22,24 @@ const NLOG_STATE_INF = 0; //Информация
 const NLOG_STATE_WRN = 1; //Предупреждение
 const NLOG_STATE_ERR = 2; //Ошибка
 
+//Типовые коды ошибок работы с БД
+const SERR_DB_CONNECT = "ERR_DB_CONNECT"; //Ошибка подключения к БД
+const SERR_DB_DISCONNECT = "ERR_DB_DISCONNECT"; //Ошибка отключения от БД
+const SERR_DB_EXECUTE = "ERR_DB_EXECUTE"; //Ошибка исполнения функции в БД
+
+//События модуля
+const SEVT_DB_CONNECTOR_CONNECTED = "DB_CONNECTOR_CONNECTED"; //Подключено к БД
+const SEVT_DB_CONNECTOR_DISCONNECTED = "DB_CONNECTOR_DISCONNECTED"; //Отключено от БД
+
 //------------
 // Тело модуля
 //------------
 
-class DBConnector {
+class DBConnector extends EventEmitter {
     //Конструктор
     constructor(prms) {
+        //создадим экземпляр родительского класса
+        super();
         //Проверяем структуру переданного объекта для подключения
         let sCheckResult = checkObject(prms, {
             fields: [
@@ -88,9 +100,10 @@ class DBConnector {
         try {
             this.connection = await this.connector.connect(this.connectSettings);
             this.bConnected = true;
+            this.emit(SEVT_DB_CONNECTOR_CONNECTED, this.connection);
             return this.connection;
         } catch (e) {
-            throw new ServerError(glConst.SERR_DB_CONNECT, e.message);
+            throw new ServerError(SERR_DB_CONNECT, e.message);
         }
     }
     //Отключиться от БД
@@ -100,9 +113,10 @@ class DBConnector {
                 await this.connector.disconnect({ connection: this.connection });
                 this.connection = {};
                 this.bConnected = false;
+                this.emit(SEVT_DB_CONNECTOR_DISCONNECTED, this.connection);
                 return;
             } catch (e) {
-                throw new ServerError(glConst.SERR_DB_DISCONNECT, e.message);
+                throw new ServerError(SERR_DB_DISCONNECT, e.message);
             }
         }
     }
@@ -126,10 +140,10 @@ class DBConnector {
                 let res = await Promise.all(srvsFuncs);
                 return res;
             } catch (e) {
-                throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+                throw new ServerError(SERR_DB_EXECUTE, e.message);
             }
         } else {
-            throw new ServerError(glConst.SERR_DB_EXECUTE, "Нет подключения к БД");
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
         }
     }
     //Запись в журнал работы
@@ -153,7 +167,7 @@ class DBConnector {
                     let res = await this.connector.log(logData);
                     return res;
                 } catch (e) {
-                    throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+                    throw new ServerError(SERR_DB_EXECUTE, e.message);
                 }
             } else {
                 throw new ServerError(
@@ -162,7 +176,7 @@ class DBConnector {
                 );
             }
         } else {
-            throw new ServerError(glConst.SERR_DB_EXECUTE, "Нет подключения к БД");
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
         }
     }
     //Запись информации в журнал работы
@@ -175,7 +189,7 @@ class DBConnector {
             let res = await this.putLog(logData);
             return res;
         } catch (e) {
-            throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+            throw new ServerError(SERR_DB_EXECUTE, e.message);
         }
     }
     //Запись предупреждения в журнал работы
@@ -188,7 +202,7 @@ class DBConnector {
             let res = await this.putLog(logData);
             return res;
         } catch (e) {
-            throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+            throw new ServerError(SERR_DB_EXECUTE, e.message);
         }
     }
     //Запись ошибки в журнал работы
@@ -201,7 +215,7 @@ class DBConnector {
             let res = await this.putLog(logData);
             return res;
         } catch (e) {
-            throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+            throw new ServerError(SERR_DB_EXECUTE, e.message);
         }
     }
     //Считать очередную порцию исходящих сообщений
@@ -220,7 +234,7 @@ class DBConnector {
                     });
                     return res;
                 } catch (e) {
-                    throw new ServerError(glConst.SERR_DB_EXECUTE, e.message);
+                    throw new ServerError(SERR_DB_EXECUTE, e.message);
                 }
             } else {
                 throw new ServerError(
@@ -229,7 +243,7 @@ class DBConnector {
                 );
             }
         } else {
-            throw new ServerError(glConst.SERR_DB_EXECUTE, "Нет подключения к БД");
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
         }
     }
 }
@@ -241,4 +255,9 @@ class DBConnector {
 exports.NLOG_STATE_INF = NLOG_STATE_INF;
 exports.NLOG_STATE_WRN = NLOG_STATE_WRN;
 exports.NLOG_STATE_ERR = NLOG_STATE_ERR;
+exports.SERR_DB_CONNECT = SERR_DB_CONNECT;
+exports.SERR_DB_DISCONNECT = SERR_DB_DISCONNECT;
+exports.SERR_DB_EXECUTE = SERR_DB_EXECUTE;
+exports.SEVT_DB_CONNECTOR_CONNECTED = SEVT_DB_CONNECTOR_CONNECTED;
+exports.SEVT_DB_CONNECTOR_DISCONNECTED = SEVT_DB_CONNECTOR_DISCONNECTED;
 exports.DBConnector = DBConnector;

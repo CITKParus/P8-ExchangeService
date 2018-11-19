@@ -17,8 +17,3 @@ exports.SERR_MODULES_BAD_INTERFACE = "ERR_MODULES_BAD_INTERFACE"; //Ошибоч
 
 //Типовые коды ошибок работы с объектами
 exports.SERR_OBJECT_BAD_INTERFACE = "ERR_OBJECT_BAD_INTERFACE"; //Ошибочный интерфейс объекта
-
-//Типовые коды ошибок работы с БД
-exports.SERR_DB_CONNECT = "ERR_DB_CONNECT"; //Ошибка подключения к БД
-exports.SERR_DB_DISCONNECT = "ERR_DB_DISCONNECT"; //Ошибка отключения от БД
-exports.SERR_DB_EXECUTE = "ERR_DB_EXECUTE"; //Ошибка исполнения функции в БД
