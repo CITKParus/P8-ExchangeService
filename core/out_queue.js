@@ -44,6 +44,8 @@ class OutQueue extends EventEmitter {
             this.dbConn = dbConn;
             //Запомним логгер
             this.logger = logger;
+            //Привяжем методы к указателю на себя для использования в обработчиках событий
+            this.outDetectingLoop = this.outDetectingLoop.bind(this);
         } else {
             throw new ServerError(
                 glConst.SERR_OBJECT_BAD_INTERFACE,
@@ -91,14 +93,14 @@ class OutQueue extends EventEmitter {
     async startProcessing() {
         await this.logger.info("Запуск обработчика очереди исходящих сообщений...");
         this.bWorking = true;
-        this.outDetectingLoop();
+        setTimeout(this.outDetectingLoop, 3000);
         await this.logger.info("Обработчик очереди исходящих сообщений запущен");
     }
     //Остановка обработки очереди печати
     async stopProcessing() {
-        await this.logger.info("Останов обработчика очереди исходящих сообщений...");
+        await this.logger.warn("Останов обработчика очереди исходящих сообщений...");
         this.bWorking = false;
-        await this.logger.info("Обработчик очереди исходящих сообщений остановлен");
+        await this.logger.warn("Обработчик очереди исходящих сообщений остановлен");
     }
 }
 
