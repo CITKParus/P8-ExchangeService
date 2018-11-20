@@ -98,17 +98,17 @@ class Logger {
         if (loggerMessage instanceof LoggerMessage) {
             switch (loggerMessage.sType) {
                 case SLOGGER_MESSAGE_TYPE_ERROR: {
-                    sPrefix = "ERROR";
+                    sPrefix = "ОШИБКА";
                     sColorPattern = "\x1b[31m%s\x1b[0m%s";
                     break;
                 }
                 case SLOGGER_MESSAGE_TYPE_WARN: {
-                    sPrefix = "WARNING";
+                    sPrefix = "ПРЕДУПРЕЖДЕНИЕ";
                     sColorPattern = "\x1b[33m%s\x1b[0m%s";
                     break;
                 }
                 case SLOGGER_MESSAGE_TYPE_INFO: {
-                    sPrefix = "INFORMATION";
+                    sPrefix = "ИНФОРМАЦИЯ";
                     sColorPattern = "\x1b[32m%s\x1b[0m%s";
                     break;
                 }
