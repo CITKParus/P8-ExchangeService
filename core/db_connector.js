@@ -67,7 +67,7 @@ class DBConnector extends EventEmitter {
                             "log",
                             "getQueueOutgoing",
                             "putQueueIncoming",
-                            "setQueueValue"
+                            "setQueueState"
                         ]
                     })
                 ) {
@@ -149,7 +149,7 @@ class DBConnector extends EventEmitter {
     //Запись в журнал работы
     async putLog(prms) {
         if (this.bConnected) {
-            //Проверяем структуру переданного объекта для подключения
+            //Проверяем структуру переданного объекта с параметрами для записи в журнал
             let sCheckResult = checkObject(prms, {
                 fields: [
                     { sName: "nLogState", bRequired: true },
@@ -221,7 +221,7 @@ class DBConnector extends EventEmitter {
     //Считать очередную порцию исходящих сообщений
     async getOutgoing(prms) {
         if (this.bConnected) {
-            //Проверяем структуру переданного объекта для подключения
+            //Проверяем структуру переданного объекта с параметрами считывания очереди
             let sCheckResult = checkObject(prms, {
                 fields: [{ sName: "nPortionSize", bRequired: true }]
             });
@@ -242,6 +242,33 @@ class DBConnector extends EventEmitter {
                     "Объект имеет недопустимый интерфейс: " + sCheckResult
                 );
             }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Установить состояние позиции очереди
+    async setQueueState(prms) {
+        if (this.bConnected) {
+            //Проверяем структуру переданного объекта для подключения
+            //let sCheckResult = checkObject(prms, {
+            //    fields: [{ sName: "nPortionSize", bRequired: true }]
+            //});
+            //Если структура объекта в норме
+            //if (!sCheckResult) {
+            let setStateData = { connection: this.connection };
+            _.extend(setStateData, prms);
+            try {
+                let res = await this.connector.setQueueState(setStateData);
+                return res;
+            } catch (e) {
+                throw new ServerError(SERR_DB_EXECUTE, e.message);
+            }
+            //} else {
+            //    throw new ServerError(
+            //        glConst.SERR_OBJECT_BAD_INTERFACE,
+            //        "Объект имеет недопустимый интерфейс: " + sCheckResult
+            //    );
+            //}
         } else {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
         }
