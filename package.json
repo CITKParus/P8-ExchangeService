@@ -20,7 +20,8 @@
     "dependencies": {
         "lodash": "^4.17.11",
         "module-alias": "^2.1.0",
-        "oracledb": "^2.3.0"
+        "oracledb": "^2.3.0",
+        "validate": "^4.5.1"
     },
     "_moduleAliases": {
         "@core": "core",
