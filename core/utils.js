@@ -7,6 +7,7 @@
 // Подключение библиотек
 //----------------------
 
+const Schema = require("validate"); //Схемы валидации
 const { SMODULES_PATH_EX } = require("../core/constants.js"); //Глобавльные константы системы
 
 //------------
@@ -58,6 +59,30 @@ const checkModuleInterface = (module, interface) => {
     }
     //Вернем результат
     return bRes;
+};
+
+//Валидация объекта
+const validateObject = (obj, schema, sObjName) => {
+    //Объявим результат
+    let sRes = "";
+    if (schema instanceof Schema) {
+        const errors = schema.validate(obj);
+        if (errors && Array.isArray(errors)) {
+            if (errors.length > 0) {
+                let a = errors.map(e => {
+                    return e.message;
+                });
+                sRes =
+                    "Объект" + (sObjName ? " '" + sObjName + "' " : " ") + "имеет некорректный формат: " + a.join("; ");
+            }
+        } else {
+            sRes = "Неожиданный ответ валидатора";
+        }
+    } else {
+        sRes = "Ошибочный формат схемы валидации";
+    }
+    //Вернем результат
+    return sRes;
 };
 
 //Проверка корректности полей объекта
@@ -123,5 +148,6 @@ const makeModuleFullPath = sModuleName => {
 exports.isFunction = isFunction;
 exports.haveFunctions = haveFunctions;
 exports.checkModuleInterface = checkModuleInterface;
+exports.validateObject = validateObject;
 exports.checkObject = checkObject;
 exports.makeModuleFullPath = makeModuleFullPath;

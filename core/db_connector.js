@@ -9,9 +9,10 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const EventEmitter = require("events"); //Обработчик пользовательских событий
+const dbConnSchemas = require("../models/prms_db_connector.js"); //Схемы валидации параметров
 const glConst = require("../core/constants.js"); //Глобальные константы
 const { ServerError } = require("../core/server_errors.js"); //Типовая ошибка
-const { checkModuleInterface, makeModuleFullPath, checkObject } = require("../core/utils.js"); //Вспомогательные функции
+const { checkModuleInterface, makeModuleFullPath, checkObject, validateObject } = require("../core/utils.js"); //Вспомогательные функции
 
 //----------
 // Константы
@@ -35,6 +36,7 @@ const SEVT_DB_CONNECTOR_DISCONNECTED = "DB_CONNECTOR_DISCONNECTED"; //Отклю
 // Тело модуля
 //------------
 
+//Класс для взаимодействия с БД
 class DBConnector extends EventEmitter {
     //Конструктор
     constructor(prms) {
@@ -249,26 +251,23 @@ class DBConnector extends EventEmitter {
     //Установить состояние позиции очереди
     async setQueueState(prms) {
         if (this.bConnected) {
-            //Проверяем структуру переданного объекта для подключения
-            //let sCheckResult = checkObject(prms, {
-            //    fields: [{ sName: "nPortionSize", bRequired: true }]
-            //});
+            //Проверяем структуру переданных параметров
+            let sCheckResult = validateObject(prms, dbConnSchemas.getQueueStatePrmsSchema);
             //Если структура объекта в норме
-            //if (!sCheckResult) {
-            let setStateData = { connection: this.connection };
-            _.extend(setStateData, prms);
-            try {
-                let res = await this.connector.setQueueState(setStateData);
-                return res;
-            } catch (e) {
-                throw new ServerError(SERR_DB_EXECUTE, e.message);
+            if (!sCheckResult) {
+                //Подготовим параметры
+                let setStateData = { connection: this.connection };
+                _.extend(setStateData, prms);
+                //Исполняем действие в БД
+                try {
+                    let res = await this.connector.setQueueState(setStateData);
+                    return res;
+                } catch (e) {
+                    throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
             }
-            //} else {
-            //    throw new ServerError(
-            //        glConst.SERR_OBJECT_BAD_INTERFACE,
-            //        "Объект имеет недопустимый интерфейс: " + sCheckResult
-            //    );
-            //}
         } else {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
         }

@@ -25,6 +25,7 @@
     },
     "_moduleAliases": {
         "@core": "core",
-        "@modules": "modules"
+        "@modules": "modules",
+        "@models": "models"
     }
 }
