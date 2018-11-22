@@ -6,7 +6,7 @@
 require("module-alias/register");
 const srvModel = require("./models/obj_service"); //Модель данных сервиса
 const dbConnectorModel = require("./models/prms_db_connector"); //Модель данных сервиса
-const dbConnectorInterfaceModel = require("./models/interface_db_connector_module"); //Интерфейс модуля взаимодействия с БД
+const dbConnectorInterfaceModel = require("./models/intf_db_connector_module"); //Интерфейс модуля взаимодействия с БД
 const utl = require("./core/utils"); //Вспомогательные функции
 const db = require("./core/db_connector"); //Взаимодействие с БД
 const cfg = require("./config"); //Настройки сервера приложений
@@ -20,8 +20,13 @@ let a = utl.validateObject(
 );
 console.log(a);
 
-let b = utl.validateObject(pDB, dbConnectorInterfaceModel.dbConnectorModule);
-console.log(b);
+let b = utl.validateObject(
+    pDB,
+    dbConnectorInterfaceModel.dbConnectorModule,
+    "Пользовательский модуль подключения к БД"
+);
+if (b) console.log(b);
+else console.log("Нет ошибок в модуле");
 /*
 const errors = srvModel.schema.validate({ nId: 123, sCode: "", nSrvType: "", sSrvType: "" });
 console.log(errors);
