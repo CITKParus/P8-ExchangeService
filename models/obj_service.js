@@ -8,6 +8,7 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
+const { defServiceFunctions } = require("../models/obj_service_functions");
 
 //----------
 // Константы
@@ -40,7 +41,7 @@ exports.SUNAVLBL_NTF_SIGN_NO = SUNAVLBL_NTF_SIGN_NO;
 exports.SUNAVLBL_NTF_SIGN_YES = SUNAVLBL_NTF_SIGN_YES;
 
 //Схема валидации
-exports.schema = new Schema({
+exports.Service = new Schema({
     //Идентификатор сервиса
     nId: {
         type: Number,
@@ -59,42 +60,102 @@ exports.schema = new Schema({
             required: "Не указан код сервиса (sCode)"
         }
     },
-    //Тип сервиса (числовой код)
+    //Тип сервиса
     nSrvType: {
         type: Number,
         enum: [NSRV_TYPE_SEND, NSRV_TYPE_RECIVE],
         required: true,
         message: {
-            enum: "Значение числового кода типа сервиса (nSrvType) не поддерживается",
-            type: "Числовой код типа сервиса (nSrvType) имеет недопустимый тип данных",
-            required: "Не указан числовой код типа сервиса (nSrvType)"
+            type: "Тип сервиса (nSrvType) должен быть числом",
+            enum: "Значение типа сервиса (nSrvType) не поддерживается",
+            required: "Не указан типа сервиса (nSrvType)"
         }
-    } /*,
+    },
     //Тип сервиса (строковый код)
     sSrvType: {
         type: String,
         enum: [SSRV_TYPE_SEND, SSRV_TYPE_RECIVE],
         required: true,
         message: {
+            type: "Строковый код типа сервиса (sSrvType) должен быть строкой",
             enum: "Значение строкового кода типа сервиса (sSrvType) не поддерживается",
-            type: "Строковый код типа сервиса (sSrvType) имеет недопустимый тип данных",
             required: "Не указан строковый код типа сервиса (sSrvType)"
         }
     },
     //Корневой каталог сервиса
-    sSrvRoot: {}*/
-    //Имя пользователя (для аутентификации на внешнем сервисе при отправке сообщений)
-    //sSrvUser: {},
-    //Пароль пользователя (для аутентификации на внешнем сервисе при отправке сообщений)
-    //sSrvPass: {},
-    //Признак необходимости оповещения о простое внешнего сервиса (числовой код)
-    //nUnavlblNtfSign: {},
+    sSrvRoot: {
+        type: String,
+        required: true,
+        message: {
+            type: "Корневой каталог сервиса (sSrvRoot) должен быть строкой",
+            required: "Не указан корневой каталог сервиса (sSrvRoot)"
+        }
+    },
+    //Имя пользователя сервиса
+    sSrvUser: {
+        type: String,
+        required: false,
+        message: {
+            type: "Имя пользователя сервиса (sSrvUser) должно быть строкой",
+            required: "Не указано имя пользователя сервиса (sSrvUser)"
+        }
+    },
+    //Пароль пользователя
+    sSrvPass: {
+        type: String,
+        required: false,
+        message: {
+            type: "Пароль пользователя сервиса (sSrvPass) должен быть строкой",
+            required: "Не указан пароль пользователя сервиса (sSrvPass)"
+        }
+    },
+    //Признак необходимости оповещения о простое внешнего сервиса
+    nUnavlblNtfSign: {
+        type: Number,
+        enum: [NUNAVLBL_NTF_SIGN_NO, NUNAVLBL_NTF_SIGN_YES],
+        required: true,
+        message: {
+            type: "Признак необходимости оповещения о простое внешнего сервиса (nUnavlblNtfSign) должен быть числом",
+            enum:
+                "Значение признака необходимости оповещения о простое внешнего сервиса (nUnavlblNtfSign) не поддерживается",
+            required: "Не указан признак необходимости оповещения о простое внешнего сервиса (nUnavlblNtfSign)"
+        }
+    },
     //Признак необходимости оповещения о простое внешнего сервиса (строковый код)
-    //sUnavlblNtfSign: {},
+    sUnavlblNtfSign: {
+        type: String,
+        enum: [SUNAVLBL_NTF_SIGN_NO, SUNAVLBL_NTF_SIGN_YES],
+        required: true,
+        message: {
+            type:
+                "Строковый код признака необходимости оповещения о простое внешнего сервиса (sUnavlblNtfSign) должен быть строкой",
+            enum:
+                "Значение строкового кода признака необходимости оповещения о простое внешнего сервиса (sUnavlblNtfSign) не поддерживается",
+            required:
+                "Не указан строковый код признака необходимости оповещения о простое внешнего сервиса (sUnavlblNtfSign)"
+        }
+    },
     //Максимальное время простоя (мин) удалённого сервиса для генерации оповещения
-    //nUnavlblNtfTime: {},
+    nUnavlblNtfTime: {
+        type: Number,
+        required: true,
+        message: {
+            type:
+                "Максимальное время простоя (мин) удалённого сервиса для генерации оповещения (nUnavlblNtfTime) должно быть числом",
+            required:
+                "Не указано максимальное время простоя (мин) удалённого сервиса для генерации оповещения (nUnavlblNtfTime)"
+        }
+    },
     //Список адресов E-Mail для оповещения о простое внешнего сервиса
-    //sUnavlblNtfMail: {},
+    sUnavlblNtfMail: {
+        type: String,
+        required: false,
+        message: {
+            type:
+                "Список адресов E-Mail для оповещения о простое внешнего сервиса (sUnavlblNtfMail) должен быть строкой",
+            required: "Не указан список адресов E-Mail для оповещения о простое внешнего сервиса (sUnavlblNtfMail)"
+        }
+    },
     //Список функций сервиса
-    //fn: {}
+    functions: defServiceFunctions(true, "functions")
 });

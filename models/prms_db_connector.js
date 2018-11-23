@@ -14,7 +14,7 @@ const Schema = require("validate"); //Схемы валидации
 //------------------
 
 //Схема валидации параметров установки состояния позиции очереди
-exports.getQueueStatePrmsSchema = new Schema({
+exports.setQueueState = new Schema({
     //Идентификатор позиции очереди
     nQueueId: {
         type: Number,

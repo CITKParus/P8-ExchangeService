@@ -9,10 +9,11 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const EventEmitter = require("events"); //Обработчик пользовательских событий
-const dbConnSchemas = require("../models/prms_db_connector.js"); //Схемы валидации параметров
-const glConst = require("../core/constants.js"); //Глобальные константы
-const { ServerError } = require("../core/server_errors.js"); //Типовая ошибка
-const { checkModuleInterface, makeModuleFullPath, checkObject, validateObject } = require("../core/utils.js"); //Вспомогательные функции
+const glConst = require("../core/constants"); //Глобальные константы
+const { ServerError } = require("../core/server_errors"); //Типовая ошибка
+const { makeModuleFullPath, checkObject, validateObject } = require("../core/utils"); //Вспомогательные функции
+const prmsDBConnectorSchema = require("../models/prms_db_connector.js"); //Схемы валидации параметров процедур модуля
+const { intfDBConnectorModuleSchema } = require("../models/intf_db_connector_module"); //Схема валидации интерфейса модуля взаимодействия с БД
 
 //----------
 // Константы
@@ -59,28 +60,16 @@ class DBConnector extends EventEmitter {
                 //Подключим модуль
                 this.connector = require(makeModuleFullPath(prms.sConnectorModule));
                 //Проверим его интерфейс
-                if (
-                    !checkModuleInterface(this.connector, {
-                        functions: [
-                            "connect",
-                            "disconnect",
-                            "getServices",
-                            "getServiceFunctions",
-                            "log",
-                            "getQueueOutgoing",
-                            "putQueueIncoming",
-                            "setQueueState"
-                        ]
-                    })
-                ) {
-                    throw new ServerError(
-                        glConst.SERR_MODULES_BAD_INTERFACE,
-                        "Модуль " + prms.sConnectorModule + " реализует неверный интерфейс!"
-                    );
+                let sCheckResult = validateObject(
+                    this.connector,
+                    intfDBConnectorModuleSchema,
+                    "Модуль " + prms.sConnectorModule
+                );
+                if (sCheckResult) {
+                    throw new ServerError(glConst.SERR_MODULES_BAD_INTERFACE, sCheckResult);
                 }
                 //Всё успешно - сохраним настройки подключения
-                this.connectSettings = {};
-                _.extend(this.connectSettings, prms);
+                this.connectSettings = _.cloneDeep(prms);
                 //Инициализируем остальные свойства
                 this.connection = {};
                 this.bConnected = false;
@@ -132,9 +121,9 @@ class DBConnector extends EventEmitter {
                         connection: this.connection,
                         nServiceId: srv.nId
                     });
-                    let tmp = {};
-                    _.extend(tmp, srv, { functions: [] });
-                    response.map(f => {
+                    let tmp = _.cloneDeep(srv);
+                    tmp.functions = [];
+                    response.forEach(f => {
                         tmp.functions.push(f);
                     });
                     return tmp;
@@ -252,7 +241,7 @@ class DBConnector extends EventEmitter {
     async setQueueState(prms) {
         if (this.bConnected) {
             //Проверяем структуру переданных параметров
-            let sCheckResult = validateObject(prms, dbConnSchemas.getQueueStatePrmsSchema);
+            let sCheckResult = validateObject(prms, prmsDBConnectorSchema.setQueueState);
             //Если структура объекта в норме
             if (!sCheckResult) {
                 //Подготовим параметры

@@ -7,73 +7,27 @@
 // Подключение библиотек
 //----------------------
 
+const _ = require("lodash"); //Работа с массивами и объектами
 const Schema = require("validate"); //Схемы валидации
-const { SMODULES_PATH_EX } = require("../core/constants.js"); //Глобавльные константы системы
+const { SMODULES_PATH_EX } = require("../core/constants"); //Глобавльные константы системы
 
 //------------
 // Тело модуля
 //------------
-
-//Проверка на функцию
-const isFunction = fnToCheck => {
-    let sFn = {}.toString.call(fnToCheck);
-    return fnToCheck && (sFn === "[object Function]" || sFn === "[object AsyncFunction]");
-};
-
-//Проверка объекта на наличие списка функций
-const haveFunctions = (obj, list) => {
-    //Объявим результат
-    let bRes = true;
-    //Если есть что проверять
-    if (obj && list) {
-        //И если пришел массив наименований функций
-        if (Array.isArray(list)) {
-            list.forEach(sFnName => {
-                if (!isFunction(obj[sFnName])) bRes = false;
-            });
-        } else {
-            bRes = false;
-        }
-    } else {
-        bRes = false;
-    }
-    //Вернем результат
-    return bRes;
-};
-
-//Проверка корректности интерфейса модуля
-const checkModuleInterface = (module, interface) => {
-    //Объявим результат
-    let bRes = true;
-    //Если есть что проверять
-    if (module && interface) {
-        //Eсли есть список функций
-        if (interface.functions) {
-            //Проверим их наличие
-            bRes = haveFunctions(module, interface.functions);
-        } else {
-            bRes = false;
-        }
-    } else {
-        bRes = false;
-    }
-    //Вернем результат
-    return bRes;
-};
 
 //Валидация объекта
 const validateObject = (obj, schema, sObjName) => {
     //Объявим результат
     let sRes = "";
     if (schema instanceof Schema) {
-        const errors = schema.validate(obj);
+        const objTmp = _.cloneDeep(obj);
+        const errors = schema.validate(objTmp, { strip: false });
         if (errors && Array.isArray(errors)) {
             if (errors.length > 0) {
                 let a = errors.map(e => {
                     return e.message;
                 });
-                sRes =
-                    "Объект" + (sObjName ? " '" + sObjName + "' " : " ") + "имеет некорректный формат: " + a.join("; ");
+                sRes = (sObjName ? sObjName + " " : "Объект ") + "имеет некорректный формат: " + a.join("; ");
             }
         } else {
             sRes = "Неожиданный ответ валидатора";
@@ -145,9 +99,6 @@ const makeModuleFullPath = sModuleName => {
 // Интерфейс модуля
 //-----------------
 
-exports.isFunction = isFunction;
-exports.haveFunctions = haveFunctions;
-exports.checkModuleInterface = checkModuleInterface;
 exports.validateObject = validateObject;
 exports.checkObject = checkObject;
 exports.makeModuleFullPath = makeModuleFullPath;
