@@ -27,7 +27,7 @@ const validateObject = (obj, schema, sObjName) => {
                 let a = errors.map(e => {
                     return e.message;
                 });
-                sRes = (sObjName ? sObjName + " " : "Объект ") + "имеет некорректный формат: " + a.join("; ");
+                sRes = (sObjName ? sObjName + " " : "Объект ") + "имеет некорректный формат: " + _.uniq(a).join("; ");
             }
         } else {
             sRes = "Неожиданный ответ валидатора";
