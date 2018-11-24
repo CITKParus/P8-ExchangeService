@@ -8,7 +8,7 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
-const { Service } = require("../models/obj_service");
+const { Service } = require("../models/obj_service"); //Схема валидации сервиса
 
 //------------
 // Тело модуля
@@ -21,6 +21,7 @@ const defServices = (bRequired, sName) => {
         required: bRequired,
         each: Service,
         message: {
+            type: "Список сервисов (" + sName + ") имеет некорректный тип данных (ожидалось - Array)",
             required: "Не указан список сервисов (" + sName + ")"
         }
     };

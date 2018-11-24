@@ -29,7 +29,8 @@ exports.dbConnectorModule = new Schema({
         use: { validateFunctionType },
         required: true,
         message: {
-            validateFunctionType: "Функция подключения к БД (connect) имеет неверный формат",
+            validateFunctionType:
+                "Функция подключения к БД (connect) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция подключения к БД (connect)"
         }
     },
@@ -38,7 +39,8 @@ exports.dbConnectorModule = new Schema({
         use: { validateFunctionType },
         required: true,
         message: {
-            validateFunctionType: "Функция отключения от БД (disconnect) имеет неверный формат",
+            validateFunctionType:
+                "Функция отключения от БД (disconnect) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция отключения от БД (disconnect)"
         }
     },
@@ -47,7 +49,8 @@ exports.dbConnectorModule = new Schema({
         use: { validateFunctionType },
         required: true,
         message: {
-            validateFunctionType: "Функция получения списка сервисов (getServices) имеет неверный формат",
+            validateFunctionType:
+                "Функция получения списка сервисов (getServices) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция получения списка сервисов (getServices)"
         }
     },
@@ -57,7 +60,7 @@ exports.dbConnectorModule = new Schema({
         required: true,
         message: {
             validateFunctionType:
-                "Функция получения списка функций сервиса (getServiceFunctions) имеет неверный формат",
+                "Функция получения списка функций сервиса (getServiceFunctions) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция получения списка функций сервиса (getServiceFunctions)"
         }
     },
@@ -66,7 +69,8 @@ exports.dbConnectorModule = new Schema({
         use: { validateFunctionType },
         required: true,
         message: {
-            validateFunctionType: "Функция протоколирования работы сервиса (log) имеет неверный формат",
+            validateFunctionType:
+                "Функция протоколирования работы сервиса (log) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция протоколирования работы сервиса (log)"
         }
     },
@@ -76,7 +80,7 @@ exports.dbConnectorModule = new Schema({
         required: true,
         message: {
             validateFunctionType:
-                "Функция считывания записей исходящих сообщений очереди (getQueueOutgoing) имеет неверный формат",
+                "Функция считывания записей исходящих сообщений очереди (getQueueOutgoing) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция считывания записей исходящих сообщений очереди (getQueueOutgoing)"
         }
     },
@@ -86,7 +90,7 @@ exports.dbConnectorModule = new Schema({
         required: true,
         message: {
             validateFunctionType:
-                "Функция добавления входящего сообщения очереди (putQueueIncoming) имеет неверный формат",
+                "Функция добавления входящего сообщения очереди (putQueueIncoming) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция добавления входящего сообщения очереди (putQueueIncoming)"
         }
     },
@@ -95,7 +99,8 @@ exports.dbConnectorModule = new Schema({
         use: { validateFunctionType },
         required: true,
         message: {
-            validateFunctionType: "Функция уствновки состояния записи очереди (setQueueState) имеет неверный формат",
+            validateFunctionType:
+                "Функция уствновки состояния записи очереди (setQueueState) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция уствновки состояния записи очереди (setQueueState)"
         }
     }

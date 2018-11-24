@@ -47,7 +47,7 @@ exports.Service = new Schema({
         type: Number,
         required: true,
         message: {
-            type: "Идентификатор сервиса (nId) должен быть числом",
+            type: "Идентификатор сервиса (nId) имеет некорректный тип данных (ожидалось - Number)",
             required: "Не указан идентификатор сервиса (nId)"
         }
     },
@@ -56,7 +56,7 @@ exports.Service = new Schema({
         type: String,
         required: true,
         message: {
-            type: "Код сервиса (sCode) должен быть строкой",
+            type: "Код сервиса (sCode) имеет некорректный тип данных (ожидалось - String)",
             required: "Не указан код сервиса (sCode)"
         }
     },
@@ -66,7 +66,7 @@ exports.Service = new Schema({
         enum: [NSRV_TYPE_SEND, NSRV_TYPE_RECIVE],
         required: true,
         message: {
-            type: "Тип сервиса (nSrvType) должен быть числом",
+            type: "Тип сервиса (nSrvType) имеет некорректный тип данных (ожидалось - Number)",
             enum: "Значение типа сервиса (nSrvType) не поддерживается",
             required: "Не указан типа сервиса (nSrvType)"
         }
@@ -77,7 +77,7 @@ exports.Service = new Schema({
         enum: [SSRV_TYPE_SEND, SSRV_TYPE_RECIVE],
         required: true,
         message: {
-            type: "Строковый код типа сервиса (sSrvType) должен быть строкой",
+            type: "Строковый код типа сервиса (sSrvType) имеет некорректный тип данных (ожидалось - String)",
             enum: "Значение строкового кода типа сервиса (sSrvType) не поддерживается",
             required: "Не указан строковый код типа сервиса (sSrvType)"
         }
@@ -87,7 +87,7 @@ exports.Service = new Schema({
         type: String,
         required: true,
         message: {
-            type: "Корневой каталог сервиса (sSrvRoot) должен быть строкой",
+            type: "Корневой каталог сервиса (sSrvRoot) имеет некорректный тип данных (ожидалось - String)",
             required: "Не указан корневой каталог сервиса (sSrvRoot)"
         }
     },
@@ -96,7 +96,7 @@ exports.Service = new Schema({
         type: String,
         required: false,
         message: {
-            type: "Имя пользователя сервиса (sSrvUser) должно быть строкой",
+            type: "Имя пользователя сервиса (sSrvUser) имеет некорректный тип данных (ожидалось - String)",
             required: "Не указано имя пользователя сервиса (sSrvUser)"
         }
     },
@@ -105,7 +105,7 @@ exports.Service = new Schema({
         type: String,
         required: false,
         message: {
-            type: "Пароль пользователя сервиса (sSrvPass) должен быть строкой",
+            type: "Пароль пользователя сервиса (sSrvPass) имеет некорректный тип данных (ожидалось - String)",
             required: "Не указан пароль пользователя сервиса (sSrvPass)"
         }
     },
@@ -115,7 +115,8 @@ exports.Service = new Schema({
         enum: [NUNAVLBL_NTF_SIGN_NO, NUNAVLBL_NTF_SIGN_YES],
         required: true,
         message: {
-            type: "Признак необходимости оповещения о простое внешнего сервиса (nUnavlblNtfSign) должен быть числом",
+            type:
+                "Признак необходимости оповещения о простое внешнего сервиса (nUnavlblNtfSign) имеет некорректный тип данных (ожидалось - Number)",
             enum:
                 "Значение признака необходимости оповещения о простое внешнего сервиса (nUnavlblNtfSign) не поддерживается",
             required: "Не указан признак необходимости оповещения о простое внешнего сервиса (nUnavlblNtfSign)"
@@ -128,7 +129,7 @@ exports.Service = new Schema({
         required: true,
         message: {
             type:
-                "Строковый код признака необходимости оповещения о простое внешнего сервиса (sUnavlblNtfSign) должен быть строкой",
+                "Строковый код признака необходимости оповещения о простое внешнего сервиса (sUnavlblNtfSign) имеет некорректный тип данных (ожидалось - String)",
             enum:
                 "Значение строкового кода признака необходимости оповещения о простое внешнего сервиса (sUnavlblNtfSign) не поддерживается",
             required:
@@ -141,7 +142,7 @@ exports.Service = new Schema({
         required: true,
         message: {
             type:
-                "Максимальное время простоя (мин) удалённого сервиса для генерации оповещения (nUnavlblNtfTime) должно быть числом",
+                "Максимальное время простоя (мин) удалённого сервиса для генерации оповещения (nUnavlblNtfTime) имеет некорректный тип данных (ожидалось - Number)",
             required:
                 "Не указано максимальное время простоя (мин) удалённого сервиса для генерации оповещения (nUnavlblNtfTime)"
         }
@@ -152,7 +153,7 @@ exports.Service = new Schema({
         required: false,
         message: {
             type:
-                "Список адресов E-Mail для оповещения о простое внешнего сервиса (sUnavlblNtfMail) должен быть строкой",
+                "Список адресов E-Mail для оповещения о простое внешнего сервиса (sUnavlblNtfMail) имеет некорректный тип данных (ожидалось - String)",
             required: "Не указан список адресов E-Mail для оповещения о простое внешнего сервиса (sUnavlblNtfMail)"
         }
     },

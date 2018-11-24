@@ -21,6 +21,7 @@ const defServiceFunctions = (bRequired, sName) => {
         required: bRequired,
         each: ServiceFunction,
         message: {
+            type: "Список функций сервиса (" + sName + ") имеет некорректный тип данных (ожидалось - Array)",
             required: "Не указан список функций сервиса (" + sName + ")"
         }
     };
