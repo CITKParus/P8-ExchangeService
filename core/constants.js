@@ -9,7 +9,8 @@
 
 //Путь к модулям
 exports.SMODULES_PATH_CORE = "@core"; //Модули ядра
-exports.SMODULES_PATH_EX = "@modules"; //Дополнительные пользовательские модули
+exports.SMODULES_PATH_MODULES = "@modules"; //Дополнительные пользовательские модули
+exports.SMODULES_PATH_MODELS = "@models"; //Модели данных и схемы валидации
 
 //Типовые коды ошибок подключения модулей
 exports.SERR_MODULES_NO_MODULE_SPECIFIED = "ERR_MODULES_NO_MODULE_SPECIFIED"; //Не указан подключаемый модуль
