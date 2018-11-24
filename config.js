@@ -14,7 +14,7 @@ let dbConnect = {
     //Пароль пользователя БД
     sPassword: "parus",
     //Строка подключения к БД
-    sConnectString: "DEMOP_CITKSERV",
+    sConnectString: "DEMOP_CITKSERV_WAN",
     //Наименование модуля (для сессии БД)
     sSessionModuleName: "PARUS$ExchangeServer",
     //Подключаемый модуль обслуживания БД (низкоуровневые функции работы с СУБД)
