@@ -7,9 +7,9 @@
 // Подключение библиотек
 //----------------------
 
-const lg = require("../core/logger.js"); //Протоколирование работы
-const db = require("../core/db_connector.js"); //Взаимодействие с БД
-const oq = require("../core/out_queue.js"); //Прослушивание очереди исходящих сообщений
+const lg = require("../core/logger"); //Протоколирование работы
+const db = require("../core/db_connector"); //Взаимодействие с БД
+const oq = require("../core/out_queue"); //Прослушивание очереди исходящих сообщений
 
 //------------
 // Тело модуля

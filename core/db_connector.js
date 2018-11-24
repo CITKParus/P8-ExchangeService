@@ -12,7 +12,7 @@ const EventEmitter = require("events"); //Обработчик пользова�
 const glConst = require("../core/constants"); //Глобальные константы
 const { ServerError } = require("../core/server_errors"); //Типовая ошибка
 const { makeModuleFullPath, checkObject, validateObject } = require("../core/utils"); //Вспомогательные функции
-const prmsDBConnectorSchema = require("../models/prms_db_connector.js"); //Схемы валидации параметров процедур модуля
+const prmsDBConnectorSchema = require("../models/prms_db_connector"); //Схемы валидации параметров процедур модуля
 const intfDBConnectorModuleSchema = require("../models/intf_db_connector_module"); //Схема валидации интерфейса модуля взаимодействия с БД
 
 //----------

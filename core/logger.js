@@ -8,7 +8,7 @@
 //----------------------
 
 const _ = require("lodash"); //Работа с массивами и объектами
-const db = require("../core/db_connector.js"); //Модуль взаимодействия с БД
+const db = require("../core/db_connector"); //Модуль взаимодействия с БД
 
 //------------
 // Тело модуля

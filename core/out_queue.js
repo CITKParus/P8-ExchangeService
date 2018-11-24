@@ -9,7 +9,7 @@
 
 const _ = require("lodash"); //Работа с массивами и коллекциями
 const EventEmitter = require("events"); //Обработчик пользовательских событий
-const { checkObject } = require("../core/utils.js"); //Вспомогательные функции
+const { checkObject } = require("../core/utils"); //Вспомогательные функции
 
 //--------------------------
 // Глобальные идентификаторы

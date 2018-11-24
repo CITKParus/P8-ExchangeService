@@ -1,6 +1,6 @@
 /*
   Сервис интеграции ПП Парус 8 с WEB API
-  Модели данных: Описатель сервиса
+  Модели данных: описатель сервиса
 */
 
 //----------------------
@@ -8,7 +8,7 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
-const { defServiceFunctions } = require("../models/obj_service_functions");
+const { defServiceFunctions } = require("../models/obj_service_functions"); //Схема валидации списка функций сервиса
 
 //----------
 // Константы
