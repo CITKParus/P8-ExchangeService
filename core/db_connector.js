@@ -13,7 +13,7 @@ const glConst = require("../core/constants"); //Глобальные конст�
 const { ServerError } = require("../core/server_errors"); //Типовая ошибка
 const { makeModuleFullPath, checkObject, validateObject } = require("../core/utils"); //Вспомогательные функции
 const prmsDBConnectorSchema = require("../models/prms_db_connector.js"); //Схемы валидации параметров процедур модуля
-const { intfDBConnectorModuleSchema } = require("../models/intf_db_connector_module"); //Схема валидации интерфейса модуля взаимодействия с БД
+const intfDBConnectorModuleSchema = require("../models/intf_db_connector_module"); //Схема валидации интерфейса модуля взаимодействия с БД
 
 //----------
 // Константы
@@ -62,7 +62,7 @@ class DBConnector extends EventEmitter {
                 //Проверим его интерфейс
                 let sCheckResult = validateObject(
                     this.connector,
-                    intfDBConnectorModuleSchema,
+                    intfDBConnectorModuleSchema.dbConnectorModule,
                     "Модуль " + prms.sConnectorModule
                 );
                 if (sCheckResult) {
