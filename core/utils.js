@@ -9,7 +9,7 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const Schema = require("validate"); //Схемы валидации
-const { SMODULES_PATH_EX } = require("../core/constants"); //Глобавльные константы системы
+const { SMODULES_PATH_MODULES } = require("../core/constants"); //Глобавльные константы системы
 
 //------------
 // Тело модуля
@@ -89,7 +89,7 @@ const checkObject = (obj, interface) => {
 //Формирование полного пути к подключаемому модулю
 const makeModuleFullPath = sModuleName => {
     if (sModuleName) {
-        return SMODULES_PATH_EX + "/" + sModuleName;
+        return SMODULES_PATH_MODULES + "/" + sModuleName;
     } else {
         return "";
     }
