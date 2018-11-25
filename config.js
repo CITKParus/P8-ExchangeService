@@ -15,8 +15,8 @@ let dbConnect = {
     sPassword: "parus",
     //Строка подключения к БД
     sConnectString: "DEMOP_CITKSERV_WAN",
-    //Наименование модуля (для сессии БД)
-    sSessionModuleName: "PARUS$ExchangeServer",
+    //Наименование сервера приложений в сессии БД
+    sSessionAppName: "PARUS$ExchangeServer",
     //Подключаемый модуль обслуживания БД (низкоуровневые функции работы с СУБД)
     sConnectorModule: "parus_oracle_db.js"
 };

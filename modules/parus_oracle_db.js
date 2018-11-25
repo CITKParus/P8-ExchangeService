@@ -66,7 +66,7 @@ const connect = async prms => {
                 password: prms.sPassword,
                 connectString: prms.sConnectString
             });
-            if (prms.sSessionModuleName) conn.module = prms.sSessionModuleName;
+            if (prms.sSessionAppName) conn.module = prms.sSessionAppName;
             return conn;
         } else {
             throw new Error(
