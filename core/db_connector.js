@@ -11,18 +11,17 @@ const _ = require("lodash"); //Работа с массивами и объек�
 const EventEmitter = require("events"); //Обработчик пользовательских событий
 const glConst = require("../core/constants"); //Глобальные константы
 const { ServerError } = require("../core/server_errors"); //Типовая ошибка
-const { makeModuleFullPath, checkObject, validateObject } = require("../core/utils"); //Вспомогательные функции
+const { makeModuleFullPath, validateObject } = require("../core/utils"); //Вспомогательные функции
 const prmsDBConnectorSchema = require("../models/prms_db_connector"); //Схемы валидации параметров процедур модуля
 const intfDBConnectorModuleSchema = require("../models/intf_db_connector_module"); //Схема валидации интерфейса модуля взаимодействия с БД
+const objServicesSchema = require("../models/obj_services"); //Схема валидации списка сервисов
+const objQueueSchema = require("../models/obj_queue"); //Схема валидации сообщения очереди обмена
+const objQueuesSchema = require("../models/obj_queues"); //Схема валидации списка сообщений очереди обмена
+const objLogSchema = require("../models/obj_log"); //Схема валидации записи журнала
 
 //----------
 // Константы
 //----------
-
-//Состояния записей журнала работы сервиса
-const NLOG_STATE_INF = 0; //Информация
-const NLOG_STATE_WRN = 1; //Предупреждение
-const NLOG_STATE_ERR = 2; //Ошибка
 
 //Типовые коды ошибок работы с БД
 const SERR_DB_CONNECT = "ERR_DB_CONNECT"; //Ошибка подключения к БД
@@ -44,15 +43,7 @@ class DBConnector extends EventEmitter {
         //создадим экземпляр родительского класса
         super();
         //Проверяем структуру переданного объекта для подключения
-        let sCheckResult = checkObject(prms, {
-            fields: [
-                { sName: "sUser", bRequired: true },
-                { sName: "sPassword", bRequired: true },
-                { sName: "sConnectString", bRequired: true },
-                { sName: "sSessionModuleName", bRequired: true },
-                { sName: "sConnectorModule", bRequired: false }
-            ]
-        });
+        let sCheckResult = validateObject(prms, prmsDBConnectorSchema.DBConnector, "Параметры конструктора");
         //Если структура объекта в норме
         if (!sCheckResult) {
             //Проверяем наличие модуля для работы с БД в настройках подключения
@@ -80,31 +71,40 @@ class DBConnector extends EventEmitter {
                 );
             }
         } else {
-            throw new ServerError(
-                glConst.SERR_OBJECT_BAD_INTERFACE,
-                "Объект имеет недопустимый интерфейс: " + sCheckResult
-            );
+            throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
         }
     }
     //Подключиться к БД
     async connect() {
-        try {
-            this.connection = await this.connector.connect(this.connectSettings);
-            this.bConnected = true;
-            this.emit(SEVT_DB_CONNECTOR_CONNECTED, this.connection);
-            return this.connection;
-        } catch (e) {
-            throw new ServerError(SERR_DB_CONNECT, e.message);
+        //Подключаемся только если ещё не подключены
+        if (!this.bConnected) {
+            try {
+                //Подключаемся
+                this.connection = await this.connector.connect(this.connectSettings);
+                //Выставим внутренний флаг подключения
+                this.bConnected = true;
+                //Расскажем всем, что подключились
+                this.emit(SEVT_DB_CONNECTOR_CONNECTED, this.connection);
+                //Возвращаем подключение
+                return this.connection;
+            } catch (e) {
+                throw new ServerError(SERR_DB_CONNECT, e.message);
+            }
         }
     }
     //Отключиться от БД
     async disconnect() {
+        //Смысл отключаться есть только когда мы подключены, в противном случае - зачем тратить время
         if (this.bConnected) {
             try {
+                //Отключаемся
                 await this.connector.disconnect({ connection: this.connection });
+                //Забываем подключение и удаляем флаги подключенности
                 this.connection = {};
                 this.bConnected = false;
-                this.emit(SEVT_DB_CONNECTOR_DISCONNECTED, this.connection);
+                //Расскажем всем, что отключились
+                this.emit(SEVT_DB_CONNECTOR_DISCONNECTED);
+                //Вернём ничего
                 return;
             } catch (e) {
                 throw new ServerError(SERR_DB_DISCONNECT, e.message);
@@ -113,25 +113,44 @@ class DBConnector extends EventEmitter {
     }
     //Получить список сервисов
     async getServices() {
+        //Работаем только при наличии подключения
         if (this.bConnected) {
             try {
+                //Забираем список сервисов и декорируем его заготовками под список функций
                 let srvs = await this.connector.getServices({ connection: this.connection });
-                let srvsFuncs = srvs.map(async srv => {
-                    const response = await this.connector.getServiceFunctions({
-                        connection: this.connection,
-                        nServiceId: srv.nId
-                    });
-                    let tmp = _.cloneDeep(srv);
-                    tmp.functions = [];
-                    response.forEach(f => {
-                        tmp.functions.push(f);
-                    });
-                    return tmp;
+                srvs.forEach(s => {
+                    s.functions = [];
                 });
-                let res = await Promise.all(srvsFuncs);
-                return res;
+                //Валидируем его
+                let sCheckResult = validateObject({ services: srvs }, objServicesSchema.Services, "Список сервисов");
+                //Если в списке сервисов всё в порядке
+                if (!sCheckResult) {
+                    //Забираем для каждого из сервисов список его функций
+                    let srvsFuncs = srvs.map(async srv => {
+                        const response = await this.connector.getServiceFunctions({
+                            connection: this.connection,
+                            nServiceId: srv.nId
+                        });
+                        let tmp = _.cloneDeep(srv);
+                        response.forEach(f => {
+                            tmp.functions.push(f);
+                        });
+                        return tmp;
+                    });
+                    //Ждём пока все функции вернутся
+                    let res = await Promise.all(srvsFuncs);
+                    //Валидируем финальный объект
+                    sCheckResult = validateObject({ services: res }, objServicesSchema.Services, "Список сервисов");
+                    //Если валидация не прошла
+                    if (sCheckResult) throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Успешно - отдаём список сервисов
+                    return res;
+                } else {
+                    throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                }
             } catch (e) {
-                throw new ServerError(SERR_DB_EXECUTE, e.message);
+                if (e instanceof ServerError) throw e;
+                else throw new ServerError(SERR_DB_EXECUTE, e.message);
             }
         } else {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
@@ -139,32 +158,32 @@ class DBConnector extends EventEmitter {
     }
     //Запись в журнал работы
     async putLog(prms) {
+        //Работаем только при наличии подключения
         if (this.bConnected) {
             //Проверяем структуру переданного объекта с параметрами для записи в журнал
-            let sCheckResult = checkObject(prms, {
-                fields: [
-                    { sName: "nLogState", bRequired: true },
-                    { sName: "sMsg", bRequired: false },
-                    { sName: "nServiceId", bRequired: false },
-                    { sName: "nServiceFnId", bRequired: false },
-                    { sName: "nQueueId", bRequired: false }
-                ]
-            });
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.putLog,
+                "Параметры функции записи в журнал работы"
+            );
             //Если структура объекта в норме
             if (!sCheckResult) {
                 try {
-                    let logData = { connection: this.connection };
-                    _.extend(logData, prms);
+                    //Подготовим параметры для передачи в БД
+                    let logData = _.cloneDeep(prms);
+                    logData.connection = this.connection;
+                    //И выполним запись в журнал
                     let res = await this.connector.log(logData);
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(res, objLogSchema.Log, "Добавленная запись журнала работы");
+                    if (sCheckResult) throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Вернём добавленную запись
                     return res;
                 } catch (e) {
                     throw new ServerError(SERR_DB_EXECUTE, e.message);
                 }
             } else {
-                throw new ServerError(
-                    glConst.SERR_OBJECT_BAD_INTERFACE,
-                    "Объект имеет недопустимый интерфейс: " + sCheckResult
-                );
+                throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
             }
         } else {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
@@ -172,12 +191,15 @@ class DBConnector extends EventEmitter {
     }
     //Запись информации в журнал работы
     async putLogInf(sMsg, prms) {
-        let logData = {};
-        _.extend(logData, prms);
-        logData.nLogState = NLOG_STATE_INF;
+        //Подготовим параметры для передачи в БД
+        let logData = _.cloneDeep(prms);
+        //Выставим сообщение и тип записи журнала
+        logData.nLogState = objLogSchema.NLOG_STATE_INF;
         logData.sMsg = sMsg;
         try {
+            //Выполним запись в журнал
             let res = await this.putLog(logData);
+            //Вернём добавленную запись
             return res;
         } catch (e) {
             throw new ServerError(SERR_DB_EXECUTE, e.message);
@@ -185,12 +207,15 @@ class DBConnector extends EventEmitter {
     }
     //Запись предупреждения в журнал работы
     async putLogWrn(sMsg, prms) {
-        let logData = {};
-        _.extend(logData, prms);
-        logData.nLogState = NLOG_STATE_WRN;
+        //Подготовим параметры для передачи в БД
+        let logData = _.cloneDeep(prms);
+        //Выставим сообщение и тип записи журнала
+        logData.nLogState = objLogSchema.NLOG_STATE_WRN;
         logData.sMsg = sMsg;
         try {
+            //Выполним запись в журнал
             let res = await this.putLog(logData);
+            //Вернём добавленную запись
             return res;
         } catch (e) {
             throw new ServerError(SERR_DB_EXECUTE, e.message);
@@ -198,12 +223,15 @@ class DBConnector extends EventEmitter {
     }
     //Запись ошибки в журнал работы
     async putLogErr(sMsg, prms) {
-        let logData = {};
-        _.extend(logData, prms);
-        logData.nLogState = NLOG_STATE_ERR;
+        //Подготовим параметры для передачи в БД
+        let logData = _.cloneDeep(prms);
+        //Выставим сообщение и тип записи журнала
+        logData.nLogState = objLogSchema.NLOG_STATE_ERR;
         logData.sMsg = sMsg;
         try {
+            //Выполним запись в журнал
             let res = await this.putLog(logData);
+            //Вернём добавленную запись
             return res;
         } catch (e) {
             throw new ServerError(SERR_DB_EXECUTE, e.message);
@@ -213,25 +241,33 @@ class DBConnector extends EventEmitter {
     async getOutgoing(prms) {
         if (this.bConnected) {
             //Проверяем структуру переданного объекта с параметрами считывания очереди
-            let sCheckResult = checkObject(prms, {
-                fields: [{ sName: "nPortionSize", bRequired: true }]
-            });
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.getOutgoing,
+                "Параметры функции считывания очереди"
+            );
             //Если структура объекта в норме
             if (!sCheckResult) {
                 try {
-                    let res = await this.connector.getQueueOutgoing({
-                        connection: this.connection,
-                        nPortionSize: prms.nPortionSize
-                    });
+                    //Подготовим параметры для передачи в БД
+                    let getQueueOutgoingData = _.cloneDeep(prms);
+                    getQueueOutgoingData.connection = this.connection;
+                    //Выполняем считывание из БД
+                    let res = await this.connector.getQueueOutgoing(getQueueOutgoingData);
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(
+                        { queues: res },
+                        objQueuesSchema.Queues,
+                        "Список сообщений очереди обмена"
+                    );
+                    if (sCheckResult) throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Вернём сообщения очереди обмена
                     return res;
                 } catch (e) {
                     throw new ServerError(SERR_DB_EXECUTE, e.message);
                 }
             } else {
-                throw new ServerError(
-                    glConst.SERR_OBJECT_BAD_INTERFACE,
-                    "Объект имеет недопустимый интерфейс: " + sCheckResult
-                );
+                throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
             }
         } else {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
@@ -245,14 +281,19 @@ class DBConnector extends EventEmitter {
             //Если структура объекта в норме
             if (!sCheckResult) {
                 //Подготовим параметры
-                let setStateData = { connection: this.connection };
-                _.extend(setStateData, prms);
-                //Исполняем действие в БД
+                let setStateData = _.cloneDeep(prms);
+                setStateData.connection = this.connection;
                 try {
+                    //Исполняем действие в БД
                     let res = await this.connector.setQueueState(setStateData);
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(res, objQueueSchema.Queue, "Изменённое сообщение очереди обмена");
+                    if (sCheckResult) throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Вернём измененную запись
                     return res;
                 } catch (e) {
-                    throw new ServerError(SERR_DB_EXECUTE, e.message);
+                    if (e instanceof ServerError) throw e;
+                    else throw new ServerError(SERR_DB_EXECUTE, e.message);
                 }
             } else {
                 throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
@@ -267,9 +308,6 @@ class DBConnector extends EventEmitter {
 // Интерфейс модуля
 //-----------------
 
-exports.NLOG_STATE_INF = NLOG_STATE_INF;
-exports.NLOG_STATE_WRN = NLOG_STATE_WRN;
-exports.NLOG_STATE_ERR = NLOG_STATE_ERR;
 exports.SERR_DB_CONNECT = SERR_DB_CONNECT;
 exports.SERR_DB_DISCONNECT = SERR_DB_DISCONNECT;
 exports.SERR_DB_EXECUTE = SERR_DB_EXECUTE;
