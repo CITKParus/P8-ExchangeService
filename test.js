@@ -35,11 +35,18 @@ const pDB = require("./modules/parus_oracle_db");
 
 const getServices = async () => {
     let d = new db.DBConnector(cfg.dbConnect);
-    await d.connect();
-    let r = await d.getServices();
-    let q = await d.getOutgoing({ nPortionSize: 1 });
-    await d.disconnect();
-    console.log(q[0].bMsg instanceof Buffer);
+    try {
+        await d.connect();
+        let r = await d.getServices();
+        let q = await d.getOutgoing({ nPortionSize: 1 });
+        console.log(q);
+        let qs = await d.setQueueState({ nQueueId: 94568140, nExecState: 0 });
+        console.log(qs);
+        let l = await d.putLog({ nLogState: 0, sMsg: "Тест", nServiceId: 94557937, nServiceFnId: 94557939 });
+        await d.disconnect();
+        /*
+    console.log(q[0]);
+    console.log(q[0].blMsg instanceof Buffer);
     let errs = utl.validateObject(r[1], srvModel.Service, "Сервис");
     let errs2 = utl.validateObject({ functions: r[1].functions }, srvFnSModel.ServiceFunctions, "Функция сервиса");
     let errs3 = utl.validateObject({ services: r }, srvsModel.Services, "Список сервисов");
@@ -55,6 +62,11 @@ const getServices = async () => {
     else console.log("Нет ошибок в сообщении обмена");
     if (errs5) console.log(errs5);
     else console.log("Нет ошибок в очереди сообщений обмена");
+    */
+    } catch (e) {
+        await d.disconnect();
+        console.log(e.sCode + " " + e.sMessage);
+    }
 };
 
 getServices();
