@@ -54,8 +54,7 @@ class OutQueue extends EventEmitter {
     //Добавление нового исходящего сообщения в очередь для отработки
     addMessage(message) {
         //Cоздадим новый элемент очереди
-        let tmp = {};
-        _.extend(tmp, message);
+        let tmp = _.cloneDeep(message);
         //Добавим его в очередь
         this.queue.push(tmp);
     }
