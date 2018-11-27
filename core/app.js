@@ -7,10 +7,13 @@
 // Подключение библиотек
 //----------------------
 
-const lg = require("../core/logger"); //Протоколирование работы
-const db = require("../core/db_connector"); //Взаимодействие с БД
-const oq = require("../core/out_queue"); //Прослушивание очереди исходящих сообщений
-
+const lg = require("./logger"); //Протоколирование работы
+const db = require("./db_connector"); //Взаимодействие с БД
+const oq = require("./out_queue"); //Прослушивание очереди исходящих сообщений
+const { ServerError } = require("./server_errors"); //Типовая ошибка
+const { validateObject } = require("./utils"); //Вспомогательные функции
+const { SERR_COMMON, SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
+const objConfigSchema = require("../models/obj_config"); //Схема валидации файла настроек
 //------------
 // Тело модуля
 //------------
@@ -18,20 +21,20 @@ const oq = require("../core/out_queue"); //Прослушивание очере
 //Класс сервера приложений
 class ParusAppServer {
     //конструктор класса
-    constructor(prms) {
-        //Создаём подключение к БД
-        this.dbConn = new db.DBConnector(prms.dbConnect);
+    constructor() {
         //Создаём логгер для протоколирования работы
         this.logger = new lg.Logger();
-        //Создаём обработчик очереди исходящих
-        this.outQ = new oq.OutQueue(prms.outgoing, this.dbConn, this.logger);
+        //Подключение к БД
+        this.dbConn = null;
+        //Обработчик очереди исходящих
+        this.outQ = null;
         //Привяжем методы к указателю на себя для использования в обработчиках событий
         this.onDBConnected = this.onDBConnected.bind(this);
         this.onDBDisconnected = this.onDBDisconnected.bind(this);
     }
     //При подключении к БД
     async onDBConnected(connection) {
-        this.logger.setDBConnector(this.dbConn);
+        this.logger.setDBConnector(this.dbConn, true);
         await this.logger.info("Сервер приложений подключен к БД");
     }
     //При отключении от БД
@@ -39,37 +42,53 @@ class ParusAppServer {
         this.logger.removeDBConnector();
         await this.logger.warn("Сервер приложений отключен от БД");
     }
+    //Инициализация сервера
+    async init(cfg) {
+        await this.logger.info("Инициализация сервера приложений...");
+        //Проверяем структуру переданного объекта конфигурации
+        let sCheckResult = validateObject(cfg, objConfigSchema.config, "Настройки сервера приложений");
+        //Если настройки верны - будем стартовать
+        if (!sCheckResult) {
+            //Создаём подключение к БД
+            this.dbConn = new db.DBConnector(cfg.dbConnect);
+            //Создаём обработчик очереди исходящих
+            this.outQ = new oq.OutQueue(cfg.outgoing, this.dbConn, this.logger);
+            //Скажем что инициализировали
+            await this.logger.info("Сервер приложение инициализирован");
+        } else {
+            throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+        }
+    }
     //Запуск сервера
     async run() {
         await this.logger.info("Запуск сервера приложений...");
+        if (!this.logger || !this.dbConn || !this.outQ) {
+            throw new ServerError(SERR_COMMON, "Не пройдена инициализация");
+        }
         this.dbConn.on(db.SEVT_DB_CONNECTOR_CONNECTED, this.onDBConnected);
         this.dbConn.on(db.SEVT_DB_CONNECTOR_DISCONNECTED, this.onDBDisconnected);
         await this.logger.info("Подключение сервера приложений к БД...");
-        try {
-            await this.dbConn.connect();
-        } catch (e) {
-            await this.logger.error("Ошибка подключения к БД: " + e.sCODE + ": " + e.sMessage);
-            stop();
-            return;
-        }
+        await this.dbConn.connect();
         await this.outQ.startProcessing();
         await this.logger.info("Сервер приложений запущен");
     }
     //Останов сервера
     async stop() {
         await this.logger.warn("Останов сервера приложений...");
-        await this.outQ.stopProcessing();
-        if (this.dbConn.bConnected) {
-            await this.logger.warn("Отключение сервера приложений от БД...");
-            try {
-                await this.dbConn.disconnect();
+        if (this.outQ) await this.outQ.stopProcessing();
+        if (this.dbConn) {
+            if (this.dbConn.bConnected) {
+                await this.logger.warn("Отключение сервера приложений от БД...");
+                try {
+                    await this.dbConn.disconnect();
+                    process.exit(0);
+                } catch (e) {
+                    await this.logger.error("Ошибка отключения от БД: " + e.sCODE + ": " + e.sMessage);
+                    process.exit(1);
+                }
+            } else {
                 process.exit(0);
-            } catch (e) {
-                await this.logger.error("Ошибка отключения от БД: " + e.sCODE + ": " + e.sMessage);
-                process.exit(1);
             }
-        } else {
-            process.exit(0);
         }
     }
 }
