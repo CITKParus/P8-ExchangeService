@@ -13,7 +13,7 @@ const oq = require("./out_queue"); //Прослушивание очереди �
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const { validateObject } = require("./utils"); //Вспомогательные функции
 const { SERR_COMMON, SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
-const objConfigSchema = require("../models/obj_config"); //Схема валидации файла настроек
+const prmsAppSchema = require("../models/prms_app"); //Схема валидации параметров функций класса
 //------------
 // Тело модуля
 //------------
@@ -43,16 +43,16 @@ class ParusAppServer {
         await this.logger.warn("Сервер приложений отключен от БД");
     }
     //Инициализация сервера
-    async init(cfg) {
+    async init(prms) {
         await this.logger.info("Инициализация сервера приложений...");
         //Проверяем структуру переданного объекта конфигурации
-        let sCheckResult = validateObject(cfg, objConfigSchema.config, "Настройки сервера приложений");
+        let sCheckResult = validateObject(prms, prmsAppSchema.init, "Параметры инициализации");
         //Если настройки верны - будем стартовать
         if (!sCheckResult) {
             //Создаём подключение к БД
-            this.dbConn = new db.DBConnector(cfg.dbConnect);
+            this.dbConn = new db.DBConnector({ connectSettings: prms.config.dbConnect });
             //Создаём обработчик очереди исходящих
-            this.outQ = new oq.OutQueue(cfg.outgoing, this.dbConn, this.logger);
+            this.outQ = new oq.OutQueue({ outGoing: prms.config.outGoing, dbConn: this.dbConn, logger: this.logger });
             //Скажем что инициализировали
             await this.logger.info("Сервер приложение инициализирован");
         } else {

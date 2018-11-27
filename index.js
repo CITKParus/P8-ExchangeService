@@ -41,7 +41,7 @@ process.on("SIGINT", () => {
 
 //Старутем
 appSrv
-    .init(cfg)
+    .init({ config: cfg })
     .then(r => {
         appSrv
             .run()

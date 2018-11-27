@@ -9,7 +9,10 @@
 
 const _ = require("lodash"); //Работа с массивами и коллекциями
 const EventEmitter = require("events"); //Обработчик пользовательских событий
-const { checkObject } = require("../core/utils"); //Вспомогательные функции
+const { ServerError } = require("./server_errors"); //Типовая ошибка
+const { SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
+const { validateObject } = require("../core/utils"); //Вспомогательные функции
+const prmsOutQueueSchema = require("../models/prms_out_queue"); //Схемы валидации параметров функций класса
 
 //--------------------------
 // Глобальные идентификаторы
@@ -24,14 +27,12 @@ const SEVT_OUT_QUEUE_NEW = "OUT_QUEUE_NEW"; //Новое сообщение в �
 
 //Класс очереди сообщений
 class OutQueue extends EventEmitter {
-    //конструктор класса
-    constructor(prms, dbConn, logger) {
+    //Конструктор класса
+    constructor(prms) {
         //Создадим экземпляр родительского класса
         super();
-        //Проверяем структуру переданного объекта с параметрами очереди
-        let sCheckResult = checkObject(prms, {
-            fields: [{ sName: "nPortionSize", bRequired: true }, { sName: "nCheckTimeout", bRequired: true }]
-        });
+        //Проверяем структуру переданного объекта для подключения
+        let sCheckResult = validateObject(prms, prmsOutQueueSchema.OutQueue, "Параметры конструктора класса OutQueue");
         //Если структура объекта в норме
         if (!sCheckResult) {
             //Хранилище очереди сообщений
@@ -39,18 +40,15 @@ class OutQueue extends EventEmitter {
             //Признак функционирования обработчика
             this.bWorking = false;
             //Параметры очереди
-            _.extend(this, prms);
+            this.outGoing = _.cloneDeep(prms.outGoing);
             //Запомним подключение к БД
-            this.dbConn = dbConn;
+            this.dbConn = prms.dbConn;
             //Запомним логгер
-            this.logger = logger;
+            this.logger = prms.logger;
             //Привяжем методы к указателю на себя для использования в обработчиках событий
             this.outDetectingLoop = this.outDetectingLoop.bind(this);
         } else {
-            throw new ServerError(
-                glConst.SERR_OBJECT_BAD_INTERFACE,
-                "Объект имеет недопустимый интерфейс: " + sCheckResult
-            );
+            throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
         }
     }
     //Добавление нового исходящего сообщения в очередь для отработки
@@ -58,7 +56,7 @@ class OutQueue extends EventEmitter {
         //Cоздадим новый элемент очереди
         let tmp = {};
         _.extend(tmp, message);
-        //добавим его в очередь
+        //Добавим его в очередь
         this.queue.push(tmp);
     }
     //Уведомление о получении нового сообщения
@@ -71,13 +69,13 @@ class OutQueue extends EventEmitter {
         if (this.bWorking)
             setTimeout(() => {
                 this.outDetectingLoop();
-            }, this.nCheckTimeout);
+            }, this.outGoing.nCheckTimeout);
     }
     //Опрос очереди исходящих сообщений
     async outDetectingLoop() {
         //Сходим на сервер за очередным исходящим сообщением
         try {
-            let outMsgs = await this.dbConn.getOutgoing({ nPortionSize: this.nPortionSize });
+            let outMsgs = await this.dbConn.getOutgoing({ nPortionSize: this.outGoing.nPortionSize });
             if (Array.isArray(outMsgs) && outMsgs.length > 0) {
                 let logAll = outMsgs.map(async msg => {
                     await this.logger.info(

@@ -9,7 +9,6 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const EventEmitter = require("events"); //Обработчик пользовательских событий
-const glConst = require("../core/constants"); //Глобальные константы
 const { ServerError } = require("../core/server_errors"); //Типовая ошибка
 const { makeModuleFullPath, validateObject } = require("../core/utils"); //Вспомогательные функции
 const prmsDBConnectorSchema = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля
@@ -18,6 +17,11 @@ const objServicesSchema = require("../models/obj_services"); //Схема вал
 const objQueueSchema = require("../models/obj_queue"); //Схема валидации сообщения очереди обмена
 const objQueuesSchema = require("../models/obj_queues"); //Схема валидации списка сообщений очереди обмена
 const objLogSchema = require("../models/obj_log"); //Схема валидации записи журнала
+const {
+    SERR_MODULES_BAD_INTERFACE,
+    SERR_OBJECT_BAD_INTERFACE,
+    SERR_MODULES_NO_MODULE_SPECIFIED
+} = require("../core/constants"); //Глобальные константы
 
 //----------
 // Константы
@@ -51,31 +55,31 @@ class DBConnector extends EventEmitter {
         //Если структура объекта в норме
         if (!sCheckResult) {
             //Проверяем наличие модуля для работы с БД в настройках подключения
-            if (prms.sConnectorModule) {
+            if (prms.connectSettings.sConnectorModule) {
                 //Подключим модуль
-                this.connector = require(makeModuleFullPath(prms.sConnectorModule));
+                this.connector = require(makeModuleFullPath(prms.connectSettings.sConnectorModule));
                 //Проверим его интерфейс
                 let sCheckResult = validateObject(
                     this.connector,
                     intfDBConnectorModuleSchema.dbConnectorModule,
-                    "Модуль " + prms.sConnectorModule
+                    "Модуль " + prms.connectSettings.sConnectorModule
                 );
                 if (sCheckResult) {
-                    throw new ServerError(glConst.SERR_MODULES_BAD_INTERFACE, sCheckResult);
+                    throw new ServerError(SERR_MODULES_BAD_INTERFACE, sCheckResult);
                 }
                 //Всё успешно - сохраним настройки подключения
-                this.connectSettings = _.cloneDeep(prms);
+                this.connectSettings = _.cloneDeep(prms.connectSettings);
                 //Инициализируем остальные свойства
                 this.connection = null;
                 this.bConnected = false;
             } else {
                 throw new ServerError(
-                    glConst.SERR_MODULES_NO_MODULE_SPECIFIED,
+                    SERR_MODULES_NO_MODULE_SPECIFIED,
                     "Не указано имя подключаемого модуля-коннектора!"
                 );
             }
         } else {
-            throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
         }
     }
     //Подключиться к БД
@@ -146,11 +150,11 @@ class DBConnector extends EventEmitter {
                     //Валидируем финальный объект
                     sCheckResult = validateObject({ services: res }, objServicesSchema.Services, "Список сервисов");
                     //Если валидация не прошла
-                    if (sCheckResult) throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
                     //Успешно - отдаём список сервисов
                     return res;
                 } else {
-                    throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
                 }
             } catch (e) {
                 if (e instanceof ServerError) throw e;
@@ -180,14 +184,14 @@ class DBConnector extends EventEmitter {
                     let res = await this.connector.log(logData);
                     //Валидируем полученный ответ
                     sCheckResult = validateObject(res, objLogSchema.Log, "Добавленная запись журнала работы");
-                    if (sCheckResult) throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
                     //Вернём добавленную запись
                     return res;
                 } catch (e) {
                     throw new ServerError(SERR_DB_EXECUTE, e.message);
                 }
             } else {
-                throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
             }
         } else {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
@@ -264,14 +268,14 @@ class DBConnector extends EventEmitter {
                         objQueuesSchema.Queues,
                         "Список сообщений очереди обмена"
                     );
-                    if (sCheckResult) throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
                     //Вернём сообщения очереди обмена
                     return res;
                 } catch (e) {
                     throw new ServerError(SERR_DB_EXECUTE, e.message);
                 }
             } else {
-                throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
             }
         } else {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
@@ -292,7 +296,7 @@ class DBConnector extends EventEmitter {
                     let res = await this.connector.setQueueState(setStateData);
                     //Валидируем полученный ответ
                     sCheckResult = validateObject(res, objQueueSchema.Queue, "Изменённое сообщение очереди обмена");
-                    if (sCheckResult) throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
                     //Вернём измененную запись
                     return res;
                 } catch (e) {
@@ -300,7 +304,7 @@ class DBConnector extends EventEmitter {
                     else throw new ServerError(SERR_DB_EXECUTE, e.message);
                 }
             } else {
-                throw new ServerError(glConst.SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
             }
         } else {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
