@@ -1,6 +1,6 @@
 /*
   Сервис интеграции ПП Парус 8 с WEB API
-  Модели данных: описатели параметров процедур модуля взаимодействия с БД (класс DBConnector)
+  Модели данных: описатели параметров функций модуля взаимодействия с БД (класс DBConnector)
 */
 
 //----------------------
@@ -8,6 +8,7 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
+const { dbConnect } = require("./obj_config"); //Схемы валидации конфигурации сервера приложений
 const { NLOG_STATE_INF, NLOG_STATE_WRN, NLOG_STATE_ERR } = require("./obj_log"); //Схемы валидации записи журнала работы сервиса обмена
 const {
     NQUEUE_EXEC_STATE_INQUEUE,
@@ -27,51 +28,12 @@ const {
 
 //Схема валидации параметров конструктора
 exports.DBConnector = new Schema({
-    //Имя пользователя БД
-    sUser: {
-        type: String,
+    //Параметры подключения к БД
+    connectSettings: {
+        schema: dbConnect,
         required: true,
         message: {
-            type: "Имя пользователя БД (sUser) имеет некорректный тип данных (ожидалось - String)",
-            required: "Не указано имя пользователя БД (sUser)"
-        }
-    },
-    //Пароль пользователя БД
-    sPassword: {
-        type: String,
-        required: true,
-        message: {
-            type: "Пароль пользователя БД (sPassword) имеет некорректный тип данных (ожидалось - String)",
-            required: "Не указан пароль пользователя БД (sPassword)"
-        }
-    },
-    //Строка подключения к БД
-    sConnectString: {
-        type: String,
-        required: true,
-        message: {
-            type: "Строка подключения к БД (sConnectString) имеет некорректный тип данных (ожидалось - String)",
-            required: "Не указана строка подключения к БД (sConnectString)"
-        }
-    },
-    //Наименование сервера приложений в сессии БД
-    sSessionAppName: {
-        type: String,
-        required: true,
-        message: {
-            type:
-                "Наименование сервера приложений в сессии БД (sSessionAppName) имеет некорректный тип данных (ожидалось - String)",
-            required: "Не указано наименование сервера приложений в сессии БД (sSessionAppName)"
-        }
-    },
-    //Наименование пользовательского модуля для взаимодействия с БД
-    sConnectorModule: {
-        type: String,
-        required: true,
-        message: {
-            type:
-                "Наименование пользовательского модуля для взаимодействия с БД (sConnectorModule) имеет некорректный тип данных (ожидалось - String)",
-            required: "Не указано наименование пользовательского модуля для взаимодействия с БД (sConnectorModule)"
+            required: "Не указаны параметры подключения к БД (connectSettings)"
         }
     }
 });
