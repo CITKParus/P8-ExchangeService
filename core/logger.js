@@ -8,106 +8,60 @@
 //----------------------
 
 const _ = require("lodash"); //Работа с массивами и объектами
-const db = require("../core/db_connector"); //Модуль взаимодействия с БД
+const { validateObject } = require("../core/utils"); //Вспомогательные функции
+const db = require("./db_connector"); //Модуль взаимодействия с БД
+const { NLOG_STATE_INF, NLOG_STATE_WRN, NLOG_STATE_ERR } = require("../models/obj_log"); //Схемы валидации записи журнала работы сервиса обмена
+const prmsLoggerSchema = require("../models/prms_logger"); //Схемы валидации параметров функций модуля
 
 //------------
 // Тело модуля
 //------------
 
-//Типы сообщений протокола
-const SLOGGER_MESSAGE_TYPE_ERROR = "ERROR"; // Ошибка
-const SLOGGER_MESSAGE_TYPE_WARN = "WARN"; // Предупреждение
-const SLOGGER_MESSAGE_TYPE_INFO = "INFO"; // Информация
-
-//Сообщение протокола
-class LoggerMessage {
-    //Конструктор класса
-    constructor(sType, sMessage, prms) {
-        this.sType = sType;
-        this.sMessage = sMessage;
-        if (prms) {
-            this.nServiceId = prms.nServiceId;
-            this.nServiceFnId = prms.nServiceFnId;
-            this.nQueueId = prms.nQueueId;
-        }
-    }
-}
-
 //Класс управления протоколом
 class Logger {
     //Конструктор класса
     constructor() {
-        this.dbConnector = "";
+        this.dbConnector = null;
         this.bLogDB = false;
     }
     //Включение/выключение записи протоколов в БД
     setLogDB(bLogDB) {
-        this.bLogDB = bLogDB;
+        if (this.dbConnector) this.bLogDB = bLogDB;
     }
     //Установка объекта для протоколирования в БД
-    setDBConnector(dbConnector) {
+    setDBConnector(dbConnector, bLogDB) {
         if (dbConnector instanceof db.DBConnector) {
             this.dbConnector = dbConnector;
-            this.bLogDB = true;
+            if (bLogDB === true) this.setLogDB(true);
+            else this.setLogDB(false);
         }
     }
     //Удаление объекта для протоколирования в БД
     removeDBConnector() {
-        this.dbConnector = "";
-        this.bLogDB = false;
-    }
-    //Протоколирование в БД
-    async logToDB(loggerMessage) {
-        //Если надо протоколировать и есть чем
-        if (this.bLogDB && this.dbConnector && this.dbConnector.bConnected) {
-            //Если протоколируем стандартное сообщение
-            if (loggerMessage instanceof LoggerMessage) {
-                //Подготовим доп. сведения для протокола
-                let logData = {};
-                _.extend(logData, loggerMessage);
-                //Анализируем тип сообщения
-                switch (loggerMessage.sType) {
-                    case SLOGGER_MESSAGE_TYPE_ERROR: {
-                        await this.dbConnector.putLogErr(loggerMessage.sMessage, logData);
-                        break;
-                    }
-                    case SLOGGER_MESSAGE_TYPE_WARN: {
-                        await this.dbConnector.putLogWrn(loggerMessage.sMessage, logData);
-                        break;
-                    }
-                    case SLOGGER_MESSAGE_TYPE_INFO: {
-                        await this.dbConnector.putLogInf(loggerMessage.sMessage, logData);
-                        break;
-                    }
-                    default:
-                        await this.dbConnector.putLogInf(loggerMessage.sMessage, logData);
-                        break;
-                }
-            } else {
-                //Для нестандартных - есдиный способ протоколирования
-                await this.dbConnector.putLogInf(loggerMessage);
-            }
-        }
+        this.dbConnector = null;
+        this.setLogDB(false);
     }
     //Протоколирование
-    async log(loggerMessage) {
-        let sMessage = "";
-        let sPrefix = "LOG MESSAGE";
-        let sColorPattern = "";
-        //Конструируем сообщение
-        if (loggerMessage instanceof LoggerMessage) {
-            switch (loggerMessage.sType) {
-                case SLOGGER_MESSAGE_TYPE_ERROR: {
+    async log(prms) {
+        //Проверяем структуру переданного объекта для подключения
+        let sCheckResult = validateObject(prms, prmsLoggerSchema.log, "Параметры функции протоколирования");
+        //Если структура объекта в норме
+        if (!sCheckResult) {
+            //Определим оформление сообщения
+            let sPrefix = "ИНФОРМАЦИЯ";
+            let sColorPattern = "";
+            switch (prms.nLogState) {
+                case NLOG_STATE_ERR: {
                     sPrefix = "ОШИБКА";
                     sColorPattern = "\x1b[31m%s\x1b[0m%s";
                     break;
                 }
-                case SLOGGER_MESSAGE_TYPE_WARN: {
+                case NLOG_STATE_WRN: {
                     sPrefix = "ПРЕДУПРЕЖДЕНИЕ";
                     sColorPattern = "\x1b[33m%s\x1b[0m%s";
                     break;
                 }
-                case SLOGGER_MESSAGE_TYPE_INFO: {
+                case NLOG_STATE_INF: {
                     sPrefix = "ИНФОРМАЦИЯ";
                     sColorPattern = "\x1b[32m%s\x1b[0m%s";
                     break;
@@ -115,31 +69,56 @@ class Logger {
                 default:
                     break;
             }
-            sMessage = loggerMessage.sMessage;
-        } else {
-            sMessage = loggerMessage;
-        }
-        //Выдаём сообщение
-        console.log(sColorPattern, sPrefix + ": ", sMessage);
-        //Протоколируем в БД, если это необходимо
-        if (this.bLogDB)
-            try {
-                await this.logToDB(loggerMessage);
-            } catch (e) {
-                console.log("LOGGER ERROR: " + e.sMessage);
+            //Выдаём сообщение
+            console.log(sColorPattern, sPrefix + ": ", prms.sMsg);
+            //Протоколируем в БД, если это необходимо
+            if (this.bLogDB) {
+                try {
+                    //Если есть чем протоколировать
+                    if (this.dbConnector && this.dbConnector.bConnected) {
+                        await this.dbConnector.putLog(prms);
+                    }
+                } catch (e) {
+                    console.log("\x1b[31m%s\x1b[0m%s", "ОШИБКА ПРОТОКОЛИРОВАНИЯ: ", e.sMessage);
+                }
             }
+        } else {
+            console.log("\x1b[31m%s\x1b[0m%s", "ОШИБКА ПРОТОКОЛИРОВАНИЯ: ", sCheckResult);
+            console.log(prms);
+        }
     }
     //Протоколирование ошибки
-    async error(sMsg) {
-        await this.log(new LoggerMessage(SLOGGER_MESSAGE_TYPE_ERROR, sMsg));
+    async error(sMsg, prms) {
+        //Подготовим параметры для протоколирования
+        let logData = {};
+        if (prms) logData = _.cloneDeep(prms);
+        //Выставим сообщение и тип записи журнала
+        logData.nLogState = NLOG_STATE_ERR;
+        logData.sMsg = sMsg;
+        //Протоколируем
+        await this.log(logData);
     }
     //Протоколирование предупреждения
-    async warn(sMsg) {
-        await this.log(new LoggerMessage(SLOGGER_MESSAGE_TYPE_WARN, sMsg));
+    async warn(sMsg, prms) {
+        //Подготовим параметры для протоколирования
+        let logData = {};
+        if (prms) logData = _.cloneDeep(prms);
+        //Выставим сообщение и тип записи журнала
+        logData.nLogState = NLOG_STATE_WRN;
+        logData.sMsg = sMsg;
+        //Протоколируем
+        await this.log(logData);
     }
     //Протоколирование информации
-    async info(sMsg) {
-        await this.log(new LoggerMessage(SLOGGER_MESSAGE_TYPE_INFO, sMsg));
+    async info(sMsg, prms) {
+        //Подготовим параметры для протоколирования
+        let logData = {};
+        if (prms) logData = _.cloneDeep(prms);
+        //Выставим сообщение и тип записи журнала
+        logData.nLogState = NLOG_STATE_INF;
+        logData.sMsg = sMsg;
+        //Протоколируем
+        await this.log(logData);
     }
 }
 
@@ -147,8 +126,4 @@ class Logger {
 // Интерфейс модуля
 //-----------------
 
-exports.SLOGGER_MESSAGE_TYPE_ERROR = SLOGGER_MESSAGE_TYPE_ERROR;
-exports.SLOGGER_MESSAGE_TYPE_WARN = SLOGGER_MESSAGE_TYPE_WARN;
-exports.SLOGGER_MESSAGE_TYPE_INFO = SLOGGER_MESSAGE_TYPE_INFO;
-exports.LoggerMessage = LoggerMessage;
 exports.Logger = Logger;
