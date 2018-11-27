@@ -9,7 +9,7 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const Schema = require("validate"); //Схемы валидации
-const { SMODULES_PATH_MODULES } = require("../core/constants"); //Глобавльные константы системы
+const { SMODULES_PATH_MODULES } = require("./constants"); //Глобавльные константы системы
 
 //------------
 // Тело модуля
@@ -43,53 +43,6 @@ const validateObject = (obj, schema, sObjName) => {
     return sRes;
 };
 
-//Проверка корректности полей объекта
-const checkObject = (obj, interface) => {
-    //Объявим результат
-    let sRes = "";
-    //Если есть что проверять
-    if (obj && interface) {
-        //Eсли есть список полей для проверки
-        if (interface.fields) {
-            if (Array.isArray(interface.fields)) {
-                let noFields = [];
-                let noValues = [];
-                //Обходим проверяемые поля
-                interface.fields.forEach(fld => {
-                    //Проверим наличие поля в объекте (только для обязательных)
-                    if (fld.bRequired && !(fld.sName in obj)) {
-                        //Поля нет
-                        noFields.push(fld.sName);
-                    } else {
-                        //Поле есть, проверим наличие значения
-                        if (
-                            fld.bRequired &&
-                            (obj[fld.sName] === "undefined" || obj[fld.sName] === null || obj[fld.sName] === "")
-                        )
-                            //Обязательное поле не содержит значения
-                            noValues.push(fld.sName);
-                    }
-                });
-                //Сформируем итоговое сообщение
-                if (noFields.length > 0) sRes = "Объект не содержит полей: " + noFields.join(", ");
-                if (noValues.length > 0)
-                    sRes +=
-                        (sRes == "" ? "" : "; ") +
-                        "Обязательные поля объекта не имеют значений: " +
-                        noValues.join(", ");
-            } else {
-                sRes = "Список проверяемых полей объекта не является массивом";
-            }
-        } else {
-            sRes = "Не указан список проверяемых полей объекта";
-        }
-    } else {
-        sRes = "Не указан проверяемый объект и/или его интерфейс";
-    }
-    //Вернем результат
-    return sRes;
-};
-
 //Формирование полного пути к подключаемому модулю
 const makeModuleFullPath = sModuleName => {
     if (sModuleName) {
@@ -104,5 +57,4 @@ const makeModuleFullPath = sModuleName => {
 //-----------------
 
 exports.validateObject = validateObject;
-exports.checkObject = checkObject;
 exports.makeModuleFullPath = makeModuleFullPath;
