@@ -12,6 +12,10 @@ exports.SMODULES_PATH_CORE = "@core"; //Модули ядра
 exports.SMODULES_PATH_MODULES = "@modules"; //Дополнительные пользовательские модули
 exports.SMODULES_PATH_MODELS = "@models"; //Модели данных и схемы валидации
 
+//Типовые коды ошибок
+exports.SERR_COMMON = "ERR_COMMON"; //Общая ошибка
+exports.SERR_UNEXPECTED = "ERR_UNEXPECTED"; //Неожиданная ошибка
+
 //Типовые коды ошибок подключения модулей
 exports.SERR_MODULES_NO_MODULE_SPECIFIED = "ERR_MODULES_NO_MODULE_SPECIFIED"; //Не указан подключаемый модуль
 exports.SERR_MODULES_BAD_INTERFACE = "ERR_MODULES_BAD_INTERFACE"; //Ошибочный интерфейс подключаемого модуля
