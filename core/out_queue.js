@@ -79,7 +79,20 @@ class OutQueue extends EventEmitter {
         try {
             let outMsgs = await this.dbConn.getOutgoing({ nPortionSize: this.nPortionSize });
             if (Array.isArray(outMsgs) && outMsgs.length > 0) {
-                await this.logger.info("Новое исходящее сообщение: " + outMsgs.toString());
+                let logAll = outMsgs.map(async msg => {
+                    await this.logger.info(
+                        "Новое исходящее сообщение: " +
+                            msg.nId +
+                            ", " +
+                            msg.sInDate +
+                            ", " +
+                            msg.sServiceFnCode +
+                            ", " +
+                            msg.sExecState,
+                        { nQueueId: msg.nId }
+                    );
+                });
+                await Promise.all(logAll);
             } else {
                 await this.logger.info("Нет новых сообщений");
             }
