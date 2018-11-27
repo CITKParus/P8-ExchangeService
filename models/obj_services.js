@@ -8,7 +8,7 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
-const { Service } = require("../models/obj_service"); //Схема валидации сервиса
+const { Service } = require("./obj_service"); //Схема валидации сервиса
 
 //------------
 // Тело модуля

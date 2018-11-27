@@ -8,7 +8,7 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
-const { defServiceFunctions } = require("../models/obj_service_functions"); //Схема валидации списка функций сервиса
+const { defServiceFunctions } = require("./obj_service_functions"); //Схема валидации списка функций сервиса
 
 //----------
 // Константы
