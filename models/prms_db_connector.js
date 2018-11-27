@@ -8,7 +8,7 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
-const { NLOG_STATE_INF, NLOG_STATE_WRN, NLOG_STATE_ERR } = require("../models/obj_log"); //Схемы валидации записи журнала работы сервиса обмена
+const { NLOG_STATE_INF, NLOG_STATE_WRN, NLOG_STATE_ERR } = require("./obj_log"); //Схемы валидации записи журнала работы сервиса обмена
 const {
     NQUEUE_EXEC_STATE_INQUEUE,
     NQUEUE_EXEC_STATE_APP,
@@ -19,7 +19,7 @@ const {
     NQUEUE_EXEC_STATE_DB_ERR,
     NQUEUE_EXEC_STATE_OK,
     NQUEUE_EXEC_STATE_ERR
-} = require("../models/obj_queue"); //Схемы валидации сообщения очереди обмена
+} = require("./obj_queue"); //Схемы валидации сообщения очереди обмена
 
 //------------------
 //  Интерфейс модуля
