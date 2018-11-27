@@ -71,7 +71,7 @@ const dbConnect = new Schema({
 });
 
 //Схема валидации параметров обработки очереди исходящих сообщений
-const outgoing = new Schema({
+const outGoing = new Schema({
     //Размер блока одновременно обрабатываемых исходящих сообщений
     nPortionSize: {
         type: Number,
@@ -102,8 +102,22 @@ const outgoing = new Schema({
 
 //Схема валидации файла конфигурации
 const config = new Schema({
-    dbConnect,
-    outgoing
+    //Параметры подключения к БД
+    dbConnect: {
+        schema: dbConnect,
+        required: true,
+        message: {
+            required: "Не указаны параметры подключения к БД (dbConnect)"
+        }
+    },
+    //Параметры обработки очереди исходящих сообщений
+    outGoing: {
+        schema: outGoing,
+        required: true,
+        message: {
+            required: "Не указаны параметры обработки очереди исходящих сообщений (outGoing)"
+        }
+    }
 });
 
 //------------------
@@ -113,6 +127,6 @@ const config = new Schema({
 //Схема валидации записи журнала работы сервиса обмена
 exports.dbConnect = dbConnect;
 //Схема валидации параметров обработки очереди исходящих сообщений
-exports.outgoing = outgoing;
+exports.outGoing = outGoing;
 //Схема валидации файла конфигурации
 exports.config = config;

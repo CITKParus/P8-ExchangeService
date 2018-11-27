@@ -22,7 +22,7 @@ let dbConnect = {
 };
 
 //Параметры обработки очереди исходящих сообщений
-let outgoing = {
+let outGoing = {
     //Размер блока одновременно обрабатываемых исходящих сообщений
     nPortionSize: 1,
     //Интервал проверки наличия исходящих сообщений (мс)
@@ -35,5 +35,5 @@ let outgoing = {
 
 module.exports = {
     dbConnect,
-    outgoing
+    outGoing
 };
