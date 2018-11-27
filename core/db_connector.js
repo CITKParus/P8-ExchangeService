@@ -12,7 +12,7 @@ const EventEmitter = require("events"); //Обработчик пользова�
 const glConst = require("../core/constants"); //Глобальные константы
 const { ServerError } = require("../core/server_errors"); //Типовая ошибка
 const { makeModuleFullPath, validateObject } = require("../core/utils"); //Вспомогательные функции
-const prmsDBConnectorSchema = require("../models/prms_db_connector"); //Схемы валидации параметров процедур модуля
+const prmsDBConnectorSchema = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля
 const intfDBConnectorModuleSchema = require("../models/intf_db_connector_module"); //Схема валидации интерфейса модуля взаимодействия с БД
 const objServicesSchema = require("../models/obj_services"); //Схема валидации списка сервисов
 const objQueueSchema = require("../models/obj_queue"); //Схема валидации сообщения очереди обмена
@@ -43,7 +43,11 @@ class DBConnector extends EventEmitter {
         //создадим экземпляр родительского класса
         super();
         //Проверяем структуру переданного объекта для подключения
-        let sCheckResult = validateObject(prms, prmsDBConnectorSchema.DBConnector, "Параметры конструктора");
+        let sCheckResult = validateObject(
+            prms,
+            prmsDBConnectorSchema.DBConnector,
+            "Параметры конструктора класса DBConnector"
+        );
         //Если структура объекта в норме
         if (!sCheckResult) {
             //Проверяем наличие модуля для работы с БД в настройках подключения
@@ -62,7 +66,7 @@ class DBConnector extends EventEmitter {
                 //Всё успешно - сохраним настройки подключения
                 this.connectSettings = _.cloneDeep(prms);
                 //Инициализируем остальные свойства
-                this.connection = {};
+                this.connection = null;
                 this.bConnected = false;
             } else {
                 throw new ServerError(
@@ -100,7 +104,7 @@ class DBConnector extends EventEmitter {
                 //Отключаемся
                 await this.connector.disconnect({ connection: this.connection });
                 //Забываем подключение и удаляем флаги подключенности
-                this.connection = {};
+                this.connection = null;
                 this.bConnected = false;
                 //Расскажем всем, что отключились
                 this.emit(SEVT_DB_CONNECTOR_DISCONNECTED);
