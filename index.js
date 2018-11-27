@@ -10,12 +10,14 @@
 require("module-alias/register"); //Поддержка псевонимов при подключении модулей
 const cfg = require("./config"); //Настройки сервера приложений
 const app = require("./core/app"); //Сервер приложений
+const { ServerError } = require("./core/server_errors"); //Типовая ошибка
+const { SERR_UNEXPECTED } = require("./core/constants"); //Общесистемные константы
 
 //--------------------------
 // Глобальные идентификаторы
 //--------------------------
 
-let appSrv = new app.ParusAppServer(cfg); //Экземпляр сервера приложений
+let appSrv = new app.ParusAppServer(); //Экземпляр сервера приложений
 
 //----------------------------------------
 // Управление процессом сервера приложений
@@ -39,8 +41,19 @@ process.on("SIGINT", () => {
 
 //Старутем
 appSrv
-    .run()
-    .then(r => {})
+    .init(cfg)
+    .then(r => {
+        appSrv
+            .run()
+            .then(r => {})
+            .catch(e => {
+                if (e instanceof ServerError) appSrv.logger.error(e.sCode + ": " + e.sMessage);
+                else appSrv.logger.error(SERR_UNEXPECTED + ": " + e.message);
+                appSrv.stop();
+            });
+    })
     .catch(e => {
-        appSrv.logger.error("НЕОЖИДАННАЯ ОШИБКА: " + e);
+        if (e instanceof ServerError) appSrv.logger.error(e.sCode + ": " + e.sMessage);
+        else appSrv.logger.error(SERR_UNEXPECTED + ": " + e.message);
+        appSrv.stop();
     });
