@@ -14,7 +14,7 @@ const Schema = require("validate"); //Схемы валидации
 //------------------
 
 //Функция проверки значения размера блока одновременно обрабатываемых исходящих сообщений
-const checkPortionSize = val => val >= 1 && val <= 100 && Number.isInteger(val);
+const checkMaxWorkers = val => val >= 1 && val <= 100 && Number.isInteger(val);
 
 //Функция проверки значения интервала проверки наличия исходящих сообщений
 const checkCheckTimeout = val => val >= 100 && val <= 60000 && Number.isInteger(val);
@@ -73,15 +73,15 @@ const dbConnect = new Schema({
 //Схема валидации параметров обработки очереди исходящих сообщений
 const outGoing = new Schema({
     //Размер блока одновременно обрабатываемых исходящих сообщений
-    nPortionSize: {
+    nMaxWorkers: {
         type: Number,
         required: true,
-        use: { checkPortionSize },
+        use: { checkMaxWorkers },
         message: {
             type:
                 "Размер блока одновременно обрабатываемых исходящих сообщений (nPortionSize) имеет некорректный тип данных (ожидалось - Number)",
             required: "Не указан размер блока одновременно обрабатываемых исходящих сообщений (nPortionSize)",
-            checkPortionSize:
+            checkMaxWorkers:
                 "Значение размера блока одновременно обрабатываемых исходящих сообщений (nPortionSize) должно быть целым числом в диапазоне от 1 до 100"
         }
     },
