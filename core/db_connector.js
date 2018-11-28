@@ -57,7 +57,16 @@ class DBConnector extends EventEmitter {
             //Проверяем наличие модуля для работы с БД в настройках подключения
             if (prms.connectSettings.sConnectorModule) {
                 //Подключим модуль
-                this.connector = require(makeModuleFullPath(prms.connectSettings.sConnectorModule));
+                try {
+                    this.connector = require(makeModuleFullPath(prms.connectSettings.sConnectorModule));
+                } catch (e) {
+                    throw new ServerError(
+                        SERR_MODULES_BAD_INTERFACE,
+                        "Ошибка подключения пользовательского модуля: " +
+                            e.message +
+                            ". Проверьте модуль на отсутствие синтаксических ошибок."
+                    );
+                }
                 //Проверим его интерфейс
                 let sCheckResult = validateObject(
                     this.connector,
