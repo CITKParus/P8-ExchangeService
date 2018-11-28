@@ -12,10 +12,11 @@ const queueModel = require("./models/obj_queue"); //Модель данных п
 const queuesModel = require("./models/obj_queues"); //Модель данных списка позиций очереди обмена
 const dbConnectorModel = require("./models/prms_db_connector"); //Описатели параметров функций модуля подключения к БД
 const dbConnectorInterfaceModel = require("./models/intf_db_connector_module"); //Интерфейс модуля взаимодействия с БД
+const configModel = require("./models/obj_config"); //Модель данных настроек сервера приложений
+const prmsAppModel = require("./models/prms_app"); //Модель данны параметров функций сервера приложений
 const utl = require("./core/utils"); //Вспомогательные функции
 const db = require("./core/db_connector"); //Взаимодействие с БД
 const cfg = require("./config"); //Настройки сервера приложений
-
 const pDB = require("./modules/parus_oracle_db");
 
 //let a = utl.validateObject(
@@ -69,7 +70,23 @@ const getServices = async () => {
     }
 };
 
-getServices();
+//getServices();
+let errs = utl.validateObject(cfg, configModel.config, "Файл настроек");
+if (errs) console.log(errs);
+else console.log("Нет ошибок в файле настроек");
+
+errs = utl.validateObject(cfg.dbConnect, configModel.dbConnect, "Настройки подключения");
+if (errs) console.log(errs);
+else console.log("Нет ошибок в настройках подключения");
+
+errs = utl.validateObject(cfg.outgoing, configModel.outgoing, "Параметры очереди");
+if (errs) console.log(errs);
+else console.log("Нет ошибок в параметрах очереди");
+
+cfg.dbConnect.sUser = null;
+errs = utl.validateObject({ config: cfg }, prmsAppModel.init, "Параметры инициализации сервера приложений");
+if (errs) console.log(errs);
+else console.log("Нет ошибок в инициализации сервера приложений");
 
 /*
 const errors = srvModel.schema.validate({ nId: 123, sCode: "", nSrvType: "", sSrvType: "" });
