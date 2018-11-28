@@ -13,9 +13,9 @@ const Schema = require("validate"); //Схемы валидации
 // Тело модуля
 //------------
 
-const validateFunctionType = val => {
+const validateAsyncFunctionType = val => {
     let sFn = {}.toString.call(val);
-    return sFn === "[object Function]" || sFn === "[object AsyncFunction]";
+    return sFn === "[object AsyncFunction]";
 };
 
 //------------------
@@ -26,80 +26,80 @@ const validateFunctionType = val => {
 exports.dbConnectorModule = new Schema({
     //Подключение к БД
     connect: {
-        use: { validateFunctionType },
+        use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateFunctionType:
+            validateAsyncFunctionType:
                 "Функция подключения к БД (connect) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция подключения к БД (connect)"
         }
     },
     //Отключение от БД
     disconnect: {
-        use: { validateFunctionType },
+        use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateFunctionType:
+            validateAsyncFunctionType:
                 "Функция отключения от БД (disconnect) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция отключения от БД (disconnect)"
         }
     },
     //Получение списка сервисов
     getServices: {
-        use: { validateFunctionType },
+        use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateFunctionType:
+            validateAsyncFunctionType:
                 "Функция получения списка сервисов (getServices) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция получения списка сервисов (getServices)"
         }
     },
     //Получения списка функций сервиса
     getServiceFunctions: {
-        use: { validateFunctionType },
+        use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateFunctionType:
+            validateAsyncFunctionType:
                 "Функция получения списка функций сервиса (getServiceFunctions) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция получения списка функций сервиса (getServiceFunctions)"
         }
     },
     //Протоколирование работы сервиса
     log: {
-        use: { validateFunctionType },
+        use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateFunctionType:
+            validateAsyncFunctionType:
                 "Функция протоколирования работы сервиса (log) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция протоколирования работы сервиса (log)"
         }
     },
     //Считывание записей исходящих сообщений очереди
     getQueueOutgoing: {
-        use: { validateFunctionType },
+        use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateFunctionType:
+            validateAsyncFunctionType:
                 "Функция считывания записей исходящих сообщений очереди (getQueueOutgoing) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция считывания записей исходящих сообщений очереди (getQueueOutgoing)"
         }
     },
     //Добавление входящего сообщения очереди
     putQueueIncoming: {
-        use: { validateFunctionType },
+        use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateFunctionType:
+            validateAsyncFunctionType:
                 "Функция добавления входящего сообщения очереди (putQueueIncoming) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция добавления входящего сообщения очереди (putQueueIncoming)"
         }
     },
     //Уствновка состояния записи очереди
     setQueueState: {
-        use: { validateFunctionType },
+        use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateFunctionType:
+            validateAsyncFunctionType:
                 "Функция уствновки состояния записи очереди (setQueueState) имеет неверный формат (ожидалось - Function или AsyncFunction)",
             required: "Не реализована функция уствновки состояния записи очереди (setQueueState)"
         }
