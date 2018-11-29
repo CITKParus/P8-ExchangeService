@@ -4,117 +4,61 @@
 */
 
 require("module-alias/register");
-const srvsModel = require("./models/obj_services"); //Модель данных списка сервисов
-const srvModel = require("./models/obj_service"); //Модель данных сервиса
-const srvFnModel = require("./models/obj_service_function"); //Модель данных функции сервиса
-const srvFnSModel = require("./models/obj_service_functions"); //Модель данных функции сервиса
-const queueModel = require("./models/obj_queue"); //Модель данных позиции очереди обмена
-const queuesModel = require("./models/obj_queues"); //Модель данных списка позиций очереди обмена
-const dbConnectorModel = require("./models/prms_db_connector"); //Описатели параметров функций модуля подключения к БД
-const dbConnectorInterfaceModel = require("./models/intf_db_connector_module"); //Интерфейс модуля взаимодействия с БД
-const configModel = require("./models/obj_config"); //Модель данных настроек сервера приложений
-const prmsAppModel = require("./models/prms_app"); //Модель данны параметров функций сервера приложений
-const utl = require("./core/utils"); //Вспомогательные функции
 const db = require("./core/db_connector"); //Взаимодействие с БД
 const cfg = require("./config"); //Настройки сервера приложений
-const pDB = require("./modules/parus_oracle_db");
+const childProcess = require("child_process"); //Работа с дочерними процессами
+const objOutQueueProcessorSchema = require("./models/obj_out_queue_processor"); //Схема валидации сообщений обмена с бработчиком очереди исходящих сообщений
+const { makeModuleFullPath, validateObject } = require("./core/utils"); //Вспомогательные функции
 
-//let a = utl.validateObject(
-//   { nQueueId: 123, nExecState: 123, sExecMsg: "" },
-//   dbConnectorModel.getQueueStatePrmsSchema,
-//   "Тестовый"
-//);
-//console.log(a);
-
-//let b = utl.validateObject(
-//    pDB,
-//    dbConnectorInterfaceModel.dbConnectorModule,
-//    "Пользовательский модуль подключения к БД"
-//);
-//if (b) console.log(b);
-//else console.log("Нет ошибок в модуле");
-
+/*
+let proc = childProcess.fork("core/out_queue_processor", { silent: true });
+*/
 const getServices = async () => {
-    let d = new db.DBConnector(cfg.dbConnect);
+    let d = new db.DBConnector({ connectSettings: cfg.dbConnect });
     try {
         await d.connect();
-        let r = await d.getServices();
-        let q = await d.getOutgoing({ nPortionSize: 1 });
-        console.log(q);
-        let qs = await d.setQueueState({ nQueueId: 94568140, nExecState: 0 });
-        console.log(qs);
-        let l = await d.putLog({ nLogState: 0, sMsg: "Тест", nServiceId: 94557937, nServiceFnId: 94557939 });
+        //let r = await d.getServices();
+        //let q = await d.getOutgoing({ nPortionSize: 1 });
+        await d.setQueueState({ nQueueId: 2, nExecState: 1, nIncExecCnt: 0 });
         await d.disconnect();
-        /*
-    console.log(q[0]);
-    console.log(q[0].blMsg instanceof Buffer);
-    let errs = utl.validateObject(r[1], srvModel.Service, "Сервис");
-    let errs2 = utl.validateObject({ functions: r[1].functions }, srvFnSModel.ServiceFunctions, "Функция сервиса");
-    let errs3 = utl.validateObject({ services: r }, srvsModel.Services, "Список сервисов");
-    let errs4 = utl.validateObject(q[0], queueModel.Queue, "Позиция очереди обмена");
-    let errs5 = utl.validateObject({ queues: q }, queuesModel.Queues, "Очередь сообщений обмена");
-    if (errs2) console.log(errs2);
-    else console.log("Нет ошибок в функции сервиса");
-    if (errs) console.log(errs);
-    else console.log("Нет ошибок в сервисе");
-    if (errs3) console.log(errs3);
-    else console.log("Нет ошибок в списке сервисов");
-    if (errs4) console.log(errs4);
-    else console.log("Нет ошибок в сообщении обмена");
-    if (errs5) console.log(errs5);
-    else console.log("Нет ошибок в очереди сообщений обмена");
-    */
     } catch (e) {
         await d.disconnect();
         console.log(e.sCode + " " + e.sMessage);
     }
 };
-
-//getServices();
-let errs = utl.validateObject(cfg, configModel.config, "Файл настроек");
-if (errs) console.log(errs);
-else console.log("Нет ошибок в файле настроек");
-
-errs = utl.validateObject(cfg.dbConnect, configModel.dbConnect, "Настройки подключения");
-if (errs) console.log(errs);
-else console.log("Нет ошибок в настройках подключения");
-
-errs = utl.validateObject(cfg.outgoing, configModel.outgoing, "Параметры очереди");
-if (errs) console.log(errs);
-else console.log("Нет ошибок в параметрах очереди");
-
-cfg.dbConnect.sUser = null;
-errs = utl.validateObject({ config: cfg }, prmsAppModel.init, "Параметры инициализации сервера приложений");
-if (errs) console.log(errs);
-else console.log("Нет ошибок в инициализации сервера приложений");
-
 /*
-const errors = srvModel.schema.validate({ nId: 123, sCode: "", nSrvType: "", sSrvType: "" });
-console.log(errors);
-let a = errors.map(e => {
-    return e.message;
-});
-console.log(a.join("; "));
-
-const dbConn = new db.DBConnector(cfg.dbConnect);
-
-const test = async () => {
-    await dbConn.connect();
-    let r = await dbConn.getOutgoing({ nPortionSize: 123 });
-    console.log(r);
-    try {
-        let rr = await dbConn.setQueueState({
-            nQueueId: 94568140,
-            nExecState: 1,
-            sExecMsg: "Обработано сервером приложений"
-        });
-        console.log(rr);
-    } catch (e) {
-        console.log(e.sMessage);
+proc.on("message", m => {
+    console.log("SUBPROCESS MESSAGE: " + m);
+    if (m == "ready") {
+        console.log("DONE!!!");
+        proc.kill();
+    } else {
+        console.log("ERROR!!!");
+        proc.kill();
     }
+});
 
-    await dbConn.disconnect();
-};
+proc.on("error", e => {
+    console.log("SUBPROCESS ERROR: " + e.message);
+    proc.kill();
+});
+proc.on("uncaughtException", e => {
+    console.log("SUBPROCESS EXCEPTION: " + e.message);
+    proc.kill();
+});
 
-test();
+proc.on("exit", code => {
+    console.log("SUBPROCESS EXIT: " + code);
+});
 */
+//proc.send({ nId: "12345" });
+
+getServices();
+
+//let sCheckResult = validateObject(
+//    { nExecState: null, sExecMsg: null, blResp: null },
+//objOutQueueProcessorSchema.OutQueueProcessorTaskResult,
+//"Задача обработчика очереди исходящих сообщений"
+//);
+
+//console.log(sCheckResult);
