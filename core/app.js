@@ -28,19 +28,54 @@ class ParusAppServer {
         this.dbConn = null;
         //Обработчик очереди исходящих
         this.outQ = null;
+        //Флаг остановки сервера
+        this.bStopping = false;
         //Привяжем методы к указателю на себя для использования в обработчиках событий
         this.onDBConnected = this.onDBConnected.bind(this);
         this.onDBDisconnected = this.onDBDisconnected.bind(this);
+        this.onOutQStarted = this.onOutQStarted.bind(this);
+        this.onOutQStopped = this.onOutQStopped.bind(this);
     }
     //При подключении к БД
     async onDBConnected(connection) {
+        //Укажем логгеру, что можно писать в базу
         this.logger.setDBConnector(this.dbConn, true);
+        //Сообщим, что подключились к БД
         await this.logger.info("Сервер приложений подключен к БД");
     }
     //При отключении от БД
     async onDBDisconnected() {
+        //Укажем логгеру, что писать в базу больше нельзя
         this.logger.removeDBConnector();
+        //Сообщим, что отключились от БД
         await this.logger.warn("Сервер приложений отключен от БД");
+    }
+    //При запуске обработчика исходящих сообщений
+    async onOutQStarted() {
+        //Сообщим, что запустили обработчик
+        await this.logger.info("Обработчик очереди исходящих сообщений запущен");
+    }
+    //При останове обработчика исходящих сообщений
+    async onOutQStopped() {
+        //Сообщим, что остановили обработчик
+        await this.logger.warn("Обработчик очереди исходящих сообщений остановлен");
+        //Отключение от БД
+        if (this.dbConn) {
+            if (this.dbConn.bConnected) {
+                await this.logger.warn("Отключение сервера приложений от БД...");
+                try {
+                    await this.dbConn.disconnect();
+                    process.exit(0);
+                } catch (e) {
+                    await this.logger.error("Ошибка отключения от БД: " + e.sCODE + ": " + e.sMessage);
+                    process.exit(1);
+                }
+            } else {
+                process.exit(0);
+            }
+        } else {
+            process.exit(0);
+        }
     }
     //Инициализация сервера
     async init(prms) {
@@ -61,34 +96,38 @@ class ParusAppServer {
     }
     //Запуск сервера
     async run() {
+        //Рапортуем, что начали запуск
         await this.logger.info("Запуск сервера приложений...");
+        //Проверим, что сервер успешно инициализирован
         if (!this.logger || !this.dbConn || !this.outQ) {
             throw new ServerError(SERR_COMMON, "Не пройдена инициализация");
         }
+        //Включим прослушивание событий БД (для подключения/отключения логгера к БД)
         this.dbConn.on(db.SEVT_DB_CONNECTOR_CONNECTED, this.onDBConnected);
         this.dbConn.on(db.SEVT_DB_CONNECTOR_DISCONNECTED, this.onDBDisconnected);
+        //Включим прослушивание событий обработчика исходящих сообщений
+        this.outQ.on(oq.SEVT_OUT_QUEUE_STARTED, this.onOutQStarted);
+        this.outQ.on(oq.SEVT_OUT_QUEUE_STOPPED, this.onOutQStopped);
+        //Подключаемся к БД
         await this.logger.info("Подключение сервера приложений к БД...");
         await this.dbConn.connect();
-        await this.outQ.startProcessing();
+        //Запускаем обслуживание очереди исходящих
+        await this.logger.info("Запуск обработчика очереди исходящих сообщений...");
+        this.outQ.startProcessing();
+        //Рапортуем, что запустились
         await this.logger.info("Сервер приложений запущен");
     }
     //Останов сервера
     async stop() {
-        await this.logger.warn("Останов сервера приложений...");
-        if (this.outQ) await this.outQ.stopProcessing();
-        if (this.dbConn) {
-            if (this.dbConn.bConnected) {
-                await this.logger.warn("Отключение сервера приложений от БД...");
-                try {
-                    await this.dbConn.disconnect();
-                    process.exit(0);
-                } catch (e) {
-                    await this.logger.error("Ошибка отключения от БД: " + e.sCODE + ": " + e.sMessage);
-                    process.exit(1);
-                }
-            } else {
-                process.exit(0);
-            }
+        if (!this.bStopping) {
+            //Установим флаг - остановка в процессе
+            this.bStopping = true;
+            //Сообщаем, что начала останов сервера
+            await this.logger.warn("Останов сервера приложений...");
+            //Останов обслуживания очереди исходящих
+            await this.logger.warn("Останов обработчика очереди исходящих сообщений...");
+            if (this.outQ) this.outQ.stopProcessing();
+            else this.onOutQStopped();
         }
     }
 }

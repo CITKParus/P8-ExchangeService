@@ -29,31 +29,60 @@ process.on("exit", code => {
     appSrv.logger.warn("Сервер приложений остановлен (код: " + code + ") ");
 });
 
-//Перехват CTRL + C (останова процесса)
-process.on("SIGINT", () => {
+//Перехват CTRL + C (останов процесса)
+process.on("SIGINT", async () => {
+    console.log("SIGINT");
+    //Инициируем выход из процесса
+    await appSrv.stop();
+});
+
+//Перехват CTRL + \ (останов процесса)
+process.on("SIGQUIT", () => {
+    console.log("SIGQUIT");
     //Инициируем выход из процесса
     appSrv.stop();
 });
+
+//Перехват мягкого останова процесса
+process.on("SIGTERM", () => {
+    console.log("SIGTERM");
+    //Инициируем выход из процесса
+    appSrv.stop();
+});
+
+//Грубый останов процесса (здесь сделать ничего нельзя, но мы пытаемся)
+process.on("SIGKILL", () => {
+    console.log("SIGKILL");
+    //Инициируем выход из процесса
+    appSrv.stop();
+});
+
+//Запуск сервера приложений
+const start = async () => {
+    try {
+        //Инициализируем сервер приложений
+        await appSrv.init({ config: cfg });
+        //Включаем его
+        await appSrv.run();
+    } catch (e) {
+        //Если есть ошибки с которыми сервер не справился - ловим их, показываем...
+        if (e instanceof ServerError) appSrv.logger.error(e.sCode + ": " + e.sMessage);
+        else appSrv.logger.error(SERR_UNEXPECTED + ": " + e.message);
+        //...и пытаемся остановить сервер нормально
+        try {
+            await appSrv.stop();
+        } catch (e) {
+            //Могут быть ошибки и при остановке - это аварийный выход
+            if (e instanceof ServerError) appSrv.logger.error(e.sCode + ": " + e.sMessage);
+            else appSrv.logger.error(SERR_UNEXPECTED + ": " + e.message);
+            process.exit(1);
+        }
+    }
+};
 
 //------------
 // Точка входа
 //------------
 
 //Старутем
-appSrv
-    .init({ config: cfg })
-    .then(r => {
-        appSrv
-            .run()
-            .then(r => {})
-            .catch(e => {
-                if (e instanceof ServerError) appSrv.logger.error(e.sCode + ": " + e.sMessage);
-                else appSrv.logger.error(SERR_UNEXPECTED + ": " + e.message);
-                appSrv.stop();
-            });
-    })
-    .catch(e => {
-        if (e instanceof ServerError) appSrv.logger.error(e.sCode + ": " + e.sMessage);
-        else appSrv.logger.error(SERR_UNEXPECTED + ": " + e.message);
-        appSrv.stop();
-    });
+start();
