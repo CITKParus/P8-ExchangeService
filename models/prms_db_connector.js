@@ -22,9 +22,21 @@ const {
     NQUEUE_EXEC_STATE_ERR
 } = require("./obj_queue"); //Схемы валидации сообщения очереди обмена
 
+//----------
+// Константы
+//----------
+
+//Признак инкремента количества попыток исполнения позиции очереди
+NINC_EXEC_CNT_NO = 0; //Не инкрементировать
+NINC_EXEC_CNT_YES = 1; //Инкрементировать
+
 //------------------
 //  Интерфейс модуля
 //------------------
+
+//Константы
+exports.NINC_EXEC_CNT_NO = NINC_EXEC_CNT_NO;
+exports.NINC_EXEC_CNT_YES = NINC_EXEC_CNT_YES;
 
 //Схема валидации параметров конструктора
 exports.DBConnector = new Schema({
@@ -147,6 +159,18 @@ exports.setQueueState = new Schema({
         message: {
             type: "Сообщение обработчика (sExecMsg) имеет некорректный тип данных (ожидалось - String)",
             required: "Не указано сообщени обработчика (sExecMsg)"
+        }
+    },
+    //Флаг инкремента количества исполнений
+    nIncExecCnt: {
+        type: Number,
+        enum: [NINC_EXEC_CNT_NO, NINC_EXEC_CNT_YES],
+        required: false,
+        message: {
+            type:
+                "Флаг инкремента количества исполнений (nIncExecCnt) имеет некорректный тип данных (ожидалось - Number)",
+            enum: "Значение флага инкремента количества исполнений (nIncExecCnt) не поддерживается",
+            required: "Не указан флаг икремента количества исполнений (nIncExecCnt)"
         }
     }
 });

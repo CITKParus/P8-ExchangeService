@@ -180,11 +180,12 @@ const putQueueIncoming = async prms => {};
 const setQueueState = async prms => {
     try {
         let res = await prms.connection.execute(
-            "BEGIN PKG_EXS.QUEUE_EXEC_STATE_SET(NEXSQUEUE => :NEXSQUEUE, NEXEC_STATE => :NEXEC_STATE, SEXEC_MSG => :SEXEC_MSG, RCQUEUE => :RCQUEUE); END;",
+            "BEGIN PKG_EXS.QUEUE_EXEC_STATE_SET(NEXSQUEUE => :NEXSQUEUE, NEXEC_STATE => :NEXEC_STATE, SEXEC_MSG => :SEXEC_MSG, NINC_EXEC_CNT => :NINC_EXEC_CNT, RCQUEUE => :RCQUEUE); END;",
             {
                 NEXSQUEUE: prms.nQueueId,
                 NEXEC_STATE: prms.nExecState,
                 SEXEC_MSG: prms.sExecMsg,
+                NINC_EXEC_CNT: prms.nIncExecCnt,
                 RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
             {

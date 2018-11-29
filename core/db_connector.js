@@ -9,8 +9,8 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const EventEmitter = require("events"); //Обработчик пользовательских событий
-const { ServerError } = require("../core/server_errors"); //Типовая ошибка
-const { makeModuleFullPath, validateObject } = require("../core/utils"); //Вспомогательные функции
+const { ServerError } = require("./server_errors"); //Типовая ошибка
+const { makeModuleFullPath, validateObject } = require("./utils"); //Вспомогательные функции
 const prmsDBConnectorSchema = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля
 const intfDBConnectorModuleSchema = require("../models/intf_db_connector_module"); //Схема валидации интерфейса модуля взаимодействия с БД
 const objServicesSchema = require("../models/obj_services"); //Схема валидации списка сервисов
@@ -21,7 +21,7 @@ const {
     SERR_MODULES_BAD_INTERFACE,
     SERR_OBJECT_BAD_INTERFACE,
     SERR_MODULES_NO_MODULE_SPECIFIED
-} = require("../core/constants"); //Глобальные константы
+} = require("./constants"); //Глобальные константы
 
 //----------
 // Константы
