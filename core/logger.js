@@ -8,7 +8,7 @@
 //----------------------
 
 const _ = require("lodash"); //Работа с массивами и объектами
-const { validateObject } = require("../core/utils"); //Вспомогательные функции
+const { validateObject } = require("./utils"); //Вспомогательные функции
 const db = require("./db_connector"); //Модуль взаимодействия с БД
 const { NLOG_STATE_INF, NLOG_STATE_WRN, NLOG_STATE_ERR } = require("../models/obj_log"); //Схемы валидации записи журнала работы сервиса обмена
 const prmsLoggerSchema = require("../models/prms_logger"); //Схемы валидации параметров функций модуля
