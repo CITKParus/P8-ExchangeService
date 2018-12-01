@@ -57,7 +57,7 @@ class ParusAppServer {
         //Запускаем обслуживание очереди исходящих
         await this.logger.info("Запуск обработчика очереди исходящих сообщений...");
         try {
-            this.outQ.startProcessing(this.services);
+            this.outQ.startProcessing({ services: this.services });
         } catch (e) {
             await this.logger.error(
                 "Ошибка запуска обработчика очереди исходящих сообщений: " + e.sCode + ": " + e.sMessage
