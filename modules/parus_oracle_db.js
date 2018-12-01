@@ -9,50 +9,6 @@
 
 const oracledb = require("oracledb"); //Работа с СУБД Oracle
 
-//----------
-// Константы
-//----------
-
-//Типы сервисов
-const NSRV_TYPE_SEND = 0; //Отправка сообщений
-const NSRV_TYPE_RECIVE = 1; //Получение сообщений
-const SSRV_TYPE_SEND = "SEND"; //Отправка сообщений (строковый код)
-const SSRV_TYPE_RECIVE = "RECIVE"; //Получение сообщений (строковый код)
-
-//Признак оповещения о простое удаленного сервиса
-const NUNAVLBL_NTF_SIGN_NO = 0; //Не оповещать о простое
-const NUNAVLBL_NTF_SIGN_YES = 1; //Оповещать о простое
-const SUNAVLBL_NTF_SIGN_NO = "UNAVLBL_NTF_NO"; //Не оповещать о простое (строковый код)
-const SUNAVLBL_NTF_SIGN_YES = "UNAVLBL_NTF_YES"; //Оповещать о простое (строковый код)
-
-//Состояния записей журнала работы сервиса
-const NLOG_STATE_INF = 0; //Информация
-const NLOG_STATE_WRN = 1; //Предупреждение
-const NLOG_STATE_ERR = 2; //Ошибка
-const SLOG_STATE_INF = "INF"; //Информация (строковый код)
-const SLOG_STATE_WRN = "WRN"; //Предупреждение (строковые коды)
-const SLOG_STATE_ERR = "ERR"; //Ошибка (строковый код)
-
-// Состояния исполнения записей очереди сервиса
-const NQUEUE_EXEC_STATE_INQUEUE = 0; //Поставлено в очередь
-const NQUEUE_EXEC_STATE_APP = 1; //Обрабатывается сервером приложений
-const NQUEUE_EXEC_STATE_APP_OK = 2; //Успешно обработано сервером приложений
-const NQUEUE_EXEC_STATE_APP_ERR = 3; //Ошибка обработки сервером приложений
-const NQUEUE_EXEC_STATE_DB = 4; //Обрабатывается СУБД
-const NQUEUE_EXEC_STATE_DB_OK = 5; //Успешно обработано СУБД
-const NQUEUE_EXEC_STATE_DB_ERR = 6; //Ошибка обработки СУБД
-const NQUEUE_EXEC_STATE_OK = 7; //Обработано успешно
-const NQUEUE_EXEC_STATE_ERR = 8; //Обработано с ошибками
-const SQUEUE_EXEC_STATE_INQUEUE = "INQUEUE"; //Поставлено в очередь
-const SQUEUE_EXEC_STATE_APP = "APP"; //Обрабатывается сервером приложений
-const SQUEUE_EXEC_STATE_APP_OK = "APP_OK"; //Успешно обработано сервером приложений
-const SQUEUE_EXEC_STATE_APP_ERR = "APP_ERR"; //Ошибка обработки сервером приложений
-const SQUEUE_EXEC_STATE_DB = "DB"; //Обрабатывается СУБД
-const SQUEUE_EXEC_STATE_DB_OK = "DB_OK"; //Успешно обработано СУБД
-const SQUEUE_EXEC_STATE_DB_ERR = "DB_ERR"; //Ошибка обработки СУБД
-const SQUEUE_EXEC_STATE_OK = "OK"; //Обработано успешно
-const SQUEUE_EXEC_STATE_ERR = "ERR"; //Обработано с ошибками
-
 //------------
 // Тело модуля
 //------------
@@ -118,8 +74,8 @@ const getServices = async prms => {
 const getServiceFunctions = async prms => {
     try {
         let res = await prms.connection.execute(
-            "BEGIN PKG_EXS.SERVICEFN_GET(NSERVICE => :NSERVICE, RCSERVICEFNS => :RCSERVICEFNS); END;",
-            { NSERVICE: prms.nServiceId, RCSERVICEFNS: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT } },
+            "BEGIN PKG_EXS.SERVICEFNS_GET(NEXSSERVICE => :NEXSSERVICE, RCSERVICEFNS => :RCSERVICEFNS); END;",
+            { NEXSSERVICE: prms.nServiceId, RCSERVICEFNS: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT } },
             { outFormat: oracledb.OBJECT }
         );
         let rows = await readCursorData(res.outBinds.RCSERVICEFNS);
@@ -155,10 +111,9 @@ const log = async prms => {
 const getQueueOutgoing = async prms => {
     try {
         let res = await prms.connection.execute(
-            "BEGIN PKG_EXS.QUEUE_NEXT_GET(NPORTION_SIZE => :NPORTION_SIZE, NSRV_TYPE => :NSRV_TYPE, RCQUEUES => :RCQUEUES); END;",
+            "BEGIN PKG_EXS.QUEUE_SRV_TYPE_SEND_GET(NPORTION_SIZE => :NPORTION_SIZE, RCQUEUES => :RCQUEUES); END;",
             {
                 NPORTION_SIZE: prms.nPortionSize,
-                NSRV_TYPE: NSRV_TYPE_SEND,
                 RCQUEUES: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
             {
