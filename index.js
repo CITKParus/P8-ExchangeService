@@ -31,28 +31,28 @@ process.on("exit", code => {
 
 //Перехват CTRL + C (останов процесса)
 process.on("SIGINT", async () => {
-    console.log("SIGINT");
+    appSrv.logger.warn("Получен сигнал на останов сервера приложений: SIGINT");
     //Инициируем выход из процесса
     await appSrv.stop();
 });
 
 //Перехват CTRL + \ (останов процесса)
 process.on("SIGQUIT", () => {
-    console.log("SIGQUIT");
+    appSrv.logger.warn("Получен сигнал на останов сервера приложений: SIGQUIT");
     //Инициируем выход из процесса
     appSrv.stop();
 });
 
 //Перехват мягкого останова процесса
 process.on("SIGTERM", () => {
-    console.log("SIGTERM");
+    appSrv.logger.warn("Получен сигнал на останов сервера приложений: SIGTERM");
     //Инициируем выход из процесса
     appSrv.stop();
 });
 
 //Грубый останов процесса (здесь сделать ничего нельзя, но мы пытаемся)
 process.on("SIGKILL", () => {
-    console.log("SIGKILL");
+    appSrv.logger.warn("Получен сигнал на останов сервера приложений: SIGKILL");
     //Инициируем выход из процесса
     appSrv.stop();
 });
