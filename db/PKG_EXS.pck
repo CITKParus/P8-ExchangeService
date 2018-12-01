@@ -129,6 +129,25 @@ create or replace package PKG_EXS as
     SSUB_CONTAINER          in varchar2 := null -- Наименование контейнера второго уровня
   );
   
+  /* Вычисление даты следующего запуска расписания */
+  function UTL_SCHED_CALC_NEXT_DATE
+  (
+    DEXEC_DATE              in date,    -- Дата предыдущего исполнения
+    NRETRY_SCHEDULE         in number,  -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
+    NRETRY_STEP             in number   -- Шаг графика перезапуска
+  ) 
+  return                    date;       -- Дата следующего запуска
+  
+  /* Выяснение необходимости запуска по расписанию */
+  function UTL_SCHED_CHECK_EXEC
+  (
+    DEXEC_DATE              in date,           -- Дата предыдущего исполнения
+    NRETRY_SCHEDULE         in number,         -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
+    NRETRY_STEP             in number,         -- Шаг графика перезапуска
+    DEXEC                   in date := sysdate -- Дата, относительно которой необходимо выполнить проверку
+  ) 
+  return                    boolean;           -- Признак необходимости запуска
+  
   /* Установка значения типа строка параметра процедуры обработки сообщения обмена */
   procedure PRC_RESP_ARG_STR_SET
   (
@@ -644,6 +663,95 @@ create or replace package body PKG_EXS as
   begin
     PKG_CONTVARGLB.PURGE(SCONTAINER => UTL_CONTAINER_MAKE_NAME(NIDENT => NIDENT, SSUB_CONTAINER => SSUB_CONTAINER));
   end UTL_CONTAINER_PURGE;
+  
+  /* Вычисление даты следующего запуска расписания */
+  function UTL_SCHED_CALC_NEXT_DATE
+  (
+    DEXEC_DATE              in date,    -- Дата предыдущего исполнения
+    NRETRY_SCHEDULE         in number,  -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
+    NRETRY_STEP             in number   -- Шаг графика перезапуска
+  ) 
+  return                    date        -- Дата следующего запуска
+  is
+  begin
+    /* Если нет даты предыдущего запуска или расписание не определено, то дата очередного запуска - это текущая дата */
+    if (DEXEC_DATE is null) or (NRETRY_SCHEDULE = NRETRY_SCHEDULE_UNDEF) then
+      /* Отнимим минутку - для верности */
+      return sysdate -(1 / (24 * 60));
+    else
+      /* Расчитаем в зависимости от типа расписания */
+      case NRETRY_SCHEDULE
+        /* Ежесекундно */
+        when NRETRY_SCHEDULE_SEC then
+          begin
+            return DEXEC_DATE +(1 / (24 * 60 * 60)) * NRETRY_STEP;
+          end;
+        /* Ежеминутно */
+        when NRETRY_SCHEDULE_MIN then
+          begin
+            return DEXEC_DATE +(1 / (24 * 60)) * NRETRY_STEP;
+          end;
+        /* Ежечасно */
+        when NRETRY_SCHEDULE_HOUR then
+          begin
+            return DEXEC_DATE +(1 / 24) * NRETRY_STEP;
+          end;
+        /* Ежедневно */
+        when NRETRY_SCHEDULE_DAY then
+          begin
+            return DEXEC_DATE + 1 * NRETRY_STEP;
+          end;
+        /* Еженедельно */
+        when NRETRY_SCHEDULE_WEEK then
+          begin
+            return DEXEC_DATE +(1 * 7) * NRETRY_STEP;
+          end;
+        /* Ежемесячно */
+        when NRETRY_SCHEDULE_MONTH then
+          begin
+            return ADD_MONTHS(DEXEC_DATE, NRETRY_STEP);
+          end;
+        /* Неподдерживаемый тип расписания */
+        else
+          return null;
+      end case;
+    end if;
+    return null;
+  exception
+    when others then
+      return null;
+  end UTL_SCHED_CALC_NEXT_DATE;
+
+  /* Выяснение необходимости запуска по расписанию */
+  function UTL_SCHED_CHECK_EXEC
+  (
+    DEXEC_DATE              in date,           -- Дата предыдущего исполнения
+    NRETRY_SCHEDULE         in number,         -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
+    NRETRY_STEP             in number,         -- Шаг графика перезапуска
+    DEXEC                   in date := sysdate -- Дата, относительно которой необходимо выполнить проверку
+  ) 
+  return                    boolean            -- Признак необходимости запуска
+  is
+    DEXEC_NEXT              date;              -- Hасчетная дата следующего запуска
+  begin
+    /* Расчитаем дату следующего запуска */
+    DEXEC_NEXT := UTL_SCHED_CALC_NEXT_DATE(DEXEC_DATE      => DEXEC_DATE,
+                                           NRETRY_SCHEDULE => NRETRY_SCHEDULE,
+                                           NRETRY_STEP     => NRETRY_STEP);
+    /* Если не расчиталась - то запускать не можем */
+    if (DEXEC_NEXT is null) then
+      return false;
+    end if;
+    /* Если она раньше указанной - надо исполнять */
+    if (DEXEC_NEXT <= DEXEC) then
+      return true;
+    end if;
+    /* Исполять не надо */
+    return false;
+  exception
+    when others then
+      return false;
+  end UTL_SCHED_CHECK_EXEC;
   
   /* Установка значения типа строка параметра процедуры обработки сообщения обмена */
   procedure PRC_RESP_ARG_STR_SET
@@ -1224,10 +1332,6 @@ create or replace package body PKG_EXS as
     REXSSERVICEFN           EXSSERVICEFN%rowtype;      -- Запись функции обработки
     NRESULT                 number(17); -- Результат работы
   begin
-    /*
-    TODO: owner="mikha" created="30.11.2018"
-    text="Реализовать проверку повтора исполнения"
-    */
     /* Инициализируем результат */
     NRESULT := NQUEUE_EXEC_NO;
     begin
@@ -1241,7 +1345,12 @@ create or replace package body PKG_EXS as
       if ((REXSSERVICE.SRV_TYPE = NSRV_TYPE_SEND) and
          (REXSQUEUE.EXEC_STATE in
          (NQUEUE_EXEC_STATE_INQUEUE, NQUEUE_EXEC_STATE_APP_ERR, NQUEUE_EXEC_STATE_DB_ERR, NQUEUE_EXEC_STATE_ERR)) and
-         (REXSQUEUE.EXEC_CNT < REXSSERVICEFN.RETRY_ATTEMPTS)) then
+         (((REXSSERVICEFN.RETRY_SCHEDULE <> NRETRY_SCHEDULE_UNDEF) and
+         (REXSQUEUE.EXEC_CNT < REXSSERVICEFN.RETRY_ATTEMPTS)) or
+         ((REXSSERVICEFN.RETRY_SCHEDULE = NRETRY_SCHEDULE_UNDEF) and (REXSQUEUE.EXEC_CNT = 0))) and
+         (UTL_SCHED_CHECK_EXEC(DEXEC_DATE      => REXSQUEUE.EXEC_DATE,
+                                NRETRY_SCHEDULE => REXSSERVICEFN.RETRY_SCHEDULE,
+                                NRETRY_STEP     => REXSSERVICEFN.RETRY_STEP))) then
         /* Надо исполнять */
         NRESULT := NQUEUE_EXEC_YES;
       end if;
