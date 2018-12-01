@@ -57,6 +57,15 @@ process.on("SIGKILL", () => {
     appSrv.stop();
 });
 
+//Перехват всех неохваченных ошибок
+process.on("uncaughtException", e => {
+    //Протоколируем ошибку
+    if (e instanceof ServerError) appSrv.logger.error(e.sCode + ": " + e.sMessage);
+    else appSrv.logger.error(SERR_UNEXPECTED + ": " + e.message);
+    //Инициируем выход из процесса
+    appSrv.stop();
+});
+
 //Запуск сервера приложений
 const start = async () => {
     try {
