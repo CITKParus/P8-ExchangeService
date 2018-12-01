@@ -8,7 +8,9 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
-const { outgoing } = require("./obj_config"); //Схемы валидации конфигурации сервера приложений
+const { outGoing } = require("./obj_config"); //Схемы валидации конфигурации сервера приложений
+const { defServices } = require("./obj_services"); //Схема валидации списка сервисов
+const { Queue } = require("./obj_queue"); //Схема валидации сообщения очереди
 const { DBConnector } = require("../core/db_connector"); //Класс взаимодействия в БД
 const { Logger } = require("../core/logger"); //Класс для протоколирования работы
 
@@ -20,7 +22,7 @@ const { Logger } = require("../core/logger"); //Класс для протоко
 exports.OutQueue = new Schema({
     //Параметры обработки очереди исходящих сообщений
     outGoing: {
-        schema: outgoing,
+        schema: outGoing,
         required: true,
         message: {
             required: "Не указаны параметры обработки очереди исходящих сообщений (outGoing)"
@@ -44,4 +46,22 @@ exports.OutQueue = new Schema({
             required: "Не указаны объект для протоколирования работы (logger)"
         }
     }
+});
+
+//Схема валидации параметров функции передачи исходящего сообшения на обработку
+exports.processMessage = new Schema({
+    //Обрабатываемое исходящее сообщение
+    queue: {
+        schema: Queue,
+        required: true,
+        message: {
+            required: "Не указано обрабатываемое исходящее сообщение (queue)"
+        }
+    }
+});
+
+//Схема валидации параметров функции запуска обслуживания очереди
+exports.startProcessing = new Schema({
+    //Список обслуживаемых сервисов
+    services: defServices(true, "services")
 });
