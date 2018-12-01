@@ -30,6 +30,8 @@ class ParusAppServer {
         this.outQ = null;
         //Флаг остановки сервера
         this.bStopping = false;
+        //Список обслуживаемых сервисов
+        this.services = [];
         //Привяжем методы к указателю на себя для использования в обработчиках событий
         this.onDBConnected = this.onDBConnected.bind(this);
         this.onDBDisconnected = this.onDBDisconnected.bind(this);
@@ -42,6 +44,29 @@ class ParusAppServer {
         this.logger.setDBConnector(this.dbConn, true);
         //Сообщим, что подключились к БД
         await this.logger.info("Сервер приложений подключен к БД");
+        //Считываем список сервисов
+        await this.logger.info("Запрашиваю информацию о сервисах...");
+        try {
+            this.services = await this.dbConn.getServices();
+        } catch (e) {
+            await this.logger.error("Ошибка получения списка сервисов: " + e.sCode + ": " + e.sMessage);
+            await this.stop();
+            return;
+        }
+        await this.logger.info("Список сервисов получен");
+        //Запускаем обслуживание очереди исходящих
+        await this.logger.info("Запуск обработчика очереди исходящих сообщений...");
+        try {
+            this.outQ.startProcessing(this.services);
+        } catch (e) {
+            await this.logger.error(
+                "Ошибка запуска обработчика очереди исходящих сообщений: " + e.sCode + ": " + e.sMessage
+            );
+            await this.stop();
+            return;
+        }
+        //Рапортуем, что запустились
+        await this.logger.info("Сервер приложений запущен");
     }
     //При отключении от БД
     async onDBDisconnected() {
@@ -67,7 +92,7 @@ class ParusAppServer {
                     await this.dbConn.disconnect();
                     process.exit(0);
                 } catch (e) {
-                    await this.logger.error("Ошибка отключения от БД: " + e.sCODE + ": " + e.sMessage);
+                    await this.logger.error("Ошибка отключения от БД: " + e.sCode + ": " + e.sMessage);
                     process.exit(1);
                 }
             } else {
@@ -89,7 +114,7 @@ class ParusAppServer {
             //Создаём обработчик очереди исходящих
             this.outQ = new oq.OutQueue({ outGoing: prms.config.outGoing, dbConn: this.dbConn, logger: this.logger });
             //Скажем что инициализировали
-            await this.logger.info("Сервер приложение инициализирован");
+            await this.logger.info("Сервер приложений инициализирован");
         } else {
             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
         }
@@ -111,11 +136,6 @@ class ParusAppServer {
         //Подключаемся к БД
         await this.logger.info("Подключение сервера приложений к БД...");
         await this.dbConn.connect();
-        //Запускаем обслуживание очереди исходящих
-        await this.logger.info("Запуск обработчика очереди исходящих сообщений...");
-        this.outQ.startProcessing();
-        //Рапортуем, что запустились
-        await this.logger.info("Сервер приложений запущен");
     }
     //Останов сервера
     async stop() {
