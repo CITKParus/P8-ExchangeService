@@ -84,6 +84,16 @@ exports.ServiceFunction = new Schema({
             required: "Не указан идентификатор функции сервиса (nId)"
         }
     },
+    //Идентификатор родительского сервиса функции
+    nServiceId: {
+        type: Number,
+        required: true,
+        message: {
+            type:
+                "Идентификатор родительского сервиса функции (nServiceId) имеет некорректный тип данных (ожидалось - Number)",
+            required: "Не указан идентификатор родительского сервиса функции (nServiceId)"
+        }
+    },
     //Код функции сервиса
     sCode: {
         type: String,
