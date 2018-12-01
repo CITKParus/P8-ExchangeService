@@ -14,6 +14,7 @@ const { makeModuleFullPath, validateObject } = require("./utils"); //Вспом�
 const prmsDBConnectorSchema = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля
 const intfDBConnectorModuleSchema = require("../models/intf_db_connector_module"); //Схема валидации интерфейса модуля взаимодействия с БД
 const objServicesSchema = require("../models/obj_services"); //Схема валидации списка сервисов
+const objServiceFunctionsSchema = require("../models/obj_service_functions"); //Схема валидации списка функций сервиса
 const objQueueSchema = require("../models/obj_queue"); //Схема валидации сообщения очереди обмена
 const objQueuesSchema = require("../models/obj_queues"); //Схема валидации списка сообщений очереди обмена
 const objLogSchema = require("../models/obj_log"); //Схема валидации записи журнала
@@ -144,10 +145,7 @@ class DBConnector extends EventEmitter {
                 if (!sCheckResult) {
                     //Забираем для каждого из сервисов список его функций
                     let srvsFuncs = srvs.map(async srv => {
-                        const response = await this.connector.getServiceFunctions({
-                            connection: this.connection,
-                            nServiceId: srv.nId
-                        });
+                        const response = await this.getServiceFunctions({ nServiceId: srv.nId });
                         let tmp = _.cloneDeep(srv);
                         response.forEach(f => {
                             tmp.functions.push(f);
@@ -168,6 +166,43 @@ class DBConnector extends EventEmitter {
             } catch (e) {
                 if (e instanceof ServerError) throw e;
                 else throw new ServerError(SERR_DB_EXECUTE, e.message);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Получить список функций для сервиса
+    async getServiceFunctions(prms) {
+        //Работаем только при наличии подключения
+        if (this.bConnected) {
+            //Проверяем структуру переданного объекта с параметрами для считывания функций сервиса
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.getServiceFunctions,
+                "Параметры функции считывания функций сервиса"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                try {
+                    //Подготовим параметры для передачи в БД
+                    let getServiceFunctionsData = _.cloneDeep(prms);
+                    getServiceFunctionsData.connection = this.connection;
+                    //И выполним считывание функций сервиса
+                    let res = await this.connector.getServiceFunctions(getServiceFunctionsData);
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(
+                        { functions: res },
+                        objServiceFunctionsSchema.ServiceFunctions,
+                        "Список функций сервиса"
+                    );
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Вернём добавленную запись
+                    return res;
+                } catch (e) {
+                    throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
             }
         } else {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");

@@ -50,6 +50,19 @@ exports.DBConnector = new Schema({
     }
 });
 
+//Схема валидации параметров функции получения списка функций сервиса
+exports.getServiceFunctions = new Schema({
+    //Идентификатор сервиса
+    nServiceId: {
+        type: Number,
+        required: true,
+        message: {
+            type: "Идентификатор сервиса (nServiceId) имеет некорректный тип данных (ожидалось - Number)",
+            required: "Не указан идентификатор сервиса (nServiceId)"
+        }
+    }
+});
+
 //Схема валидации параметров функции записи в журнал работы сервиса
 exports.putLog = new Schema({
     //Тип сообщения журнала работы сервиса
