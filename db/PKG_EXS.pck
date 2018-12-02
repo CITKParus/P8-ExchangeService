@@ -238,6 +238,7 @@ create or replace package PKG_EXS as
   /* Получение сервиса */
   procedure SERVICE_GET
   (
+    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке
     NEXSSERVICE             in number,        -- Рег. номер записи сервиса
     RCSERVICE               out sys_refcursor -- Курсор со списком сервисов
   );
@@ -258,6 +259,7 @@ create or replace package PKG_EXS as
   /* Получение функции сервиса */
   procedure SERVICEFN_GET
   (
+    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке
     NEXSSERVICEFN           in number,        -- Рег. номер функции сервиса
     RCSERVICEFN             out sys_refcursor -- Курсор со списком функций сервиса
   );  
@@ -288,6 +290,7 @@ create or replace package PKG_EXS as
   /* Считывание записи журнала работы */
   procedure LOG_GET
   (
+    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке
     NEXSLOG                 in number,        -- Рег. номер записи журнала
     RCLOG                   out sys_refcursor -- Курсор со списком записей журнала работы
   );  
@@ -313,6 +316,7 @@ create or replace package PKG_EXS as
   /* Считывание сообщения из очереди */
   procedure QUEUE_GET
   (
+    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
     RCQUEUE                 out sys_refcursor -- Курсор с позицией очереди
   );  
@@ -973,22 +977,26 @@ create or replace package body PKG_EXS as
   /* Получение сервиса */
   procedure SERVICE_GET
   (
-    NEXSSERVICE             in number,        -- Рег. номер записи сервиса
-    RCSERVICE               out sys_refcursor -- Курсор со списком сервисов
+    NFLAG_SMART             in number,          -- Признак выдачи сообщения об ошибке
+    NEXSSERVICE             in number,          -- Рег. номер записи сервиса
+    RCSERVICE               out sys_refcursor   -- Курсор со списком сервисов
   )
   is
-    NIDENT                  PKG_STD.TREF;     -- Идентификатор буфера
-    NTMP                    PKG_STD.TREF;     -- Рег. номер очередной записи буфера
+    REXSSERVICE             EXSSERVICE%rowtype; -- Запись сервиса
+    NIDENT                  PKG_STD.TREF;       -- Идентификатор буфера
+    NTMP                    PKG_STD.TREF;       -- Рег. номер очередной записи буфера
   begin
+    /* Считаем запись сервиса */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => NFLAG_SMART, NRN => NEXSSERVICE);
     /* Сформируем идентификатор буфера */
     NIDENT := GEN_IDENT();
     /* Положим рег. номер сервиса в буфер */
-    RNLIST_BASE_INSERT(NIDENT => NIDENT, NDOCUMENT => NEXSSERVICE, NRN => NTMP);
+    RNLIST_BASE_INSERT(NIDENT => NIDENT, NDOCUMENT => NVL(REXSSERVICE.RN, NEXSSERVICE), NRN => NTMP);
     /* Забираем сервис в виде курсора */
     SERVICE_GET(NIDENT => NIDENT, RCSERVICE => RCSERVICE);
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
-  end SERVICE_GET;  
+  end SERVICE_GET;
   
   /* Получение списка сервисов */
   procedure SERVICES_GET
@@ -1063,25 +1071,29 @@ create or replace package body PKG_EXS as
          and T.EXSMSGTYPE = M.RN;
   end SERVICEFN_GET;
   
-    /* Получение функции сервиса */
+  /* Получение функции сервиса */
   procedure SERVICEFN_GET
   (
-    NEXSSERVICEFN           in number,        -- Рег. номер функции сервиса
-    RCSERVICEFN             out sys_refcursor -- Курсор со списком функций сервиса
+    NFLAG_SMART             in number,            -- Признак выдачи сообщения об ошибке
+    NEXSSERVICEFN           in number,            -- Рег. номер функции сервиса
+    RCSERVICEFN             out sys_refcursor     -- Курсор со списком функций сервиса
   )
   is
-    NIDENT                  PKG_STD.TREF;     -- Идентификатор буфера
-    NTMP                    PKG_STD.TREF;     -- Рег. номер очередной записи буфера
+    REXSSERVICEFN           EXSSERVICEFN%rowtype; -- Запись функции сервиса
+    NIDENT                  PKG_STD.TREF;         -- Идентификатор буфера
+    NTMP                    PKG_STD.TREF;         -- Рег. номер очередной записи буфера
   begin
+    /* Считаем запись функции сервиса */
+    REXSSERVICEFN := GET_EXSSERVICEFN_ID(NFLAG_SMART => NFLAG_SMART, NRN => NEXSSERVICEFN);
     /* Сформируем идентификатор буфера */
     NIDENT := GEN_IDENT();
     /* Положим рег. номер функции сервиса в буфер */
-    RNLIST_BASE_INSERT(NIDENT => NIDENT, NDOCUMENT => NEXSSERVICEFN, NRN => NTMP);
+    RNLIST_BASE_INSERT(NIDENT => NIDENT, NDOCUMENT => NVL(REXSSERVICEFN.RN, NEXSSERVICEFN), NRN => NTMP);
     /* Забираем сервис в виде курсора */
     SERVICEFN_GET(NIDENT => NIDENT, RCSERVICEFN => RCSERVICEFN);
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
-  end SERVICEFN_GET;  
+  end SERVICEFN_GET;
   
   /* Получение списка функций сервиса */
   procedure SERVICEFNS_GET
@@ -1176,22 +1188,26 @@ create or replace package body PKG_EXS as
   /* Считывание записи журнала работы */
   procedure LOG_GET
   (
+    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке    
     NEXSLOG                 in number,        -- Рег. номер записи журнала
     RCLOG                   out sys_refcursor -- Курсор со списком записей журнала работы
   )
   is
+    REXSLOG                 EXSLOG%rowtype;   -- Запись журнала работы
     NIDENT                  PKG_STD.TREF;     -- Идентификатор буфера
     NTMP                    PKG_STD.TREF;     -- Рег. номер очередной записи буфера
   begin
+    /* Считаем запись журнала работы */
+    REXSLOG := GET_EXSLOG_ID(NFLAG_SMART => NFLAG_SMART, NRN => NEXSLOG);
     /* Сформируем идентификатор буфера */
     NIDENT := GEN_IDENT();
     /* Положим рег. номер записи журнала работы в буфер */
-    RNLIST_BASE_INSERT(NIDENT => NIDENT, NDOCUMENT => NEXSLOG, NRN => NTMP);
+    RNLIST_BASE_INSERT(NIDENT => NIDENT, NDOCUMENT => NVL(REXSLOG.RN, NEXSLOG), NRN => NTMP);
     /* Забираем позицию очереди в виде курсора */
     LOG_GET(NIDENT => NIDENT, RCLOG => RCLOG);
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
-  end LOG_GET;  
+  end LOG_GET;
 
   /* Добавление записи в журнал работы */
   procedure LOG_PUT
@@ -1245,7 +1261,7 @@ create or replace package body PKG_EXS as
                          NEXSQUEUE     => NEXSQUEUE,
                          NRN           => NEXSLOG);
     /* Вернем добавленную запись */
-    LOG_GET(NEXSLOG => NEXSLOG, RCLOG => RCLOG);                         
+    LOG_GET(NFLAG_SMART => 0, NEXSLOG => NEXSLOG, RCLOG => RCLOG);                         
   end LOG_PUT;
 
   /* Считывание сообщения из очереди */
@@ -1303,17 +1319,21 @@ create or replace package body PKG_EXS as
   /* Считывание сообщения из очереди */
   procedure QUEUE_GET
   (
+    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке    
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
     RCQUEUE                 out sys_refcursor -- Курсор с позицией очереди
   )
   is
+    REXSQUEUE               EXSQUEUE%rowtype; -- Запись позиции очереди
     NIDENT                  PKG_STD.TREF;     -- Идентификатор буфера
     NTMP                    PKG_STD.TREF;     -- Рег. номер очередной записи буфера
   begin
+    /* Считаем запись позиции очереди */
+    REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => NFLAG_SMART, NRN => NEXSQUEUE);
     /* Сформируем идентификатор буфера */
     NIDENT := GEN_IDENT();
     /* Положим рег. номер записи очереди в буфер */
-    RNLIST_BASE_INSERT(NIDENT => NIDENT, NDOCUMENT => NEXSQUEUE, NRN => NTMP);
+    RNLIST_BASE_INSERT(NIDENT => NIDENT, NDOCUMENT => NVL(REXSQUEUE.RN, NEXSQUEUE), NRN => NTMP);
     /* Забираем позицию очереди в виде курсора */
     QUEUE_GET(NIDENT => NIDENT, RCQUEUE => RCQUEUE);
     /* Чистим буфер */
@@ -1443,7 +1463,7 @@ create or replace package body PKG_EXS as
       PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NEXSQUEUE, SUNIT_TABLE => 'EXSQUEUE');
     end if;
     /* Вернем измененную позицию очереди */
-    QUEUE_GET(NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
+    QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_EXEC_STATE_SET;
   
   /* Установка результата обработки записи очереди */
@@ -1457,8 +1477,11 @@ create or replace package body PKG_EXS as
   begin
     /* Выставим результат */
     update EXSQUEUE T set T.RESP = BRESP where T.RN = NEXSQUEUE;
+    if (sql%rowcount = 0) then
+      PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NEXSQUEUE, SUNIT_TABLE => 'EXSQUEUE');
+    end if;
     /* Вернем измененную позицию очереди */
-    QUEUE_GET(NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
+    QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_RESP_SET;
 
   /* Помещение сообщения обмена в очередь */
@@ -1489,7 +1512,7 @@ create or replace package body PKG_EXS as
                            NEXSQUEUE     => NEXSQUEUE,
                            NRN           => NRN);
     /* Возвращаем добавленную позицию очереди */
-    QUEUE_GET(NEXSQUEUE => NRN, RCQUEUE => RCQUEUE);
+    QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NRN, RCQUEUE => RCQUEUE);
   end QUEUE_PUT;
 
   /* Помещение сообщения обмена в очередь (по коду сервиса и функции обрабоки) */
@@ -1590,7 +1613,7 @@ create or replace package body PKG_EXS as
       PKG_CONTPRMLOC.PURGE(RCONTAINER => PRMS);
     end if;
     /* Возвращаем обработанную позицию очереди */
-    QUEUE_GET(NEXSQUEUE => REXSQUEUE.RN, RCQUEUE => RCQUEUE);
+    QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => REXSQUEUE.RN, RCQUEUE => RCQUEUE);
   end QUEUE_PRC;
   
 end;
