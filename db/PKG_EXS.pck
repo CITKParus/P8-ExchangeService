@@ -353,6 +353,14 @@ create or replace package PKG_EXS as
     RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди    
   );
   
+  /* Установка сообщения записи очереди */
+  procedure QUEUE_MSG_SET
+  (
+    NEXSQUEUE               in number,        -- Рег. номер записи очереди  
+    BMSG                    in blob,          -- Результат обработки
+    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди            
+  );  
+  
   /* Помещение сообщения обмена в очередь */
   procedure QUEUE_PUT
   (
@@ -1363,8 +1371,11 @@ create or replace package body PKG_EXS as
       REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => REXSSERVICEFN.PRN);
       /* Проверим условия исполнения - исходящее, недоисполнено, и остались попытки */
       if ((REXSSERVICE.SRV_TYPE = NSRV_TYPE_SEND) and
-         (REXSQUEUE.EXEC_STATE in
-         (NQUEUE_EXEC_STATE_INQUEUE, NQUEUE_EXEC_STATE_APP_ERR, NQUEUE_EXEC_STATE_DB_ERR, NQUEUE_EXEC_STATE_ERR)) and
+         (REXSQUEUE.EXEC_STATE in (NQUEUE_EXEC_STATE_INQUEUE,
+                                    NQUEUE_EXEC_STATE_APP_OK,
+                                    NQUEUE_EXEC_STATE_APP_ERR,
+                                    NQUEUE_EXEC_STATE_DB_ERR,
+                                    NQUEUE_EXEC_STATE_ERR)) and
          (((REXSSERVICEFN.RETRY_SCHEDULE <> NRETRY_SCHEDULE_UNDEF) and
          (REXSQUEUE.EXEC_CNT < REXSSERVICEFN.RETRY_ATTEMPTS)) or
          ((REXSSERVICEFN.RETRY_SCHEDULE = NRETRY_SCHEDULE_UNDEF) and (REXSQUEUE.EXEC_CNT = 0))) and
@@ -1399,7 +1410,7 @@ create or replace package body PKG_EXS as
                 from (select T.RN
                         from EXSQUEUE T
                        where QUEUE_SRV_TYPE_SEND_EXEC_CHECK(T.RN) = NQUEUE_EXEC_YES
-                       order by T.IN_DATE)
+                       order by NVL(T.EXEC_DATE, T.IN_DATE))
                where ROWNUM <= NPORTION_SIZE)
     loop
       /* Запоминаем их рег. номера в буфере */
@@ -1483,6 +1494,24 @@ create or replace package body PKG_EXS as
     /* Вернем измененную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_RESP_SET;
+  
+  /* Установка сообщения записи очереди */
+  procedure QUEUE_MSG_SET
+  (
+    NEXSQUEUE               in number,        -- Рег. номер записи очереди  
+    BMSG                    in blob,          -- Результат обработки
+    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди            
+  )
+  is
+  begin
+    /* Выставим сообщение */
+    update EXSQUEUE T set T.MSG = BMSG where T.RN = NEXSQUEUE;
+    if (sql%rowcount = 0) then
+      PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NEXSQUEUE, SUNIT_TABLE => 'EXSQUEUE');
+    end if;
+    /* Вернем измененную позицию очереди */
+    QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
+  end QUEUE_MSG_SET;
 
   /* Помещение сообщения обмена в очередь */
   procedure QUEUE_PUT
@@ -1592,10 +1621,6 @@ create or replace package body PKG_EXS as
       PKG_SQL_CALL.EXECUTE_STORED(SSTORED_NAME     => UTL_STORED_MAKE_LINK(SPACKAGE   => REXSMSGTYPE.PKG_RESP,
                                                                            SPROCEDURE => REXSMSGTYPE.PRC_RESP),
                                   RPARAM_CONTAINER => PRMS);
-      /*
-      TODO: owner="mikha" created="15.11.2018"
-      text="Протестировать что будет если процедура не установила параметр перед завершением и вообще - как эту ситуацию отловить, чтобы ругаться, мол не установлено значение"
-      */
       /* Забираем параметр с ошибками обработчика */
       SERR := PRC_RESP_ARG_STR_GET(NIDENT => NIDENT, SARG => SCONT_FLD_SERR);
       /* Если были ошибки - скажем об этом */
