@@ -173,7 +173,7 @@ exports.setQueueState = new Schema({
             NQUEUE_EXEC_STATE_OK,
             NQUEUE_EXEC_STATE_ERR
         ],
-        required: true,
+        required: false,
         message: {
             type: "Код состояния (nExecState) имеет некорректный тип данных (ожидалось - Number)",
             enum: "Значение кода состояния (nExecState) не поддерживается",
