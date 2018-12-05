@@ -339,7 +339,7 @@ create or replace package PKG_EXS as
   procedure QUEUE_EXEC_STATE_SET
   (
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
-    NEXEC_STATE             in number,        -- Устанавливаемое состояние
+    NEXEC_STATE             in number,        -- Устанавливаемое состояние (см. констнаты NQUEUE_EXEC_STATE_*, null - не менять)
     SEXEC_MSG               in varchar2,      -- Сообщение обработчика
     NINC_EXEC_CNT           in number,        -- Флаг инкремента счётчика исполнений (см. констнаты NINC_EXEC_CNT_*, null - не менять)
     RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди    
@@ -1292,6 +1292,7 @@ create or replace package body PKG_EXS as
              T.EXEC_DATE "dExecDate",
              TO_CHAR(T.EXEC_DATE, 'dd.mm.yyyy hh24:mi:ss') "sExecDate",
              T.EXEC_CNT "nExecCnt",
+             F.RETRY_ATTEMPTS "nRetryAttempts",
              T.EXEC_STATE "nExecState",
              DECODE(T.EXEC_STATE,
                     NQUEUE_EXEC_STATE_INQUEUE,
@@ -1371,11 +1372,8 @@ create or replace package body PKG_EXS as
       REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => REXSSERVICEFN.PRN);
       /* Проверим условия исполнения - исходящее, недоисполнено, и остались попытки */
       if ((REXSSERVICE.SRV_TYPE = NSRV_TYPE_SEND) and
-         (REXSQUEUE.EXEC_STATE in (NQUEUE_EXEC_STATE_INQUEUE,
-                                    NQUEUE_EXEC_STATE_APP_OK,
-                                    NQUEUE_EXEC_STATE_APP_ERR,
-                                    NQUEUE_EXEC_STATE_DB_ERR,
-                                    NQUEUE_EXEC_STATE_ERR)) and
+         (REXSQUEUE.EXEC_STATE not in
+         (NQUEUE_EXEC_STATE_OK, NQUEUE_EXEC_STATE_ERR, NQUEUE_EXEC_STATE_APP, NQUEUE_EXEC_STATE_DB)) and
          (((REXSSERVICEFN.RETRY_SCHEDULE <> NRETRY_SCHEDULE_UNDEF) and
          (REXSQUEUE.EXEC_CNT < REXSSERVICEFN.RETRY_ATTEMPTS)) or
          ((REXSSERVICEFN.RETRY_SCHEDULE = NRETRY_SCHEDULE_UNDEF) and (REXSQUEUE.EXEC_CNT = 0))) and
@@ -1426,7 +1424,7 @@ create or replace package body PKG_EXS as
   procedure QUEUE_EXEC_STATE_SET
   (
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
-    NEXEC_STATE             in number,        -- Устанавливаемое состояние
+    NEXEC_STATE             in number,        -- Устанавливаемое состояние (см. констнаты NQUEUE_EXEC_STATE_*, null - не менять)
     SEXEC_MSG               in varchar2,      -- Сообщение обработчика
     NINC_EXEC_CNT           in number,        -- Флаг инкремента счётчика исполнений (см. констнаты NINC_EXEC_CNT_*, null - не менять)
     RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди    
@@ -1439,15 +1437,16 @@ create or replace package body PKG_EXS as
       P_EXCEPTION(0,
                   'Не указан идентификатор позиции очереди для изменения состояния');
     end if;
-    if (NEXEC_STATE not in (NQUEUE_EXEC_STATE_INQUEUE,
-                            NQUEUE_EXEC_STATE_APP,
-                            NQUEUE_EXEC_STATE_APP_OK,
-                            NQUEUE_EXEC_STATE_APP_ERR,
-                            NQUEUE_EXEC_STATE_DB,
-                            NQUEUE_EXEC_STATE_DB_OK,
-                            NQUEUE_EXEC_STATE_DB_ERR,
-                            NQUEUE_EXEC_STATE_OK,
-                            NQUEUE_EXEC_STATE_ERR)) then
+    if ((NEXEC_STATE is not null) and
+       (NEXEC_STATE not in (NQUEUE_EXEC_STATE_INQUEUE,
+                             NQUEUE_EXEC_STATE_APP,
+                             NQUEUE_EXEC_STATE_APP_OK,
+                             NQUEUE_EXEC_STATE_APP_ERR,
+                             NQUEUE_EXEC_STATE_DB,
+                             NQUEUE_EXEC_STATE_DB_OK,
+                             NQUEUE_EXEC_STATE_DB_ERR,
+                             NQUEUE_EXEC_STATE_OK,
+                             NQUEUE_EXEC_STATE_ERR))) then
       P_EXCEPTION(0,
                   'Код состояния "%s" позиции очереди не поддерживается',
                   TO_CHAR(NEXEC_STATE));
@@ -1466,7 +1465,7 @@ create or replace package body PKG_EXS as
     /* Выставим состояние */
     update EXSQUEUE T
        set T.EXEC_DATE  = sysdate,
-           T.EXEC_STATE = NEXEC_STATE,
+           T.EXEC_STATE = NVL(NEXEC_STATE, T.EXEC_STATE),
            T.EXEC_CNT   = REXSQUEUE.EXEC_CNT,
            T.EXEC_MSG   = SEXEC_MSG
      where T.RN = NEXSQUEUE;
