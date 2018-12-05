@@ -373,12 +373,12 @@ class DBConnector extends EventEmitter {
                 try {
                     let res = await this.connector.setQueueMsg({
                         nQueueId: prms.nQueueId,
-                        blMsg: prms.blMsg,
+                        blMsg: prms.blMsg ? prms.blMsg : new Buffer(""),
                         connection: this.connection
                     });
                     res = await this.connector.setQueueResp({
                         nQueueId: prms.nQueueId,
-                        blResp: prms.blResp,
+                        blResp: prms.blResp ? prms.blResp : new Buffer(""),
                         connection: this.connection
                     });
                     //Валидируем полученный ответ
