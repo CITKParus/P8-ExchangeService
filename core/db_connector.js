@@ -329,7 +329,11 @@ class DBConnector extends EventEmitter {
     async setQueueState(prms) {
         if (this.bConnected) {
             //Проверяем структуру переданных параметров
-            let sCheckResult = validateObject(prms, prmsDBConnectorSchema.setQueueState);
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.setQueueState,
+                "Параметры функции установки состояния позиции очереди"
+            );
             //Если структура объекта в норме
             if (!sCheckResult) {
                 //Подготовим параметры
@@ -338,6 +342,78 @@ class DBConnector extends EventEmitter {
                 try {
                     //Исполняем действие в БД
                     let res = await this.connector.setQueueState(setStateData);
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(res, objQueueSchema.Queue, "Изменённое сообщение очереди обмена");
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Вернём измененную запись
+                    return res;
+                } catch (e) {
+                    if (e instanceof ServerError) throw e;
+                    else throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Установить результат обработки записи сервером приложений
+    async setQueueAppSrvResult(prms) {
+        if (this.bConnected) {
+            //Проверяем структуру переданных параметров
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.setQueueAppSrvResult,
+                "Параметры функции установки результата обработки позиции очереди"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                //Исполняем действие в БД
+                try {
+                    let res = await this.connector.setQueueMsg({
+                        nQueueId: prms.nQueueId,
+                        blMsg: prms.blMsg,
+                        connection: this.connection
+                    });
+                    res = await this.connector.setQueueResp({
+                        nQueueId: prms.nQueueId,
+                        blResp: prms.blResp,
+                        connection: this.connection
+                    });
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(res, objQueueSchema.Queue, "Изменённое сообщение очереди обмена");
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Вернём измененную запись
+                    return res;
+                } catch (e) {
+                    if (e instanceof ServerError) throw e;
+                    else throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Исполнить обработчик со стороны БД
+    async execQueueDBPrc(prms) {
+        if (this.bConnected) {
+            //Проверяем структуру переданных параметров
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.execQueueDBPrc,
+                "Параметры функции исполнения обработчика со стороны БД для позиции очереди"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                //Исполняем действие в БД
+                try {
+                    let res = await this.connector.execQueuePrc({
+                        nQueueId: prms.nQueueId,
+                        connection: this.connection
+                    });
                     //Валидируем полученный ответ
                     sCheckResult = validateObject(res, objQueueSchema.Queue, "Изменённое сообщение очереди обмена");
                     if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
