@@ -9,11 +9,12 @@
 
 const lg = require("./logger"); //Протоколирование работы
 const db = require("./db_connector"); //Взаимодействие с БД
-const oq = require("./out_queue"); //Прослушивание очереди исходящих сообщений
+const oq = require("./out_queue2"); //Прослушивание очереди исходящих сообщений
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const { validateObject } = require("./utils"); //Вспомогательные функции
 const { SERR_COMMON, SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
 const prmsAppSchema = require("../models/prms_app"); //Схема валидации параметров функций класса
+
 //------------
 // Тело модуля
 //------------
