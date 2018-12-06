@@ -74,6 +74,16 @@ exports.dbConnectorModule = new Schema({
             required: "Не реализована функция протоколирования работы сервиса (log)"
         }
     },
+    //Считывание записи очереди обмена
+    getQueue: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType:
+                "Функция считывания записи очереди обмена (getQueue) имеет неверный формат (ожидалось - AsyncFunction)",
+            required: "Не реализована функция считывания записи очереди обмена (getQueue)"
+        }
+    },
     //Считывание записей исходящих сообщений очереди
     getQueueOutgoing: {
         use: { validateAsyncFunctionType },

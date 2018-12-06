@@ -289,6 +289,39 @@ class DBConnector extends EventEmitter {
             throw new ServerError(SERR_DB_EXECUTE, e.message);
         }
     }
+    //Считать запись очереди обмена
+    async getQueue(prms) {
+        if (this.bConnected) {
+            //Проверяем структуру переданных параметров
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.getQueue,
+                "Параметры функции считывания записи очереди обмена"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                //Подготовим параметры
+                let getQueueData = _.cloneDeep(prms);
+                getQueueData.connection = this.connection;
+                try {
+                    //Исполняем действие в БД
+                    let res = await this.connector.getQueue(getQueueData);
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(res, objQueueSchema.Queue, "Сообщение очереди обмена");
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Вернём считанную запись
+                    return res;
+                } catch (e) {
+                    if (e instanceof ServerError) throw e;
+                    else throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
     //Считать очередную порцию исходящих сообщений
     async getOutgoing(prms) {
         if (this.bConnected) {

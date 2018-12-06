@@ -107,6 +107,28 @@ const log = async prms => {
     }
 };
 
+//Считывание записи очереди обмена
+const getQueue = async prms => {
+    try {
+        let res = await prms.connection.execute(
+            "BEGIN PKG_EXS.QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => :NEXSQUEUE, RCQUEUE => :RCQUEUE); END;",
+            {
+                NEXSQUEUE: prms.nQueueId,
+                RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+            },
+            {
+                outFormat: oracledb.OBJECT,
+                autoCommit: true,
+                fetchInfo: { blMsg: { type: oracledb.BUFFER }, blResp: { type: oracledb.BUFFER } }
+            }
+        );
+        let rows = await readCursorData(res.outBinds.RCQUEUE);
+        return rows[0];
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
 //Считывание очередной порции исходящих сообщений из очереди
 const getQueueOutgoing = async prms => {
     try {
@@ -233,6 +255,7 @@ exports.disconnect = disconnect;
 exports.getServices = getServices;
 exports.getServiceFunctions = getServiceFunctions;
 exports.log = log;
+exports.getQueue = getQueue;
 exports.getQueueOutgoing = getQueueOutgoing;
 exports.putQueueIncoming = putQueueIncoming;
 exports.setQueueState = setQueueState;
