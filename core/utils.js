@@ -20,21 +20,25 @@ const validateObject = (obj, schema, sObjName) => {
     //Объявим результат
     let sRes = "";
     if (schema instanceof Schema) {
-        const objTmp = _.cloneDeep(obj);
-        const errors = schema.validate(objTmp, { strip: false });
-        if (errors && Array.isArray(errors)) {
-            if (errors.length > 0) {
-                let a = errors.map(e => {
-                    return e.message;
-                });
-                sRes =
-                    "Объект" +
-                    (sObjName ? " '" + sObjName + "' " : " ") +
-                    "имеет некорректный формат: " +
-                    _.uniq(a).join("; ");
+        if (obj) {
+            const objTmp = _.cloneDeep(obj);
+            const errors = schema.validate(objTmp, { strip: false });
+            if (errors && Array.isArray(errors)) {
+                if (errors.length > 0) {
+                    let a = errors.map(e => {
+                        return e.message;
+                    });
+                    sRes =
+                        "Объект" +
+                        (sObjName ? " '" + sObjName + "' " : " ") +
+                        "имеет некорректный формат: " +
+                        _.uniq(a).join("; ");
+                }
+            } else {
+                sRes = "Неожиданный ответ валидатора";
             }
         } else {
-            sRes = "Неожиданный ответ валидатора";
+            sRes = "Объект" + (sObjName ? " '" + sObjName + "' " : " ") + "не указан";
         }
     } else {
         sRes = "Ошибочный формат схемы валидации";
