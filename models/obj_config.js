@@ -17,7 +17,7 @@ const Schema = require("validate"); //Схемы валидации
 const checkMaxWorkers = val => val >= 1 && val <= 100 && Number.isInteger(val);
 
 //Функция проверки значения интервала проверки наличия исходящих сообщений
-const checkCheckTimeout = val => val >= 100 && val <= 60000 && Number.isInteger(val);
+const checkCheckTimeout = val => val >= 1 && val <= 60000 && Number.isInteger(val);
 
 //Схема валидации параметров подключения к БД
 const dbConnect = new Schema({
