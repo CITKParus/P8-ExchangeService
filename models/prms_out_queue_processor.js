@@ -8,22 +8,8 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
+const { Queue } = require("./obj_queue"); //Схема валидации позиции очереди
 const { OutQueueProcessorTask } = require("./obj_out_queue_processor"); //Схемы валидации объектов обработчика исходящих сообщений
-
-//------------
-// Тело модуля
-//------------
-
-//Валидация данных сообщения очереди
-const validateBuffer = val => {
-    //Либо null
-    if (val === null) {
-        return true;
-    } else {
-        //Либо Buffer
-        return val instanceof Buffer;
-    }
-};
 
 //------------------
 //  Интерфейс модуля
@@ -42,38 +28,26 @@ exports.sendErrorResult = new Schema({
     }
 });
 
-//Схема валидации параметров функции отправки успеха обработки
-exports.sendOKResult = new Schema({
-    //Данные сообщения очереди обмена
-    blMsg: {
-        use: { validateBuffer },
+//Схема валидации параметров функции обработчки сообщения сервером приложений
+exports.appProcess = new Schema({
+    //Обрабатываемое сообщение очереди
+    queue: {
+        schema: Queue,
         required: true,
         message: {
-            validateBuffer: path =>
-                `Данные сообщения очереди обмена (${path}) имеют некорректный тип данных (ожидалось - null или Buffer)`,
-            required: path => `Не указаны данные сообщения очереди обмена (${path})`
-        }
-    },
-    //Данные ответа сообщения очереди обмена
-    blResp: {
-        use: { validateBuffer },
-        required: true,
-        message: {
-            validateBuffer: path =>
-                `Данные ответа сообщения очереди обмена (${path}) имеют некорректный тип данных (ожидалось - null или Buffer)`,
-            required: path => `Не указаны данные ответа сообщения очереди обмена (${path})`
+            required: path => `Не указано обрабатываемое сообщение очреди (${path})`
         }
     }
-}).validator({ required: val => typeof val != "undefined" });
+});
 
-//Параметры функции отправки сообщения родителю без обработки
-exports.sendUnChange = new Schema({
-    //Задача обработки
-    task: {
-        schema: OutQueueProcessorTask,
+//Схема валидации параметров функции обработчки сообщения сервером БД
+exports.dbProcess = new Schema({
+    //Обрабатываемое сообщение очереди
+    queue: {
+        schema: Queue,
         required: true,
         message: {
-            required: path => `Не указана задача для обработки (${path})`
+            required: path => `Не указано обрабатываемое сообщение очреди (${path})`
         }
     }
 });

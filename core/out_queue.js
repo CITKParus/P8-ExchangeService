@@ -11,9 +11,9 @@ const _ = require("lodash"); //Работа с массивами и колле�
 const EventEmitter = require("events"); //Обработчик пользовательских событий
 const ChildProcess = require("child_process"); //Работа с дочерними процессами
 const { ServerError } = require("./server_errors"); //Типовая ошибка
-const { SERR_UNEXPECTED, SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
-const { validateObject } = require("./utils"); //Вспомогательные функции
-const { NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
+const { SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
+const { makeErrorText, validateObject } = require("./utils"); //Вспомогательные функции
+const { NINC_EXEC_CNT_YES } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 const objOutQueueProcessorSchema = require("../models/obj_out_queue_processor"); //Схемы валидации сообщений обмена с обработчиком сообщения очереди
 const objQueueSchema = require("../models/obj_queue"); //Схемы валидации сообщения очереди
 const prmsOutQueueSchema = require("../models/prms_out_queue"); //Схемы валидации параметров функций класса
@@ -60,6 +60,8 @@ class OutQueue extends EventEmitter {
             this.dbConn = prms.dbConn;
             //Запомним логгер
             this.logger = prms.logger;
+            //Список обрабатываемых в текущий момент сообщений очереди
+            this.inProgress = [];
             //Привяжем методы к указателю на себя для использования в обработчиках событий
             this.outDetectingLoop = this.outDetectingLoop.bind(this);
         } else {
@@ -76,119 +78,106 @@ class OutQueue extends EventEmitter {
         //оповестим подписчиков о появлении нового отчета
         this.emit(SEVT_OUT_QUEUE_STOPPED);
     }
-    //Установка финальных статусов сообщения в БД
-    async finalise(prms) {
-        //Проверяем структуру переданного объекта для старта
+    //Добавление идентификатора позиции очереди в список обрабатываемых
+    addInProgress(prms) {
+        //Проверяем структуру переданного объекта
         let sCheckResult = validateObject(
             prms,
-            prmsOutQueueSchema.finalise,
-            "Параметры функции установки финальных статусов сообщения в БД"
+            prmsOutQueueSchema.addInProgress,
+            "Параметры функции добавления идентификатора позиции очереди в список обрабатываемых"
         );
         //Если структура объекта в норме
         if (!sCheckResult) {
-            //Если больше нет попыток исполнения и сообщение не в статусе успешной обработки сервером БД
-            if (
-                prms.queue.nExecState != objQueueSchema.NQUEUE_EXEC_STATE_DB_OK &&
-                prms.queue.nExecCnt >= prms.queue.nRetryAttempts
-            ) {
-                //То считаем, что оно выполнено с ошибками и больше пытаться не надо
-                await this.dbConn.setQueueState({
-                    nQueueId: prms.queue.nId,
-                    sExecMsg: prms.queue.sExecMsg,
-                    nExecState: objQueueSchema.NQUEUE_EXEC_STATE_ERR
-                });
-            } else {
-                //Если сообщение успешно исполнено сервером БД - то значит оно успешно исполнено вообще
-                if (prms.queue.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_DB_OK) {
-                    await this.dbConn.setQueueState({
-                        nQueueId: prms.queue.nId,
-                        nIncExecCnt: prms.queue.nExecCnt == 0 ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
-                        nExecState: objQueueSchema.NQUEUE_EXEC_STATE_OK
-                    });
-                } else {
-                    //Если сообщение в статусе исполнения сервером приложений (чего здесь быть не может) - это ошибка
-                    if (prms.queue.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_APP) {
-                        //То выставим ему ошибку исполнения сервером приложений
-                        await this.dbConn.setQueueState({
-                            nQueueId: prms.queue.nId,
-                            sExecMsg: prms.queue.sExecMsg,
-                            nIncExecCnt: prms.queue.nExecCnt == 0 ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
-                            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR
-                        });
-                    } else {
-                        //Если сообщение в статусе исполнения сервером БД (чего здесь быть не может) - это ошибка
-                        if (prms.queue.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_DB) {
-                            //То выставим ему ошибку исполнения сервером БД
-                            await this.dbConn.setQueueState({
-                                nQueueId: prms.queue.nId,
-                                sExecMsg: prms.queue.sExecMsg,
-                                nIncExecCnt: prms.queue.nExecCnt == 0 ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
-                                nExecState: objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
-                            });
-                        }
-                    }
-                }
+            //Проверим, что такого идентификатора ещё нет в списке обрабатываемых
+            const i = this.inProgress.indexOf(prms.nQueueId);
+            //Если нет - добавим
+            if (i === -1) this.inProgress.push(prms.nQueueId);
+        } else {
+            throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+        }
+    }
+    //Удаление идентификатора позиции очереди из списка обрабатываемых
+    rmInProgress(prms) {
+        //Проверяем структуру переданного объекта
+        let sCheckResult = validateObject(
+            prms,
+            prmsOutQueueSchema.rmInProgress,
+            "Параметры функции удаления идентификатора позиции очереди из списка обрабатываемых"
+        );
+        //Если структура объекта в норме
+        if (!sCheckResult) {
+            //Если удаляемый идентификатор есть в списке
+            const i = this.inProgress.indexOf(prms.nQueueId);
+            //Удалим его
+            if (i > -1) {
+                this.inProgress.splice(i, 1);
             }
         } else {
             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
         }
     }
-    //Запуск обработки сообщения сервером БД
-    async dbProcess(prms) {
-        //Проверяем структуру переданного объекта для старта
+    //Проверка наличия идентификатора позиции очереди в списке обрабатываемых
+    isInProgress(prms) {
+        //Проверяем структуру переданного объекта
         let sCheckResult = validateObject(
             prms,
-            prmsOutQueueSchema.dbProcess,
-            "Параметры функции запуска обработки ообщения сервером БД"
+            prmsOutQueueSchema.isInProgress,
+            "Параметры функции проверки наличия идентификатора позиции очереди в списке обрабатываемых"
         );
         //Если структура объекта в норме
         if (!sCheckResult) {
-            //Буфер для текущего состояния сообщения
-            let curQueue = null;
-            //Обрабатываем
-            try {
-                //Фиксируем начало исполнения сервером БД - в статусе сообщения
-                curQueue = await this.dbConn.setQueueState({
-                    nQueueId: prms.queue.nId,
-                    nExecState: objQueueSchema.NQUEUE_EXEC_STATE_DB
-                });
-                //Вызов обработчика БД
-                curQueue = await this.dbConn.execQueueDBPrc({ nQueueId: prms.queue.nId });
-                //Фиксируем успешное исполнение сервером БД - в статусе сообщения
-                curQueue = await this.dbConn.setQueueState({
-                    nQueueId: prms.queue.nId,
-                    nExecState: objQueueSchema.NQUEUE_EXEC_STATE_DB_OK
-                });
-                //Фиксируем успешное исполнение сервером БД - в протоколе работы сервиса
-                await this.logger.info(`Исходящее сообщение ${prms.queue.nId} успешно отработано сервером БД`, {
-                    nQueueId: prms.queue.nId
-                });
-            } catch (e) {
-                //Сформируем текст ошибки
-                let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
-                if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
-                //Фиксируем ошибку обработки сервером БД - в статусе сообщения
-                curQueue = await this.dbConn.setQueueState({
-                    nQueueId: prms.queue.nId,
-                    sExecMsg: sErr,
-                    nIncExecCnt: NINC_EXEC_CNT_YES,
-                    nExecState: objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
-                });
-                //Фиксируем ошибку обработки сервером БД - в протоколе работы сервиса
-                await this.logger.error(
-                    `Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером БД: ${sErr}`,
-                    { nQueueId: prms.queue.nId }
-                );
-            }
-            //Вернём текущее состоянии сообщения очереди
-            return curQueue;
+            //Проверим наличие идентификатора в списке
+            return !(this.inProgress.indexOf(prms.nQueueId) === -1);
+        } else {
+            throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+        }
+    }
+    //Старт обработчика
+    startQueueProcessor(prms) {
+        //Проверяем структуру переданного объекта
+        let sCheckResult = validateObject(
+            prms,
+            prmsOutQueueSchema.startQueueProcessor,
+            "Параметры функции запуска обработчика сообщения очереди"
+        );
+        //Если структура объекта в норме
+        if (!sCheckResult) {
+            //Добавляем идентификатор позиции очереди в список обрабатываемых
+            this.addInProgress({ nQueueId: prms.nQueueId });
+            //Отдаём команду дочернему процессу обработчика на старт исполнения
+            prms.proc.send({
+                nQueueId: prms.nQueueId,
+                connectSettings: this.dbConn.connectSettings
+            });
+            //Уменьшаем количество доступных обработчиков
+            this.nWorkersLeft--;
+        } else {
+            throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+        }
+    }
+    //Останов обработчика
+    stopQueueProcessor(prms) {
+        //Проверяем структуру переданного объекта для старта
+        let sCheckResult = validateObject(
+            prms,
+            prmsOutQueueSchema.stopQueueProcessor,
+            "Параметры функции останова обработчика сообщения очереди"
+        );
+        //Если структура объекта в норме
+        if (!sCheckResult) {
+            //Удаляем идентификатор позиции очереди из списка обрабатываемых
+            this.rmInProgress({ nQueueId: prms.nQueueId });
+            //Завершаем дочерний процесс обработчика
+            prms.proc.kill();
+            //Увеличиваем количество доступных обработчиков
+            this.nWorkersLeft++;
         } else {
             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
         }
     }
     //Запуск обработки очередного сообщения
-    async processMessage(prms) {
-        //Проверяем структуру переданного объекта для старта
+    processMessage(prms) {
+        //Проверяем структуру переданного объекта
         let sCheckResult = validateObject(
             prms,
             prmsOutQueueSchema.processMessage,
@@ -204,30 +193,6 @@ class OutQueue extends EventEmitter {
                 const proc = ChildProcess.fork("core/out_queue_processor", { silent: false });
                 //Текущее состояние сообщения
                 let curQueue = null;
-                //Скажем что начали обработку
-                await self.logger.info(
-                    `Обрабатываю исходящее сообщение: ${prms.queue.nId}, ${prms.queue.sInDate}, ${
-                        prms.queue.sServiceFnCode
-                    }, ${prms.queue.sExecState}, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
-                    { nQueueId: prms.queue.nId }
-                );
-                //Установим его статус в БД - обрабатывается сервером приложений (только для новых или повторно обрабатываемых сервером приложений)
-                if (
-                    prms.queue.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_INQUEUE ||
-                    prms.queue.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR
-                ) {
-                    curQueue = await self.dbConn.setQueueState({
-                        nQueueId: prms.queue.nId,
-                        nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP
-                    });
-                }
-                //Установим его статус в БД - обрабатывается в БД (только если сюда пришло сообщение на повторную обработку сервером БД)
-                if (prms.queue.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR) {
-                    curQueue = await self.dbConn.setQueueState({
-                        nQueueId: prms.queue.nId,
-                        nExecState: objQueueSchema.NQUEUE_EXEC_STATE_DB
-                    });
-                }
                 //Перехват сообщений обработчика
                 proc.on("message", async result => {
                     //Проверяем структуру полученного сообщения
@@ -238,168 +203,81 @@ class OutQueue extends EventEmitter {
                     );
                     //Если структура сообщения в норме
                     if (!sCheckResult) {
-                        //Движение события по статусам в зависимости от того в каком состоянии его вернул обработчик
-                        try {
-                            //Работаем от статуса сообщения полученного от обработчика
-                            switch (result.nExecState) {
-                                //Ошибка обработки
-                                case objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR: {
-                                    //Установим ошибочный статус в БД для сообщений и увеличим счетчик попыток отправки
-                                    curQueue = await self.dbConn.setQueueState({
-                                        nQueueId: prms.queue.nId,
-                                        sExecMsg: result.sExecMsg,
-                                        nIncExecCnt: NINC_EXEC_CNT_YES,
-                                        nExecState: result.nExecState
-                                    });
-                                    //Фиксируем ошибку в протоколе работы сервиса
-                                    await self.logger.error(
-                                        `Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером приложений: ${
-                                            result.sExecMsg
-                                        }`,
-                                        { nQueueId: prms.queue.nId }
-                                    );
-                                    break;
-                                }
-                                //Успех обработки
-                                case objQueueSchema.NQUEUE_EXEC_STATE_APP_OK: {
-                                    //Если состояние менялось (а не просто повторная отработка)
-                                    if (result.nExecState != prms.queue.nExecState) {
-                                        //Пишем в базу успех отработки сервером приложений - результаты обработки
-                                        curQueue = await self.dbConn.setQueueAppSrvResult({
-                                            nQueueId: prms.queue.nId,
-                                            blMsg: result.blMsg ? new Buffer(result.blMsg) : null,
-                                            blResp: result.blResp ? new Buffer(result.blResp) : null
-                                        });
-                                        //Пишем в базу успех отработки сервером приложений - статус сообщения
-                                        curQueue = await self.dbConn.setQueueState({
-                                            nQueueId: prms.queue.nId,
-                                            nExecState: result.nExecState
-                                        });
-                                        //Пишем в базу успех отработки сервером приложений - запись в протокол работы сервера приложений
-                                        await self.logger.info(
-                                            `Исходящее сообщение ${
-                                                prms.queue.nId
-                                            } успешно отработано сервером приложений`,
-                                            { nQueueId: prms.queue.nId }
-                                        );
-                                    }
-                                    //Запускаем обработку сервером БД
-                                    curQueue = await self.dbProcess(prms);
-                                    break;
-                                }
-                                //Обработчик ничего не делал
-                                default: {
-                                    //Обработчик ничего не делал, но если сообщение сообщение в статусе - ошибка обработки сервером БД или обрабатывается сервером БД, то запустим обработчик БД
-                                    if (result.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR) {
-                                        //Запускаем обработчик сервера БД
-                                        curQueue = await self.dbProcess(prms);
-                                    } else {
-                                        //Во всех остальных случаях - ничего не делаем вообще
-                                        curQueue = prms.queue;
-                                    }
-                                    break;
-                                }
-                            }
-                        } catch (e) {
-                            //Сформируем текст ошибки
-                            let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
-                            if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
-                            //Фиксируем ошибку обработки сервером приложений - статус сообщения
-                            curQueue = await self.dbConn.setQueueState({
-                                nQueueId: prms.queue.nId,
-                                sExecMsg: sErr,
-                                nIncExecCnt: NINC_EXEC_CNT_YES
+                        if (result.sResult == "ERR") {
+                            //Фиксируем ошибку обработки - протокол работы сервиса
+                            await self.logger.error(`Ошибка обработки исходящего сообщения: ${result.sMsg}`, {
+                                nQueueId: prms.queue.nId
                             });
-                            //Фиксируем ошибку обработки сервером приложений - запись в протокол работы сервера приложений
-                            await self.logger.error(sErr, { nQueueId: prms.queue.nId });
+                            //Фиксируем ошибку обработки - статус сообщения
+                            await this.dbConn.setQueueState({
+                                nQueueId: prms.queue.nId,
+                                sExecMsg: result.sMsg,
+                                nIncExecCnt: NINC_EXEC_CNT_YES,
+                                nExecState:
+                                    prms.queue.nExecCnt + 1 < prms.queue.nRetryAttempts
+                                        ? prms.queue.nExecState
+                                        : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                            });
                         }
                     } else {
-                        //Пришел неожиданный ответ обработчика - статус сообщения
-                        curQueue = await self.dbConn.setQueueState({
-                            nQueueId: prms.queue.nId,
-                            sExecMsg: sCheckResult,
-                            nIncExecCnt: NINC_EXEC_CNT_YES
-                        });
-                        //Пришел неожиданный ответ обработчика - запись в протокол работы сервера приложений
+                        //Пришел неожиданный ответ обработчика - запись в протокол работы сервиса
                         await self.logger.error(
                             `Неожиданный ответ обработчика для сообщения ${prms.queue.nId}: ${sCheckResult}`,
                             { nQueueId: prms.queue.nId }
                         );
-                    }
-                    //Выставляем финальные статусы
-                    try {
-                        await self.finalise({ queue: curQueue });
-                    } catch (e) {
-                        //Сформируем текст ошибки
-                        let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
-                        if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
-                        //Установим его статус в БД - ошибка установки финального статуса
-                        await self.dbConn.setQueueState({
+                        //Фиксируем ошибку обработки - статус сообщения
+                        await this.dbConn.setQueueState({
                             nQueueId: prms.queue.nId,
-                            sExecMsg: sErr,
-                            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_ERR
-                        });
-                        //Пришел неожиданный ответ обработчика - запись в протокол работы сервера приложений
-                        await self.logger.error(`Фатальная ошибка обработчика сообщения ${prms.queue.nId}: ${sErr}`, {
-                            nQueueId: prms.queue.nId
+                            sExecMsg: `Неожиданный ответ обработчика для сообщения ${prms.queue.nId}: ${sCheckResult}`,
+                            nIncExecCnt: NINC_EXEC_CNT_YES,
+                            nExecState:
+                                prms.queue.nExecCnt + 1 < prms.queue.nRetryAttempts
+                                    ? prms.queue.nExecState
+                                    : objQueueSchema.NQUEUE_EXEC_STATE_ERR
                         });
                     }
                     //Останавливаем обработчик и инкрементируем флаг их доступного количества
-                    proc.kill();
-                    this.nWorkersLeft++;
+                    try {
+                        this.stopQueueProcessor({ nQueueId: prms.queue.nId, proc });
+                    } catch (e) {
+                        //Отразим в протоколе ошибку останова
+                        await self.logger.error(
+                            `Ошибка останова обработчика исходящего сообщения: ${makeErrorText(e)}`,
+                            { nQueueId: prms.queue.nId }
+                        );
+                    }
                 });
                 //Перехват ошибок обработчика
                 proc.on("error", async e => {
-                    //Сформируем текст ошибки
-                    let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
-                    if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
-                    //Установим его статус в БД - ошибка обработки сервером приложений
-                    let curQueue = await self.dbConn.setQueueState({
-                        nQueueId: prms.queue.nId,
-                        sExecMsg: sErr,
-                        nIncExecCnt: NINC_EXEC_CNT_YES
-                    });
-                    //Так же фиксируем ошибку в протоколе работы
-                    await self.logger.error(`Ошибка обработки исходящего сообщения сервером приложений: ${sErr}`, {
+                    //Фиксируем ошибку в протоколе работы
+                    await self.logger.error(`Ошибка обработки исходящего сообщения: ${makeErrorText(e)}`, {
                         nQueueId: prms.queue.nId
                     });
-                    //Выставляем финальные статусы
-                    try {
-                        await self.finalise({ queue: curQueue });
-                    } catch (e) {
-                        //Сформируем текст ошибки
-                        let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
-                        if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
-                        //Установим его статус в БД - ошибка установки финального статуса
-                        await self.dbConn.setQueueState({
-                            nQueueId: prms.queue.nId,
-                            sExecMsg: sErr,
-                            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_ERR
-                        });
-                        //Пришел неожиданный ответ обработчика - запись в протокол работы сервера приложений
-                        await self.logger.error(`Фатальная ошибка обработчика сообщения ${prms.queue.nId}: ${sErr}`, {
-                            nQueueId: prms.queue.nId
-                        });
-                    }
+                    //Фиксируем ошибку обработки - статус сообщения
+                    await this.dbConn.setQueueState({
+                        nQueueId: prms.queue.nId,
+                        sExecMsg: makeErrorText(e),
+                        nIncExecCnt: NINC_EXEC_CNT_YES,
+                        nExecState:
+                            prms.queue.nExecCnt + 1 < prms.queue.nRetryAttempts
+                                ? prms.queue.nExecState
+                                : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                    });
                     //Останавливаем обработчик и инкрементируем флаг их доступного количества
-                    proc.kill();
-                    this.nWorkersLeft++;
+                    try {
+                        this.stopQueueProcessor({ nQueueId: prms.queue.nId, proc });
+                    } catch (e) {
+                        //Отразим в протоколе ошибку останова
+                        await self.logger.error(
+                            `Ошибка останова обработчика исходящего сообщения: ${makeErrorText(e)}`,
+                            { nQueueId: prms.queue.nId }
+                        );
+                    }
                 });
                 //Перехват останова обработчика
                 proc.on("exit", code => {});
                 //Запускаем обработчик
-                proc.send({
-                    nQueueId: prms.queue.nId,
-                    nExecState: prms.queue.nExecState,
-                    blMsg: prms.queue.blMsg,
-                    blResp: prms.queue.blResp,
-                    service: _.find(this.services, { nId: prms.queue.nServiceId }),
-                    function: _.find(_.find(this.services, { nId: prms.queue.nServiceId }).functions, {
-                        nId: prms.queue.nServiceFnId
-                    })
-                });
-                //Уменьшаем количество доступных обработчиков
-                this.nWorkersLeft--;
+                this.startQueueProcessor({ nQueueId: prms.queue.nId, proc });
             }
         } else {
             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
@@ -427,38 +305,22 @@ class OutQueue extends EventEmitter {
                     //Обходим их
                     for (let i = 0; i < outMsgs.length; i++) {
                         //И запускаем обработчики
-                        try {
-                            await this.processMessage({ queue: outMsgs[i] });
-                        } catch (e) {
-                            //Какие непредвиденные ошибки при обработке текущего сообщения - подготовим текст ошибки
-                            let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
-                            if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
-                            //Фиксируем ошибку обработки сервером приложений - статус сообщения (сам статус - не меняем, здесь только фатальные ошибки, но делаем инкремент количества попыток)
-                            let curQueue = await this.dbConn.setQueueState({
-                                nQueueId: outMsgs[i].nId,
-                                sExecMsg: sErr,
-                                nIncExecCnt: NINC_EXEC_CNT_YES
-                            });
-                            //Фиксируем ошибку обработки сервером приложений - запись в протокол работы сервера приложений
-                            await this.logger.error(sErr, { nQueueId: outMsgs[i].nId });
-                            //Выставляем финальные статусы
+                        if (!this.isInProgress({ nQueueId: outMsgs[i].nId })) {
                             try {
-                                await this.finalise({ queue: curQueue });
+                                this.processMessage({ queue: outMsgs[i] });
                             } catch (e) {
-                                //Сформируем текст ошибки
-                                let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
-                                if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
-                                //Установим его статус в БД - ошибка установки финального статуса
-                                await self.dbConn.setQueueState({
+                                //Фиксируем ошибку обработки сервером приложений - статус сообщения
+                                await this.dbConn.setQueueState({
                                     nQueueId: outMsgs[i].nId,
-                                    sExecMsg: sErr,
-                                    nExecState: objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                                    sExecMsg: makeErrorText(e),
+                                    nIncExecCnt: NINC_EXEC_CNT_YES,
+                                    nExecState:
+                                        outMsgs[i].nExecCnt + 1 < outMsgs[i].nRetryAttempts
+                                            ? outMsgs[i].nExecState
+                                            : objQueueSchema.NQUEUE_EXEC_STATE_ERR
                                 });
-                                //Пришел неожиданный ответ обработчика - запись в протокол работы сервера приложений
-                                await self.logger.error(
-                                    `Фатальная ошибка обработчика сообщения ${outMsgs[i].nId}: ${sErr}`,
-                                    { nQueueId: outMsgs[i].nId }
-                                );
+                                //Фиксируем ошибку обработки сервером приложений - запись в протокол работы сервера приложений
+                                await this.logger.error(makeErrorText(e), { nQueueId: outMsgs[i].nId });
                             }
                         }
                     }
@@ -466,11 +328,8 @@ class OutQueue extends EventEmitter {
                 //Запустили отработку всех считанных - перезапускаем цикл опроса исходящих сообщений
                 await this.restartDetectingLoop();
             } catch (e) {
-                //Какие непредвиденные ошибки при получении списка сообщений - подготовим текст ошибки
-                let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
-                if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
                 //Фиксируем ошибку в протоколе работы сервера приложений
-                await this.logger.error(sErr);
+                await this.logger.error(makeErrorText(e));
                 await this.restartDetectingLoop();
             }
         } else {

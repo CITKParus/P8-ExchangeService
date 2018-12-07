@@ -7,8 +7,10 @@
 // Подключение библиотек
 //----------------------
 
-const _ = require("lodash"); //Работа с массивами и коллекциями
-const { makeModuleFullPath, validateObject } = require("./utils"); //Вспомогательные функции
+require("module-alias/register"); //Поддержка псевонимов при подключении модулей
+const lg = require("./logger"); //Протоколирование работы
+const db = require("./db_connector"); //Взаимодействие с БД
+const { makeErrorText, makeModuleFullPath, validateObject } = require("./utils"); //Вспомогательные функции
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const objOutQueueProcessorSchema = require("../models/obj_out_queue_processor"); //Схема валидации сообщений обмена с бработчиком очереди исходящих сообщений
 const prmsOutQueueProcessorSchema = require("../models/prms_out_queue_processor"); //Схема валидации параметров функций модуля
@@ -19,8 +21,14 @@ const {
     SERR_OBJECT_BAD_INTERFACE,
     SERR_MODULES_NO_MODULE_SPECIFIED
 } = require("./constants"); //Глобальные константы
-//!!!!!!!!!!!!!!!!!!!!!!! УБРАТЬ!!!!!!!!!!!!!!!!!!!!!!
-const fs = require("fs");
+const { NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
+
+//--------------------------
+// Глобальные идентификаторы
+//--------------------------
+
+let dbConn = null; //Подключение к БД
+let logger = null; //Протоколирование работы
 
 //------------
 // Тело модуля
@@ -28,84 +36,162 @@ const fs = require("fs");
 
 //Отправка родительскому процессу ошибки обработки сообщения сервером приложений
 const sendErrorResult = prms => {
-    //Проверяем параметры
+    //Проверяем структуру переданного сообщения
     let sCheckResult = validateObject(
         prms,
         prmsOutQueueProcessorSchema.sendErrorResult,
-        "Параметры функции отправки ошибки обработки"
+        "Параметры функции отправки родительскому процессу ошибки обработки сообщения"
     );
-    //Если параметры в норме
+    //Если структура объекта в норме
     if (!sCheckResult) {
-        //Отправляем родительскому процессу ошибку
         process.send({
-            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR,
-            sExecMsg: prms.sMessage,
-            blMsg: null,
-            blResp: null
+            sResult: objOutQueueProcessorSchema.STASK_RESULT_ERR,
+            sMsg: prms.sMessage
         });
     } else {
-        //Отправляем родительскому процессу сведения об ошибочных параметрах
         process.send({
-            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR,
-            sExecMsg: sCheckResult,
-            blMsg: null,
-            blResp: null
+            sResult: objOutQueueProcessorSchema.STASK_RESULT_ERR,
+            sMsg: sCheckResult
         });
     }
 };
 
 //Отправка родительскому процессу успеха обработки сообщения сервером приложений
-const sendOKResult = prms => {
-    //Проверяем параметры
+const sendOKResult = () => {
+    process.send({
+        sResult: objOutQueueProcessorSchema.STASK_RESULT_OK,
+        sMsg: null
+    });
+};
+
+//Запуск обработки сообщения сервером приложений
+const appProcess = async prms => {
+    //Проверяем структуру переданного объекта для старта
     let sCheckResult = validateObject(
         prms,
-        prmsOutQueueProcessorSchema.sendOKResult,
-        "Параметры функции отправки ответа об успехе обработки"
+        prmsOutQueueProcessorSchema.appProcess,
+        "Параметры функции запуска обработки ообщения сервером приложений"
     );
-    //Если параметры в норме
+    //Если структура объекта в норме
     if (!sCheckResult) {
-        //Отправляем родительскому процессу успех
-        process.send({
-            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK,
-            sExecMsg: null,
-            blMsg: prms.blMsg,
-            blResp: prms.blResp
-        });
+        //Обработанное сообщение
+        let newQueue = null;
+        //Обрабатываем
+        try {
+            //Фиксируем начало исполнения сервером приложений - в статусе сообщения
+            newQueue = await dbConn.setQueueState({
+                nQueueId: prms.queue.nId,
+                nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP
+            });
+            //Скажем что начали обработку
+            await logger.info(
+                `Обрабатываю исходящее сообщение сервером приложений: ${prms.queue.nId}, ${prms.queue.sInDate}, ${
+                    prms.queue.sServiceFnCode
+                }, ${prms.queue.sExecState}, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
+                { nQueueId: prms.queue.nId }
+            );
+            if (prms.queue.blMsg) {
+                let sMsg = prms.queue.blMsg.toString() + " MODIFICATION FOR " + prms.queue.nId;
+                //Фиксируем успех исполнения
+                newQueue = await dbConn.setQueueAppSrvResult({
+                    nQueueId: prms.queue.nId,
+                    blMsg: new Buffer(sMsg),
+                    blResp: new Buffer("REPLAY ON " + prms.queue.nId)
+                });
+                //Фиксируем успешное исполнение сервером приложений - в статусе сообщения
+                newQueue = await dbConn.setQueueState({
+                    nQueueId: prms.queue.nId,
+                    nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
+                });
+                //Фиксируем успешное исполнение сервером приложений - в протоколе работы сервиса
+                await logger.info(`Исходящее сообщение ${prms.queue.nId} успешно отработано сервером приложений`, {
+                    nQueueId: prms.queue.nId
+                });
+            } else {
+                throw new ServerError(
+                    SERR_UNEXPECTED,
+                    `Ошибка отработки сообщения ${prms.queue.nId}: нет данных для обработки`
+                );
+            }
+        } catch (e) {
+            //Фиксируем ошибку обработки сервером приложений - в статусе сообщения
+            newQueue = await dbConn.setQueueState({
+                nQueueId: prms.queue.nId,
+                sExecMsg: makeErrorText(e),
+                nIncExecCnt: NINC_EXEC_CNT_YES,
+                nExecState:
+                    prms.queue.nExecCnt + 1 < prms.queue.nRetryAttempts
+                        ? objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR
+                        : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+            });
+            //Фиксируем ошибку обработки сервером приложений - в протоколе работы сервиса
+            await logger.error(
+                `Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером приложений: ${makeErrorText(e)}`,
+                { nQueueId: prms.queue.nId }
+            );
+        }
+        //Возвращаем результат
+        return newQueue;
     } else {
-        //Отправляем родительскому процессу сведения об ошибочных параметрах
-        process.send({
-            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR,
-            sExecMsg: sCheckResult,
-            blMsg: null,
-            blResp: null
-        });
+        throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
     }
 };
 
-//Отправка родительскому процессу сообщения без обработки
-const sendUnChange = prms => {
-    //Проверяем параметры
+//Запуск обработки сообщения сервером БД
+const dbProcess = async prms => {
+    //Проверяем структуру переданного объекта для старта
     let sCheckResult = validateObject(
         prms,
-        prmsOutQueueProcessorSchema.sendUnChange,
-        "Параметры функции отправки сообщения без обработки"
+        prmsOutQueueProcessorSchema.dbProcess,
+        "Параметры функции запуска обработки ообщения сервером БД"
     );
-    //Если параметры в норме
+    //Если структура объекта в норме
     if (!sCheckResult) {
-        process.send({
-            nExecState: prms.task.nExecState,
-            sExecMsg: null,
-            blMsg: prms.task.blMsg ? new Buffer(prms.task.blMsg) : null,
-            blResp: prms.task.blResp ? new Buffer(prms.task.blResp) : null
-        });
+        //Обрабатываем
+        try {
+            //Фиксируем начало исполнения сервером БД - в статусе сообщения
+            await dbConn.setQueueState({
+                nQueueId: prms.queue.nId,
+                nExecState: objQueueSchema.NQUEUE_EXEC_STATE_DB
+            });
+            //Скажем что начали обработку
+            await logger.info(
+                `Обрабатываю исходящее сообщение сервером БД: ${prms.queue.nId}, ${prms.queue.sInDate}, ${
+                    prms.queue.sServiceFnCode
+                }, ${prms.queue.sExecState}, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
+                { nQueueId: prms.queue.nId }
+            );
+            //Вызов обработчика БД
+            await dbConn.execQueueDBPrc({ nQueueId: prms.queue.nId });
+            //Фиксируем успешное исполнение сервером БД - в статусе сообщения
+            await dbConn.setQueueState({
+                nQueueId: prms.queue.nId,
+                nIncExecCnt: prms.queue.nExecCnt == 0 ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
+                nExecState: objQueueSchema.NQUEUE_EXEC_STATE_OK
+            });
+            //Фиксируем успешное исполнение сервером БД - в протоколе работы сервиса
+            await logger.info(`Исходящее сообщение ${prms.queue.nId} успешно отработано сервером БД`, {
+                nQueueId: prms.queue.nId
+            });
+        } catch (e) {
+            //Фиксируем ошибку обработки сервером БД - в статусе сообщения
+            await dbConn.setQueueState({
+                nQueueId: prms.queue.nId,
+                sExecMsg: makeErrorText(e),
+                nIncExecCnt: NINC_EXEC_CNT_YES,
+                nExecState:
+                    prms.queue.nExecCnt + 1 < prms.queue.nRetryAttempts
+                        ? objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
+                        : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+            });
+            //Фиксируем ошибку обработки сервером БД - в протоколе работы сервиса
+            await logger.error(
+                `Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером БД: ${makeErrorText(e)}`,
+                { nQueueId: prms.queue.nId }
+            );
+        }
     } else {
-        //Отправляем родительскому процессу сведения об ошибочных параметрах
-        process.send({
-            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR,
-            sExecMsg: sCheckResult,
-            blMsg: null,
-            blResp: null
-        });
+        throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
     }
 };
 
@@ -119,38 +205,248 @@ const processTask = async prms => {
     );
     //Если параметры в норме
     if (!sCheckResult) {
-        //Обработке подлежат только необработанные сервером приложений сообщения
-        if (
-            prms.task.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_INQUEUE ||
-            prms.task.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR
-        ) {
-            setTimeout(() => {
-                //if (prms.task.nQueueId == 2) {
-                //    sendErrorResult({ sMessage: "Ошибка отработки сообщения " + prms.task.nQueueId });
-                //} else {
-                if (prms.task.blMsg) {
-                    let b = new Buffer(prms.task.blMsg);
-                    fs.writeFile("c:/repos/temp/" + prms.task.nQueueId, b, err => {
-                        if (err) {
-                            sendErrorResult({ sMessage: err.message });
-                        } else {
-                            let sMsg = b.toString() + " MODIFICATION FOR " + prms.task.nQueueId;
-                            sendOKResult({
-                                blMsg: new Buffer(sMsg),
-                                blResp: new Buffer("REPLAY ON " + prms.task.nQueueId)
-                            });
+        let q = null;
+        try {
+            //Создаём подключение к БД
+            dbConn = new db.DBConnector({ connectSettings: prms.task.connectSettings });
+            //Создаём логгер для протоколирования работы
+            logger = new lg.Logger();
+            //Подключим логгер к БД (и отключим когда надо)
+            dbConn.on(db.SEVT_DB_CONNECTOR_CONNECTED, connection => {
+                logger.setDBConnector(dbConn, true);
+            });
+            dbConn.on(db.SEVT_DB_CONNECTOR_DISCONNECTED, () => {
+                logger.removeDBConnector();
+            });
+            //Подключаемся к БД
+            await dbConn.connect();
+            //Считываем запись очереди
+            q = await dbConn.getQueue({ nQueueId: prms.task.nQueueId });
+            //Далее работаем от статуса считанной записи
+            switch (q.nExecState) {
+                //Поставлено в очередь
+                case objQueueSchema.NQUEUE_EXEC_STATE_INQUEUE: {
+                    //Запускаем обработку сервером приложений
+                    try {
+                        let res = await appProcess({ queue: q });
+                        //И если она успешно завершилась - обработку сервером БД
+                        if (res.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_APP_OK) {
+                            try {
+                                await dbProcess({ queue: res });
+                            } catch (e) {
+                                //Фиксируем ошибку обработки сервером БД - в статусе сообщения
+                                await dbConn.setQueueState({
+                                    nQueueId: res.nId,
+                                    sExecMsg: makeErrorText(e),
+                                    nIncExecCnt: NINC_EXEC_CNT_YES,
+                                    nExecState:
+                                        res.nExecCnt + 1 < res.nRetryAttempts
+                                            ? objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
+                                            : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                                });
+                                //Фиксируем ошибку обработки сервером БД - в протоколе работы сервиса
+                                await logger.error(
+                                    `Ошибка обработки исходящего сообщения ${res.nId} сервером БД: ${makeErrorText(e)}`,
+                                    { nQueueId: res.nId }
+                                );
+                            }
                         }
-                    });
-                } else {
-                    sendErrorResult({
-                        sMessage: "Ошибка отработки сообщения " + prms.task.nQueueId + ": нет данных для обработки"
-                    });
+                    } catch (e) {
+                        //Фиксируем ошибку обработки сервером приложений - в статусе сообщения
+                        newQueue = await dbConn.setQueueState({
+                            nQueueId: q.nId,
+                            sExecMsg: makeErrorText(e),
+                            nIncExecCnt: NINC_EXEC_CNT_YES,
+                            nExecState:
+                                q.nExecCnt + 1 < q.nRetryAttempts
+                                    ? objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR
+                                    : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                        });
+                        //Фиксируем ошибку обработки сервером приложений - в протоколе работы сервиса
+                        await logger.error(
+                            `Ошибка обработки исходящего сообщения ${q.nId} сервером приложений: ${makeErrorText(e)}`,
+                            { nQueueId: q.nId }
+                        );
+                    }
+                    break;
                 }
-                //}
-            }, 3000);
-        } else {
-            //Остальные возвращаем без изменения и отработки, с сохранением статусов и сообщений
-            sendUnChange(prms);
+                //Обрабатывается сервером приложений
+                case objQueueSchema.NQUEUE_EXEC_STATE_APP: {
+                    //Предупредим о неверном статусе сообщения (такие сюда попадать не должны)
+                    await logger.warn(`Cообщение ${q.nId} в статусе ${q.sExecState} попало в очередь обработчика`, {
+                        nQueueId: q.nId
+                    });
+                    break;
+                }
+                //Ошибка обработки сервером приложений
+                case objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR: {
+                    //Если ещё есть попытки отработки
+                    if (q.nExecCnt < q.nRetryAttempts) {
+                        //Снова запускаем обработку сервером приложений
+                        try {
+                            let res = await appProcess({ queue: q });
+                            //И если она успешно завершилась - обработку сервоером БД
+                            if (res.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_APP_OK) {
+                                try {
+                                    await dbProcess({ queue: res });
+                                } catch (e) {
+                                    //Фиксируем ошибку обработки сервером БД - в статусе сообщения
+                                    await dbConn.setQueueState({
+                                        nQueueId: res.nId,
+                                        sExecMsg: makeErrorText(e),
+                                        nIncExecCnt: NINC_EXEC_CNT_YES,
+                                        nExecState:
+                                            res.nExecCnt + 1 < res.nRetryAttempts
+                                                ? objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
+                                                : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                                    });
+                                    //Фиксируем ошибку обработки сервером БД - в протоколе работы сервиса
+                                    await logger.error(
+                                        `Ошибка обработки исходящего сообщения ${res.nId} сервером БД: ${makeErrorText(
+                                            e
+                                        )}`,
+                                        { nQueueId: res.nId }
+                                    );
+                                }
+                            }
+                        } catch (e) {
+                            //Фиксируем ошибку обработки сервером приложений - в статусе сообщения
+                            newQueue = await dbConn.setQueueState({
+                                nQueueId: q.nId,
+                                sExecMsg: makeErrorText(e),
+                                nIncExecCnt: NINC_EXEC_CNT_YES,
+                                nExecState:
+                                    q.nExecCnt + 1 < q.nRetryAttempts
+                                        ? objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR
+                                        : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                            });
+                            //Фиксируем ошибку обработки сервером приложений - в протоколе работы сервиса
+                            await logger.error(
+                                `Ошибка обработки исходящего сообщения ${q.nId} сервером приложений: ${makeErrorText(
+                                    e
+                                )}`,
+                                { nQueueId: q.nId }
+                            );
+                        }
+                    } else {
+                        //Попыток нет - финализируем обработку
+                        await dbConn.setQueueState({
+                            nQueueId: q.nId,
+                            sExecMsg: q.sExecMsg,
+                            nIncExecCnt: q.nExecCnt == 0 ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
+                            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                        });
+                    }
+                    break;
+                }
+                //Успешно обработано сервером приложений
+                case objQueueSchema.NQUEUE_EXEC_STATE_APP_OK: {
+                    //Запускаем обработку в БД
+                    try {
+                        await dbProcess({ queue: q });
+                    } catch (e) {
+                        //Фиксируем ошибку обработки сервером БД - в статусе сообщения
+                        await dbConn.setQueueState({
+                            nQueueId: q.nId,
+                            sExecMsg: makeErrorText(e),
+                            nIncExecCnt: NINC_EXEC_CNT_YES,
+                            nExecState:
+                                q.nExecCnt + 1 < q.nRetryAttempts
+                                    ? objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
+                                    : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                        });
+                        //Фиксируем ошибку обработки сервером БД - в протоколе работы сервиса
+                        await logger.error(
+                            `Ошибка обработки исходящего сообщения ${q.nId} сервером БД: ${makeErrorText(e)}`,
+                            { nQueueId: q.nId }
+                        );
+                    }
+                    break;
+                }
+                //Обрабатывается в БД
+                case objQueueSchema.NQUEUE_EXEC_STATE_DB: {
+                    //Предупредим о неверном статусе сообщения (такие сюда попадать не должны)
+                    await logger.warn(`Cообщение ${q.nId} в статусе ${q.sExecState} попало в очередь обработчика`, {
+                        nQueueId: q.nId
+                    });
+                    break;
+                }
+                //Ошибка обработки в БД
+                case objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR: {
+                    //Если ещё есть попытки отработки
+                    if (q.nExecCnt < q.nRetryAttempts) {
+                        //Снова запускаем обработку сервером БД
+                        try {
+                            await dbProcess({ queue: q });
+                        } catch (e) {
+                            //Фиксируем ошибку обработки сервером БД - в статусе сообщения
+                            await dbConn.setQueueState({
+                                nQueueId: q.nId,
+                                sExecMsg: makeErrorText(e),
+                                nIncExecCnt: NINC_EXEC_CNT_YES,
+                                nExecState:
+                                    q.nExecCnt + 1 < q.nRetryAttempts
+                                        ? objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
+                                        : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                            });
+                            //Фиксируем ошибку обработки сервером БД - в протоколе работы сервиса
+                            await logger.error(
+                                `Ошибка обработки исходящего сообщения ${q.nId} сервером БД: ${makeErrorText(e)}`,
+                                { nQueueId: q.nId }
+                            );
+                        }
+                    } else {
+                        //Попыток нет - финализируем обработку
+                        await dbConn.setQueueState({
+                            nQueueId: q.nId,
+                            sExecMsg: q.sExecMsg,
+                            nIncExecCnt: q.nExecCnt == 0 ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
+                            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                        });
+                    }
+                    break;
+                }
+                //Успешно обработано в БД
+                case objQueueSchema.NQUEUE_EXEC_STATE_DB_OK: {
+                    //Финализируем
+                    await dbConn.setQueueState({
+                        nQueueId: q.nId,
+                        sExecMsg: null,
+                        nIncExecCnt: q.nExecCnt == 0 ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
+                        nExecState: objQueueSchema.NQUEUE_EXEC_STATE_OK
+                    });
+                    break;
+                }
+                //Обработано с ошибками
+                case objQueueSchema.NQUEUE_EXEC_STATE_ERR: {
+                    //Предупредим о неверном статусе сообщения (такие сюда попадать не должны)
+                    await logger.warn(`Cообщение ${q.nId} в статусе ${q.sExecState} попало в очередь обработчика`, {
+                        nQueueId: q.nId
+                    });
+                    break;
+                }
+                //Обработано успешно
+                case objQueueSchema.NQUEUE_EXEC_STATE_OK: {
+                    //Предупредим о неверном статусе сообщения (такие сюда попадать не должны)
+                    await logger.warn(`Cообщение ${q.nId} в статусе ${q.sExecState} попало в очередь обработчика`, {
+                        nQueueId: q.nId
+                    });
+                    break;
+                }
+                default: {
+                    //Ничего не делаем
+                    break;
+                }
+            }
+            //Отключаемся от БД
+            if (dbConn) await dbConn.disconnect();
+            //Отправляем успех
+            sendOKResult();
+        } catch (e) {
+            //Отключаемся от БД
+            if (dbConn) await dbConn.disconnect();
+            //Отправляем ошибку
+            sendErrorResult({ sMessage: makeErrorText(e) });
         }
     } else {
         sendErrorResult({ sMessage: sCheckResult });
@@ -173,7 +469,7 @@ process.on("SIGTERM", () => {});
 //Перехват ошибок
 process.on("uncaughtException", e => {
     //Отправляем ошибку родительскому процессу
-    sendErrorResult({ sMessage: e.message });
+    sendErrorResult({ sMessage: makeErrorText(e) });
 });
 
 //Приём сообщений

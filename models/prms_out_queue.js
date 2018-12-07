@@ -14,6 +14,14 @@ const { Queue } = require("./obj_queue"); //Схема валидации соо
 const { DBConnector } = require("../core/db_connector"); //Класс взаимодействия в БД
 const { Logger } = require("../core/logger"); //Класс для протоколирования работы
 
+//-------------
+//  Тело модуля
+//-------------
+
+const validateChildProcess = val => {
+    return val["constructor"]["name"] === "ChildProcess";
+};
+
 //------------------
 //  Интерфейс модуля
 //------------------
@@ -25,7 +33,7 @@ exports.OutQueue = new Schema({
         schema: outGoing,
         required: true,
         message: {
-            required: "Не указаны параметры обработки очереди исходящих сообщений (outGoing)"
+            required: path => `Не указаны параметры обработки очереди исходящих сообщений (${path})`
         }
     },
     //Объект для взаимодействия с БД
@@ -33,8 +41,9 @@ exports.OutQueue = new Schema({
         type: DBConnector,
         required: true,
         message: {
-            type: "Объект для взаимодействия с БД (dbConn) имеет некорректный тип данных (ожидалось - DBConnector)",
-            required: "Не указан объект для взаимодействия с БД (dbConn)"
+            type: path =>
+                `Объект для взаимодействия с БД (${path}) имеет некорректный тип данных (ожидалось - DBConnector)`,
+            required: path => `Не указан объект для взаимодействия с БД (${path})`
         }
     },
     //Объект для протоколирования работы
@@ -42,32 +51,94 @@ exports.OutQueue = new Schema({
         type: Logger,
         required: true,
         message: {
-            type: "Объект для протоколирования работы (logger) имеет некорректный тип данных (ожидалось - Logger)",
-            required: "Не указаны объект для протоколирования работы (logger)"
+            type: path =>
+                `Объект для протоколирования работы (${path}) имеет некорректный тип данных (ожидалось - Logger)`,
+            required: path => `Не указаны объект для протоколирования работы (${path})`
         }
     }
 });
 
-//Схема валидации параметров функции установки финальных статусов сообщения в БД
-exports.finalise = new Schema({
-    //Обрабатываемое исходящее сообщение
-    queue: {
-        schema: Queue,
+//Схема валидации параметров функции добавления идентификатора сообщения очереди в список обрабатываемых
+exports.addInProgress = new Schema({
+    //Идентификатор сообщения
+    nQueueId: {
+        type: Number,
         required: true,
         message: {
-            required: "Не указано обрабатываемое исходящее сообщение (queue)"
+            type: path => `Идентификатор сообщения (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сообщения (${path})`
         }
     }
 });
 
-//Схема валидации параметров функции запуска обработчика БД
-exports.dbProcess = new Schema({
-    //Обрабатываемое исходящее сообщение
-    queue: {
-        schema: Queue,
+//Схема валидации параметров функции удаления идентификатора сообщения очереди из списка обрабатываемых
+exports.rmInProgress = new Schema({
+    //Идентификатор сообщения
+    nQueueId: {
+        type: Number,
         required: true,
         message: {
-            required: "Не указано обрабатываемое исходящее сообщение (queue)"
+            type: path => `Идентификатор сообщения (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сообщения (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции проверки наличия идентификатора сообщения очереди в списке обрабатываемых
+exports.isInProgress = new Schema({
+    //Идентификатор сообщения
+    nQueueId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор сообщения (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сообщения (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции запуска обработчика сообщения очереди
+exports.startQueueProcessor = new Schema({
+    //Идентификатор сообщения
+    nQueueId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор сообщения (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сообщения (${path})`
+        }
+    },
+    //Процесс обработчика
+    proc: {
+        use: { validateChildProcess },
+        required: true,
+        message: {
+            validateChildProcess: path =>
+                `Процесс обработчика (${path}) имеет некорректный тип данных (ожидалось - ChildProcess)`,
+            required: path => `Не указан процесс обработчика (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции останова обработчика сообщения очереди
+exports.stopQueueProcessor = new Schema({
+    //Идентификатор сообщения
+    nQueueId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор сообщения (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сообщения (${path})`
+        }
+    },
+    //Процесс обработчика
+    proc: {
+        use: { validateChildProcess },
+        required: true,
+        message: {
+            validateChildProcess: path =>
+                `Процесс обработчика (${path}) имеет некорректный тип данных (ожидалось - ChildProcess)`,
+            required: path => `Не указан процесс обработчика (${path})`
         }
     }
 });
@@ -79,7 +150,7 @@ exports.processMessage = new Schema({
         schema: Queue,
         required: true,
         message: {
-            required: "Не указано обрабатываемое исходящее сообщение (queue)"
+            required: path => `Не указано обрабатываемое исходящее сообщение (${path})`
         }
     }
 });
