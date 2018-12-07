@@ -9,7 +9,12 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const Schema = require("validate"); //Схемы валидации
-const { SERR_UNEXPECTED, SMODULES_PATH_MODULES } = require("./constants"); //Глобавльные константы системы
+const {
+    SERR_UNEXPECTED,
+    SMODULES_PATH_MODULES,
+    SERR_MODULES_NO_MODULE_SPECIFIED,
+    SERR_MODULES_BAD_INTERFACE
+} = require("./constants"); //Глобавльные константы системы
 const { ServerError } = require("./server_errors"); //Ошибка сервера
 
 //------------
@@ -64,6 +69,76 @@ const makeErrorText = e => {
     return sErr;
 };
 
+//Считывание наименования модуля-обработчика сервера приложений (ожидаемый формат - <МОДУЛЬ>/<ФУНКЦИЯ>)
+const getAppSrvModuleName = sAppSrv => {
+    if (sAppSrv) {
+        if (sAppSrv instanceof String || typeof sAppSrv === "string") {
+            if (sAppSrv.indexOf("/") === -1) {
+                return null;
+            } else {
+                return sAppSrv.substring(0, sAppSrv.indexOf("/"));
+            }
+        } else {
+            return null;
+        }
+    } else {
+        return null;
+    }
+};
+
+//Считывание наименования функции модуля-обработчика сервера приложений (ожидаемый формат - <МОДУЛЬ>/<ФУНКЦИЯ>)
+const getAppSrvFunctionName = sAppSrv => {
+    if (sAppSrv) {
+        if (sAppSrv instanceof String || typeof sAppSrv === "string") {
+            if (sAppSrv.indexOf("/") === -1) {
+                return null;
+            } else {
+                return sAppSrv.substring(sAppSrv.indexOf("/") + 1, sAppSrv.length);
+            }
+        } else {
+            return null;
+        }
+    } else {
+        return null;
+    }
+};
+
+//Получение функции обработчика
+const getAppSrvFunction = sAppSrv => {
+    //Объявим формат (для сообщений об ошибках)
+    const sFormat = "(ожидаемый формат: <МОДУЛЬ>/<ФУНКЦИЯ>)";
+    //Проверим, что есть что разбирать
+    if (!sAppSrv)
+        throw new ServerError(SERR_MODULES_NO_MODULE_SPECIFIED, `Не указаны модуль и функция обработчика ${sFormat}`);
+    //Разбираем
+    try {
+        //Разбираем на модуль и функцию
+        let moduleName = getAppSrvModuleName(sAppSrv);
+        let funcName = getAppSrvFunctionName(sAppSrv);
+        //Проверим, что есть и то и другое
+        if (!moduleName) throw Error(`Обработчик ${sAppSrv} не указывает на модуль ${sFormat}`);
+        if (!funcName) throw Error(`Обработчик ${sAppSrv} не указывает на функцию ${sFormat}`);
+        //Подключаем модуль
+        let mdl = null;
+        try {
+            mdl = require(makeModuleFullPath(moduleName));
+        } catch (e) {
+            throw Error(
+                `Не удалось подключить модуль ${moduleName}, проверье что он существует и не имеет синтаксических ошибок. Ошибка подключения: ${
+                    e.message
+                }`
+            );
+        }
+        //Проверяем, что в нём есть эта функция
+        if (!mdl[funcName]) throw Error(`Функция ${funcName} не определена в модуле ${moduleName}`);
+        //Проверяем, что функция асинхронна и если это так - возвращаем её
+        if ({}.toString.call(mdl[funcName]) === "[object AsyncFunction]") return mdl[funcName];
+        else throw Error(`Функция ${funcName} модуля ${moduleName} должна быть асинхронной`);
+    } catch (e) {
+        throw new ServerError(SERR_MODULES_BAD_INTERFACE, e.message);
+    }
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -71,3 +146,6 @@ const makeErrorText = e => {
 exports.validateObject = validateObject;
 exports.makeModuleFullPath = makeModuleFullPath;
 exports.makeErrorText = makeErrorText;
+exports.getAppSrvModuleName = getAppSrvModuleName;
+exports.getAppSrvFunctionName = getAppSrvFunctionName;
+exports.getAppSrvFunction = getAppSrvFunction;
