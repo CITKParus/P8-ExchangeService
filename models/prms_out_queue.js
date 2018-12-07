@@ -99,13 +99,12 @@ exports.isInProgress = new Schema({
 
 //Схема валидации параметров функции запуска обработчика сообщения очереди
 exports.startQueueProcessor = new Schema({
-    //Идентификатор сообщения
-    nQueueId: {
-        type: Number,
+    //Обрабатываемое сообщение очереди
+    queue: {
+        schema: Queue,
         required: true,
         message: {
-            type: path => `Идентификатор сообщения (${path}) имеет некорректный тип данных (ожидалось - Number)`,
-            required: path => `Не указан идентификатор сообщения (${path})`
+            required: path => `Не указано обрабатываемое сообщение очреди (${path})`
         }
     },
     //Процесс обработчика

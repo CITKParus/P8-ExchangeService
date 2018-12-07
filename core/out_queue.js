@@ -143,11 +143,15 @@ class OutQueue extends EventEmitter {
         //Если структура объекта в норме
         if (!sCheckResult) {
             //Добавляем идентификатор позиции очереди в список обрабатываемых
-            this.addInProgress({ nQueueId: prms.nQueueId });
+            this.addInProgress({ nQueueId: prms.queue.nId });
             //Отдаём команду дочернему процессу обработчика на старт исполнения
             prms.proc.send({
-                nQueueId: prms.nQueueId,
-                connectSettings: this.dbConn.connectSettings
+                nQueueId: prms.queue.nId,
+                connectSettings: this.dbConn.connectSettings,
+                service: _.find(this.services, { nId: prms.queue.nServiceId }),
+                function: _.find(_.find(this.services, { nId: prms.queue.nServiceId }).functions, {
+                    nId: prms.queue.nServiceFnId
+                })
             });
             //Уменьшаем количество доступных обработчиков
             this.nWorkersLeft--;
@@ -277,7 +281,7 @@ class OutQueue extends EventEmitter {
                 //Перехват останова обработчика
                 proc.on("exit", code => {});
                 //Запускаем обработчик
-                this.startQueueProcessor({ nQueueId: prms.queue.nId, proc });
+                this.startQueueProcessor({ queue: prms.queue, proc });
             }
         } else {
             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);

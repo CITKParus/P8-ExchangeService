@@ -10,6 +10,8 @@
 const Schema = require("validate"); //Схемы валидации
 const { Queue } = require("./obj_queue"); //Схема валидации позиции очереди
 const { OutQueueProcessorTask } = require("./obj_out_queue_processor"); //Схемы валидации объектов обработчика исходящих сообщений
+const { Service } = require("./obj_service"); //Схема валидации сервиса
+const { ServiceFunction } = require("./obj_service_function"); //Схема валидации функции сервиса
 
 //------------------
 //  Интерфейс модуля
@@ -36,6 +38,22 @@ exports.appProcess = new Schema({
         required: true,
         message: {
             required: path => `Не указано обрабатываемое сообщение очреди (${path})`
+        }
+    },
+    //Cервис-обработчик
+    service: {
+        schema: Service,
+        required: true,
+        message: {
+            required: path => `Не указан сервис для обработки сообщения очереди (${path})`
+        }
+    },
+    //Функция сервиса-обработчика
+    function: {
+        schema: ServiceFunction,
+        required: true,
+        message: {
+            required: path => `Не указана функция сервиса для обработки сообщения очереди (${path})`
         }
     }
 });

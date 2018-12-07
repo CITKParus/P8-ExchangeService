@@ -9,6 +9,8 @@
 
 const Schema = require("validate"); //Схемы валидации
 const { dbConnect } = require("./obj_config"); //Схемы валидации конфигурации сервера приложений
+const { Service } = require("./obj_service"); //Схема валидации сервиса
+const { ServiceFunction } = require("./obj_service_function"); //Схема валидации функции сервиса
 
 //----------
 // Константы
@@ -44,6 +46,22 @@ exports.OutQueueProcessorTask = new Schema({
         required: true,
         message: {
             required: path => `Не указаны параметры подключения к БД (${path})`
+        }
+    },
+    //Cервис-обработчик
+    service: {
+        schema: Service,
+        required: true,
+        message: {
+            required: path => `Не указан сервис для обработки сообщения очереди (${path})`
+        }
+    },
+    //Функция сервиса-обработчика
+    function: {
+        schema: ServiceFunction,
+        required: true,
+        message: {
+            required: path => `Не указана функция сервиса для обработки сообщения очереди (${path})`
         }
     }
 });

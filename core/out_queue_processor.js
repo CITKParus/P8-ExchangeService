@@ -90,29 +90,23 @@ const appProcess = async prms => {
                 }, ${prms.queue.sExecState}, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
                 { nQueueId: prms.queue.nId }
             );
-            if (prms.queue.blMsg) {
-                let sMsg = prms.queue.blMsg.toString() + " MODIFICATION FOR " + prms.queue.nId;
-                //Фиксируем успех исполнения
-                newQueue = await dbConn.setQueueAppSrvResult({
-                    nQueueId: prms.queue.nId,
-                    blMsg: new Buffer(sMsg),
-                    blResp: new Buffer("REPLAY ON " + prms.queue.nId)
-                });
-                //Фиксируем успешное исполнение сервером приложений - в статусе сообщения
-                newQueue = await dbConn.setQueueState({
-                    nQueueId: prms.queue.nId,
-                    nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
-                });
-                //Фиксируем успешное исполнение сервером приложений - в протоколе работы сервиса
-                await logger.info(`Исходящее сообщение ${prms.queue.nId} успешно отработано сервером приложений`, {
-                    nQueueId: prms.queue.nId
-                });
-            } else {
-                throw new ServerError(
-                    SERR_UNEXPECTED,
-                    `Ошибка отработки сообщения ${prms.queue.nId}: нет данных для обработки`
-                );
-            }
+            let sMsg =
+                (prms.queue.blMsg ? prms.queue.blMsg.toString() : "null") + " MODIFICATION FOR " + prms.queue.nId;
+            //Фиксируем успех исполнения
+            newQueue = await dbConn.setQueueAppSrvResult({
+                nQueueId: prms.queue.nId,
+                blMsg: new Buffer(sMsg),
+                blResp: new Buffer("REPLAY ON " + prms.queue.nId)
+            });
+            //Фиксируем успешное исполнение сервером приложений - в статусе сообщения
+            newQueue = await dbConn.setQueueState({
+                nQueueId: prms.queue.nId,
+                nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
+            });
+            //Фиксируем успешное исполнение сервером приложений - в протоколе работы сервиса
+            await logger.info(`Исходящее сообщение ${prms.queue.nId} успешно отработано сервером приложений`, {
+                nQueueId: prms.queue.nId
+            });
         } catch (e) {
             //Фиксируем ошибку обработки сервером приложений - в статусе сообщения
             newQueue = await dbConn.setQueueState({
@@ -228,7 +222,11 @@ const processTask = async prms => {
                 case objQueueSchema.NQUEUE_EXEC_STATE_INQUEUE: {
                     //Запускаем обработку сервером приложений
                     try {
-                        let res = await appProcess({ queue: q });
+                        let res = await appProcess({
+                            queue: q,
+                            service: prms.task.service,
+                            function: prms.task.function
+                        });
                         //И если она успешно завершилась - обработку сервером БД
                         if (res.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_APP_OK) {
                             try {
@@ -284,7 +282,11 @@ const processTask = async prms => {
                     if (q.nExecCnt < q.nRetryAttempts) {
                         //Снова запускаем обработку сервером приложений
                         try {
-                            let res = await appProcess({ queue: q });
+                            let res = await appProcess({
+                                queue: q,
+                                service: prms.task.service,
+                                function: prms.task.function
+                            });
                             //И если она успешно завершилась - обработку сервоером БД
                             if (res.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_APP_OK) {
                                 try {
