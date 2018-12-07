@@ -9,7 +9,8 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const Schema = require("validate"); //Схемы валидации
-const { SMODULES_PATH_MODULES } = require("./constants"); //Глобавльные константы системы
+const { SERR_UNEXPECTED, SMODULES_PATH_MODULES } = require("./constants"); //Глобавльные константы системы
+const { ServerError } = require("./server_errors"); //Ошибка сервера
 
 //------------
 // Тело модуля
@@ -56,9 +57,17 @@ const makeModuleFullPath = sModuleName => {
     }
 };
 
+//Формирование текста ошибки
+const makeErrorText = e => {
+    let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
+    if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
+    return sErr;
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
 
 exports.validateObject = validateObject;
 exports.makeModuleFullPath = makeModuleFullPath;
+exports.makeErrorText = makeErrorText;
