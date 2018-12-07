@@ -3,7 +3,7 @@ create or replace package PKG_EXS as
   /* Константы - идентификация сервера приложений в сессиях экземпляра БД */
   SAPPSRV_PROGRAMM_NAME     constant PKG_STD.TSTRING := 'node.exe';             -- Наименование исполняемого файла
   SAPPSRV_MODULE_NAME       constant PKG_STD.TSTRING := 'PARUS$ExchangeServer'; -- Наименование модуля
-  
+
   /* Константы - контейнеры контекста и процессов расчёта */
   SCONT_MAIN                constant PKG_STD.TSTRING := 'EXSCONT'; -- Глобальный префикс контейнера
   SCONT_PRC                 constant PKG_STD.TSTRING := 'PRC';     -- Наименование контейнера для параметров процесса
@@ -61,7 +61,7 @@ create or replace package PKG_EXS as
   SLOG_STATE_INF            constant varchar2(40) := 'INF';      -- Информация (строковый код)
   SLOG_STATE_WRN            constant varchar2(40) := 'WRN';      -- Предупреждение (строковый код)
   SLOG_STATE_ERR            constant varchar2(40) := 'ERR';      -- Ошибка (строковый код)
-  
+
   /* Константы - состояния исполнения записей очереди обмена */
   NQUEUE_EXEC_STATE_INQUEUE constant EXSQUEUE.EXEC_STATE%type := 0; -- Поставлено в очередь
   NQUEUE_EXEC_STATE_APP     constant EXSQUEUE.EXEC_STATE%type := 1; -- Обрабатывается сервером приложений
@@ -78,32 +78,32 @@ create or replace package PKG_EXS as
   SQUEUE_EXEC_STATE_APP_ERR constant varchar2(40) := 'APP_ERR';     -- Ошибка обработки сервером приложений
   SQUEUE_EXEC_STATE_DB      constant varchar2(40) := 'DB';          -- Обрабатывается СУБД
   SQUEUE_EXEC_STATE_DB_OK   constant varchar2(40) := 'DB_OK';       -- Успешно обработано СУБД
-  SQUEUE_EXEC_STATE_DB_ERR  constant varchar2(40) := 'DB_ERR';      -- Ошибка обработки СУБД    
+  SQUEUE_EXEC_STATE_DB_ERR  constant varchar2(40) := 'DB_ERR';      -- Ошибка обработки СУБД
   SQUEUE_EXEC_STATE_OK      constant varchar2(40) := 'OK';          -- Обработано успешно
   SQUEUE_EXEC_STATE_ERR     constant varchar2(40) := 'ERR';         -- Обработано с ошибками
 
   /* Константы - признак инкремента количества попыток исполнения позиции очереди */
   NINC_EXEC_CNT_NO          constant number(1) := 0; -- Не инкрементировать
   NINC_EXEC_CNT_YES         constant number(1) := 1; -- Инкрементировать
-  
-  /* Константы - признак инкремента количества попыток исполнения позиции очереди */  
+
+  /* Константы - признак инкремента количества попыток исполнения позиции очереди */
   NQUEUE_EXEC_NO            constant number(1) := 0; -- Не исполнять
   NQUEUE_EXEC_YES           constant number(1) := 1; -- Исполнять
-  
+
   /* Константы - ожидаемый интерфейс процедуры обработки сообщения очереди на стороне БД */
   SPRC_RESP_ARGS            constant varchar2(80) := 'NIDENT,IN,NUMBER;NSRV_TYPE,IN,NUMBER;NEXSQUEUE,IN,NUMBER;'; -- Список параметров процедуры обработки
 
   /* Проверка активности сервера приложений */
-  function UTL_APPSRV_IS_ACTIVE 
+  function UTL_APPSRV_IS_ACTIVE
   return                    boolean;    -- Флаг активности сервера приложений
-  
+
   /* Формирование ссылки на вызываемый хранимый объект */
   function UTL_STORED_MAKE_LINK
   (
     SPROCEDURE              in varchar2,        -- Имя процедуры
     SPACKAGE                in varchar2 := null -- Имя пакета
   ) return                  varchar2;           -- Ссылка на вызываемый хранимый объект
-  
+
   /* Проверка интерфейса хранимого объекта */
   procedure UTL_STORED_CHECK
   (
@@ -113,31 +113,31 @@ create or replace package PKG_EXS as
     SARGS                   in varchar2, -- Список параметров (";" - разделитель аргументов, "," - разделитель атрибутов аргумента, формат: <АРГУМЕНТ>,<IN|OUT|IN OUT>,<ТИП ДАННЫХ ORACLE>;)
     NRESULT                 out number   -- Результат проверки (0 - ошибка, 1 - успех)
   );
-  
+
   /* Формирование полного наименования контейнера для хранения окружения вызова процедуры */
   function UTL_CONTAINER_MAKE_NAME
   (
     NIDENT                  in number,          -- Идентификатор процесса
     SSUB_CONTAINER          in varchar2 := null -- Наименование контейнера второго уровня
   )
-  return                    varchar2;           -- Полное наименование контейнера  
-  
+  return                    varchar2;           -- Полное наименование контейнера
+
   /* Очистка контейнера для хранения окружения вызова процедуры */
   procedure UTL_CONTAINER_PURGE
   (
     NIDENT                  in number,          -- Идентификатор процесса
     SSUB_CONTAINER          in varchar2 := null -- Наименование контейнера второго уровня
   );
-  
+
   /* Вычисление даты следующего запуска расписания */
   function UTL_SCHED_CALC_NEXT_DATE
   (
     DEXEC_DATE              in date,    -- Дата предыдущего исполнения
     NRETRY_SCHEDULE         in number,  -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
     NRETRY_STEP             in number   -- Шаг графика перезапуска
-  ) 
+  )
   return                    date;       -- Дата следующего запуска
-  
+
   /* Выяснение необходимости запуска по расписанию */
   function UTL_SCHED_CHECK_EXEC
   (
@@ -145,9 +145,9 @@ create or replace package PKG_EXS as
     NRETRY_SCHEDULE         in number,         -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
     NRETRY_STEP             in number,         -- Шаг графика перезапуска
     DEXEC                   in date := sysdate -- Дата, относительно которой необходимо выполнить проверку
-  ) 
+  )
   return                    boolean;           -- Признак необходимости запуска
-  
+
   /* Установка значения типа строка параметра процедуры обработки сообщения обмена */
   procedure PRC_RESP_ARG_STR_SET
   (
@@ -179,7 +179,7 @@ create or replace package PKG_EXS as
     SARG                    in varchar2, -- Наименование параметра
     BVALUE                  in blob      -- Значение параметра
   );
-  
+
   /* Считывание значения типа строка параметра процедуры обработки сообщения обмена */
   function PRC_RESP_ARG_STR_GET
   (
@@ -200,14 +200,14 @@ create or replace package PKG_EXS as
     NIDENT                  in number,  -- Идентификатор процесса
     SARG                    in varchar2 -- Наименование параметра
   ) return                  date;       -- Значение параметра
-  
+
   /* Считывание значения типа BLOB параметра процедуры обработки сообщения обмена */
   function PRC_RESP_ARG_BLOB_GET
   (
     NIDENT                  in number,  -- Идентификатор процесса
     SARG                    in varchar2 -- Наименование параметра
   ) return                  blob;       -- Значение параметра
-  
+
   /* Базовое добавление в буфер отбора документов */
   procedure RNLIST_BASE_INSERT
   (
@@ -215,26 +215,26 @@ create or replace package PKG_EXS as
     NDOCUMENT               in number,  -- Рег. номер записи документа
     NRN                     out number  -- Рег. номер добавленной записи буфера
   );
-  
+
   /* Базовое удаление из буфера отбора документов */
   procedure RNLINST_BASE_DELETE
   (
     NRN                     in number   -- Рег. номер записи буфера
   );
-  
+
   /* Базовая очистка буфера отбора документов */
   procedure RNLIST_BASE_CLEAR
   (
     NIDENT                  in number   -- Идентификатор буфера
-  );  
-  
+  );
+
   /* Получение сервиса */
   procedure SERVICE_GET
   (
     NIDENT                  in number,        -- Идентификатор буфера
     RCSERVICE               out sys_refcursor -- Курсор со списком сервисов
   );
-  
+
   /* Получение сервиса */
   procedure SERVICE_GET
   (
@@ -242,7 +242,7 @@ create or replace package PKG_EXS as
     NEXSSERVICE             in number,        -- Рег. номер записи сервиса
     RCSERVICE               out sys_refcursor -- Курсор со списком сервисов
   );
-  
+
   /* Получение списка сервисов */
   procedure SERVICES_GET
   (
@@ -254,7 +254,7 @@ create or replace package PKG_EXS as
   (
     NIDENT                  in number,        -- Идентификатор буфера
     RCSERVICEFN             out sys_refcursor -- Курсор со списком функций сервиса
-  );  
+  );
 
   /* Получение функции сервиса */
   procedure SERVICEFN_GET
@@ -262,15 +262,15 @@ create or replace package PKG_EXS as
     NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке
     NEXSSERVICEFN           in number,        -- Рег. номер функции сервиса
     RCSERVICEFN             out sys_refcursor -- Курсор со списком функций сервиса
-  );  
-  
+  );
+
   /* Получение списка функций сервиса */
   procedure SERVICEFNS_GET
   (
     NEXSSERVICE             in number,        -- Рег. номер записи сервиса
     RCSERVICEFNS            out sys_refcursor -- Курсор со списком функций
   );
-  
+
   /* Поиск функции сервиса обмена по коду функции и коду сервиса */
   function SERVICEFN_FIND_BY_SRVCODE
   (
@@ -286,15 +286,15 @@ create or replace package PKG_EXS as
     NIDENT                  in number,        -- Идентификатор буфера
     RCLOG                   out sys_refcursor -- Курсор со списком записей журнала работы
   );
-  
+
   /* Считывание записи журнала работы */
   procedure LOG_GET
   (
     NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке
     NEXSLOG                 in number,        -- Рег. номер записи журнала
     RCLOG                   out sys_refcursor -- Курсор со списком записей журнала работы
-  );  
-  
+  );
+
   /* Добавление записи в журнал работы */
   procedure LOG_PUT
   (
@@ -312,29 +312,29 @@ create or replace package PKG_EXS as
     NIDENT                  in number,        -- Идентификатор буфера
     RCQUEUE                 out sys_refcursor -- Курсор с позицией очереди
   );
-  
+
   /* Считывание сообщения из очереди */
   procedure QUEUE_GET
   (
     NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
     RCQUEUE                 out sys_refcursor -- Курсор с позицией очереди
-  );  
-  
+  );
+
   /* Проверка необходимости исполнения исходящего сообщения очереди */
   function QUEUE_SRV_TYPE_SEND_EXEC_CHECK
   (
     NEXSQUEUE               in number -- Рег. номер записи очереди
   )
   return                    number;   -- Флаг необходимости исполнения позиции очереди (см. константы NQUEUE_EXEC_*)
-  
+
   /* Считывание очередной порции исходящих сообщений из очереди */
   procedure QUEUE_SRV_TYPE_SEND_GET
   (
     NPORTION_SIZE           in number,        -- Количество выбираемых сообщений
     RCQUEUES                out sys_refcursor -- Курсор со списком позиций очереди
   );
- 
+
   /* Установка состояние записи очереди */
   procedure QUEUE_EXEC_STATE_SET
   (
@@ -342,34 +342,34 @@ create or replace package PKG_EXS as
     NEXEC_STATE             in number,        -- Устанавливаемое состояние (см. констнаты NQUEUE_EXEC_STATE_*, null - не менять)
     SEXEC_MSG               in varchar2,      -- Сообщение обработчика
     NINC_EXEC_CNT           in number,        -- Флаг инкремента счётчика исполнений (см. констнаты NINC_EXEC_CNT_*, null - не менять)
-    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди    
+    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
   );
-  
+
   /* Установка результата обработки записи очереди */
   procedure QUEUE_RESP_SET
   (
-    NEXSQUEUE               in number,        -- Рег. номер записи очереди  
+    NEXSQUEUE               in number,        -- Рег. номер записи очереди
     BRESP                   in blob,          -- Результат обработки
-    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди    
+    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
   );
-  
+
   /* Установка сообщения записи очереди */
   procedure QUEUE_MSG_SET
   (
-    NEXSQUEUE               in number,        -- Рег. номер записи очереди  
+    NEXSQUEUE               in number,        -- Рег. номер записи очереди
     BMSG                    in blob,          -- Результат обработки
-    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди            
-  );  
-  
+    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
+  );
+
   /* Помещение сообщения обмена в очередь */
   procedure QUEUE_PUT
   (
     NEXSSERVICEFN           in number,         -- Рег. номер функции обработки
     BMSG                    in blob,           -- Данные
     NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
-    RCQUEUE                 out sys_refcursor  -- Курсор с добавленной позицией очереди    
+    RCQUEUE                 out sys_refcursor  -- Курсор с добавленной позицией очереди
   );
-  
+
   /* Помещение сообщения обмена в очередь (по коду сервиса и функции обрабоки) */
   procedure QUEUE_PUT
   (
@@ -379,20 +379,20 @@ create or replace package PKG_EXS as
     NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
     RCQUEUE                 out sys_refcursor  -- Курсор с добавленной позицией очереди
   );
-  
+
   /* Исполнение обработчика для сообщения обмена */
   procedure QUEUE_PRC
   (
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
     RCQUEUE                 out sys_refcursor -- Курсор с обработанной позицией очереди
   );
-  
+
 end;
 /
 create or replace package body PKG_EXS as
 
   /* Проверка активности сервера приложений */
-  function UTL_APPSRV_IS_ACTIVE 
+  function UTL_APPSRV_IS_ACTIVE
   return                    boolean     -- Флаг активности сервера приложений
   is
   begin
@@ -408,7 +408,7 @@ create or replace package body PKG_EXS as
     /* Сеанса нет */
     return false;
   end UTL_APPSRV_IS_ACTIVE;
-  
+
   /* Формирование ссылки на вызываемый хранимый объект */
   function UTL_STORED_MAKE_LINK
   (
@@ -627,7 +627,7 @@ create or replace package body PKG_EXS as
                   CHR(13) || SINTERFACE);
     end if;
   end UTL_STORED_CHECK;
-  
+
   /* Формирование полного наименования контейнера для хранения окружения вызова процедуры */
   function UTL_CONTAINER_MAKE_NAME
   (
@@ -675,14 +675,14 @@ create or replace package body PKG_EXS as
   begin
     PKG_CONTVARGLB.PURGE(SCONTAINER => UTL_CONTAINER_MAKE_NAME(NIDENT => NIDENT, SSUB_CONTAINER => SSUB_CONTAINER));
   end UTL_CONTAINER_PURGE;
-  
+
   /* Вычисление даты следующего запуска расписания */
   function UTL_SCHED_CALC_NEXT_DATE
   (
     DEXEC_DATE              in date,    -- Дата предыдущего исполнения
     NRETRY_SCHEDULE         in number,  -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
     NRETRY_STEP             in number   -- Шаг графика перезапуска
-  ) 
+  )
   return                    date        -- Дата следующего запуска
   is
   begin
@@ -741,7 +741,7 @@ create or replace package body PKG_EXS as
     NRETRY_SCHEDULE         in number,         -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
     NRETRY_STEP             in number,         -- Шаг графика перезапуска
     DEXEC                   in date := sysdate -- Дата, относительно которой необходимо выполнить проверку
-  ) 
+  )
   return                    boolean            -- Признак необходимости запуска
   is
     DEXEC_NEXT              date;              -- Hасчетная дата следующего запуска
@@ -764,7 +764,7 @@ create or replace package body PKG_EXS as
     when others then
       return false;
   end UTL_SCHED_CHECK_EXEC;
-  
+
   /* Установка значения типа строка параметра процедуры обработки сообщения обмена */
   procedure PRC_RESP_ARG_STR_SET
   (
@@ -831,8 +831,8 @@ create or replace package body PKG_EXS as
     P_FILE_BUFFER_INSERT(NIDENT => NFILE_IDENT, CFILENAME => NFILE_IDENT, CDATA => null, BLOBDATA => BVALUE);
     /* Сохраним данные в контейнер */
     PKG_CONTVARGLB.PUTN(SCONTAINER => SCONTAINER, SNAME => SARG, NVALUE => NFILE_IDENT);
-  end PRC_RESP_ARG_BLOB_SET;  
-  
+  end PRC_RESP_ARG_BLOB_SET;
+
   /* Считывание значения типа строка параметра процедуры обработки сообщения обмена */
   function PRC_RESP_ARG_STR_GET
   (
@@ -877,7 +877,7 @@ create or replace package body PKG_EXS as
     /* Считаем и вернём значение */
     return PKG_CONTVARGLB.GETD(SCONTAINER => SCONTAINER, SNAME => SARG);
   end PRC_RESP_ARG_DATE_GET;
-  
+
   /* Считывание значения типа BLOB параметра процедуры обработки сообщения обмена */
   function PRC_RESP_ARG_BLOB_GET
   (
@@ -907,10 +907,10 @@ create or replace package body PKG_EXS as
                     TO_CHAR(NFILE_IDENT));
     end;
     /* Зачистим файловый буфер */
-    P_FILE_BUFFER_CLEAR(NIDENT => NFILE_IDENT);    
+    P_FILE_BUFFER_CLEAR(NIDENT => NFILE_IDENT);
     /* Вернём значение */
     return BRESP;
-  end PRC_RESP_ARG_BLOB_GET;  
+  end PRC_RESP_ARG_BLOB_GET;
 
   /* Базовое добавление в буфер отбора документов */
   procedure RNLIST_BASE_INSERT
@@ -926,7 +926,7 @@ create or replace package body PKG_EXS as
     /* Добавляем запись */
     insert into EXSRNLIST (RN, IDENT, DOCUMENT) values (NRN, NIDENT, NDOCUMENT);
   end RNLIST_BASE_INSERT;
-  
+
   /* Базовое удаление из буфера отбора документов */
   procedure RNLINST_BASE_DELETE
   (
@@ -937,7 +937,7 @@ create or replace package body PKG_EXS as
     /* Удалим запись */
     delete from EXSRNLIST T where T.RN = NRN;
   end RNLINST_BASE_DELETE;
-  
+
   /* Базовая очистка буфера отбора документов */
   procedure RNLIST_BASE_CLEAR
   (
@@ -952,7 +952,7 @@ create or replace package body PKG_EXS as
       RNLINST_BASE_DELETE(NRN => C.RN);
     end loop;
   end RNLIST_BASE_CLEAR;
-  
+
   /* Получение сервиса */
   procedure SERVICE_GET
   (
@@ -981,7 +981,7 @@ create or replace package body PKG_EXS as
         from EXSSERVICE T
        where T.RN in (select L.DOCUMENT from EXSRNLIST L where L.IDENT = NIDENT);
   end SERVICE_GET;
-  
+
   /* Получение сервиса */
   procedure SERVICE_GET
   (
@@ -1005,7 +1005,7 @@ create or replace package body PKG_EXS as
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
   end SERVICE_GET;
-  
+
   /* Получение списка сервисов */
   procedure SERVICES_GET
   (
@@ -1027,8 +1027,8 @@ create or replace package body PKG_EXS as
     SERVICE_GET(NIDENT => NIDENT, RCSERVICE => RCSERVICES);
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
-  end SERVICES_GET;  
-  
+  end SERVICES_GET;
+
   /* Получение функции сервиса */
   procedure SERVICEFN_GET
   (
@@ -1078,7 +1078,7 @@ create or replace package body PKG_EXS as
        where T.RN in (select L.DOCUMENT from EXSRNLIST L where L.IDENT = NIDENT)
          and T.EXSMSGTYPE = M.RN;
   end SERVICEFN_GET;
-  
+
   /* Получение функции сервиса */
   procedure SERVICEFN_GET
   (
@@ -1102,7 +1102,7 @@ create or replace package body PKG_EXS as
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
   end SERVICEFN_GET;
-  
+
   /* Получение списка функций сервиса */
   procedure SERVICEFNS_GET
   (
@@ -1126,7 +1126,7 @@ create or replace package body PKG_EXS as
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
   end SERVICEFNS_GET;
-  
+
   /* Поиск функции сервиса обмена по коду функции и коду сервиса */
   function SERVICEFN_FIND_BY_SRVCODE
   (
@@ -1136,7 +1136,7 @@ create or replace package body PKG_EXS as
   )
   return                    number        -- Рег. номер функции сервиса обмена
   is
-    NEXSSERVICEFN           PKG_STD.TREF; -- Рег. номер функции сервиса обработки  
+    NEXSSERVICEFN           PKG_STD.TREF; -- Рег. номер функции сервиса обработки
   begin
     /* Найдем функцию сервиса обработки */
     begin
@@ -1157,7 +1157,7 @@ create or replace package body PKG_EXS as
     /* Вернем результат */
     return NEXSSERVICEFN;
   end SERVICEFN_FIND_BY_SRVCODE;
-  
+
   /* Считывание записи журнала работы */
   procedure LOG_GET
   (
@@ -1192,11 +1192,11 @@ create or replace package body PKG_EXS as
          and T.EXSSERVICE = S.RN(+)
          and T.EXSSERVICEFN = SFN.RN(+);
   end LOG_GET;
-  
+
   /* Считывание записи журнала работы */
   procedure LOG_GET
   (
-    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке    
+    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке
     NEXSLOG                 in number,        -- Рег. номер записи журнала
     RCLOG                   out sys_refcursor -- Курсор со списком записей журнала работы
   )
@@ -1269,7 +1269,7 @@ create or replace package body PKG_EXS as
                          NEXSQUEUE     => NEXSQUEUE,
                          NRN           => NEXSLOG);
     /* Вернем добавленную запись */
-    LOG_GET(NFLAG_SMART => 0, NEXSLOG => NEXSLOG, RCLOG => RCLOG);                         
+    LOG_GET(NFLAG_SMART => 0, NEXSLOG => NEXSLOG, RCLOG => RCLOG);
   end LOG_PUT;
 
   /* Считывание сообщения из очереди */
@@ -1324,11 +1324,11 @@ create or replace package body PKG_EXS as
          and T.EXSSERVICEFN = F.RN
          and F.PRN = S.RN;
   end QUEUE_GET;
-  
+
   /* Считывание сообщения из очереди */
   procedure QUEUE_GET
   (
-    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке    
+    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
     RCQUEUE                 out sys_refcursor -- Курсор с позицией очереди
   )
@@ -1348,7 +1348,7 @@ create or replace package body PKG_EXS as
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
   end QUEUE_GET;
-  
+
   /* Проверка необходимости исполнения позиции очереди */
   function QUEUE_SRV_TYPE_SEND_EXEC_CHECK
   (
@@ -1390,7 +1390,7 @@ create or replace package body PKG_EXS as
     /* Вернём результат */
     return NRESULT;
   end QUEUE_SRV_TYPE_SEND_EXEC_CHECK;
-  
+
   /* Считывание очередной порции исходящих сообщений из очереди */
   procedure QUEUE_SRV_TYPE_SEND_GET
   (
@@ -1408,7 +1408,7 @@ create or replace package body PKG_EXS as
                 from (select T.RN
                         from EXSQUEUE T
                        where QUEUE_SRV_TYPE_SEND_EXEC_CHECK(T.RN) = NQUEUE_EXEC_YES
-                       order by NVL(T.EXEC_DATE, T.IN_DATE))
+                       order by T.RN)
                where ROWNUM <= NPORTION_SIZE)
     loop
       /* Запоминаем их рег. номера в буфере */
@@ -1427,7 +1427,7 @@ create or replace package body PKG_EXS as
     NEXEC_STATE             in number,        -- Устанавливаемое состояние (см. констнаты NQUEUE_EXEC_STATE_*, null - не менять)
     SEXEC_MSG               in varchar2,      -- Сообщение обработчика
     NINC_EXEC_CNT           in number,        -- Флаг инкремента счётчика исполнений (см. констнаты NINC_EXEC_CNT_*, null - не менять)
-    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди    
+    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
   )
   is
     REXSQUEUE               EXSQUEUE%rowtype; -- Запись позиции очереди
@@ -1475,13 +1475,13 @@ create or replace package body PKG_EXS as
     /* Вернем измененную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_EXEC_STATE_SET;
-  
+
   /* Установка результата обработки записи очереди */
   procedure QUEUE_RESP_SET
   (
-    NEXSQUEUE               in number,        -- Рег. номер записи очереди  
+    NEXSQUEUE               in number,        -- Рег. номер записи очереди
     BRESP                   in blob,          -- Результат обработки
-    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди            
+    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
   )
   is
   begin
@@ -1493,13 +1493,13 @@ create or replace package body PKG_EXS as
     /* Вернем измененную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_RESP_SET;
-  
+
   /* Установка сообщения записи очереди */
   procedure QUEUE_MSG_SET
   (
-    NEXSQUEUE               in number,        -- Рег. номер записи очереди  
+    NEXSQUEUE               in number,        -- Рег. номер записи очереди
     BMSG                    in blob,          -- Результат обработки
-    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди            
+    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
   )
   is
   begin
@@ -1518,7 +1518,7 @@ create or replace package body PKG_EXS as
     NEXSSERVICEFN           in number,         -- Рег. номер функции обработки
     BMSG                    in blob,           -- Данные
     NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
-    RCQUEUE                 out sys_refcursor  -- Курсор с добавленной позицией очереди    
+    RCQUEUE                 out sys_refcursor  -- Курсор с добавленной позицией очереди
   )
   is
     NRN                     EXSQUEUE.RN%type;  -- Рег. номер добавленной записи очереди
@@ -1569,7 +1569,7 @@ create or replace package body PKG_EXS as
     /* Ставим запись в очередь */
     QUEUE_PUT(NEXSSERVICEFN => NEXSSERVICEFN, BMSG => BMSG, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_PUT;
-  
+
   /* Исполнение обработчика для сообщения обмена */
   procedure QUEUE_PRC
   (
@@ -1583,7 +1583,7 @@ create or replace package body PKG_EXS as
     REXSMSGTYPE             EXSMSGTYPE%rowtype;        -- Запись типового сообщения обмена
     SERR                    EXSQUEUE.EXEC_MSG%type;    -- Сообщение об ошибке обработчика
     NIDENT                  PKG_STD.TREF;              -- Идентификатор процесса обработки
-    PRMS                    PKG_CONTPRMLOC.TCONTAINER; -- Контейнер для параметров процедуры обработки 
+    PRMS                    PKG_CONTPRMLOC.TCONTAINER; -- Контейнер для параметров процедуры обработки
   begin
     /* Считаем запись очереди */
     REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
@@ -1639,6 +1639,6 @@ create or replace package body PKG_EXS as
     /* Возвращаем обработанную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => REXSQUEUE.RN, RCQUEUE => RCQUEUE);
   end QUEUE_PRC;
-  
+
 end;
 /
