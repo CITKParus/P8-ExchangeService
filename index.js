@@ -10,8 +10,7 @@
 require("module-alias/register"); //Поддержка псевонимов при подключении модулей
 const cfg = require("./config"); //Настройки сервера приложений
 const app = require("./core/app"); //Сервер приложений
-const { ServerError } = require("./core/server_errors"); //Типовая ошибка
-const { SERR_UNEXPECTED } = require("./core/constants"); //Общесистемные константы
+const { makeErrorText } = require("./core/utils"); //Вспомогательные функции
 
 //--------------------------
 // Глобальные идентификаторы
@@ -60,8 +59,7 @@ process.on("SIGKILL", () => {
 //Перехват всех неохваченных ошибок
 process.on("uncaughtException", e => {
     //Протоколируем ошибку
-    if (e instanceof ServerError) appSrv.logger.error(e.sCode + ": " + e.sMessage);
-    else appSrv.logger.error(SERR_UNEXPECTED + ": " + e.message);
+    appSrv.logger.error(makeErrorText(e));
     //Инициируем выход из процесса
     appSrv.stop();
 });
@@ -75,15 +73,13 @@ const start = async () => {
         await appSrv.run();
     } catch (e) {
         //Если есть ошибки с которыми сервер не справился - ловим их, показываем...
-        if (e instanceof ServerError) appSrv.logger.error(e.sCode + ": " + e.sMessage);
-        else appSrv.logger.error(SERR_UNEXPECTED + ": " + e.message);
+        appSrv.logger.error(makeErrorText(e));
         //...и пытаемся остановить сервер нормально
         try {
             await appSrv.stop();
         } catch (e) {
             //Могут быть ошибки и при остановке - это аварийный выход
-            if (e instanceof ServerError) appSrv.logger.error(e.sCode + ": " + e.sMessage);
-            else appSrv.logger.error(SERR_UNEXPECTED + ": " + e.message);
+            appSrv.logger.error(makeErrorText(e));
             process.exit(1);
         }
     }
