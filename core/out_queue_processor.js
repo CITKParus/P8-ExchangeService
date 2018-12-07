@@ -10,17 +10,12 @@
 require("module-alias/register"); //Поддержка псевонимов при подключении модулей
 const lg = require("./logger"); //Протоколирование работы
 const db = require("./db_connector"); //Взаимодействие с БД
-const { makeErrorText, makeModuleFullPath, validateObject } = require("./utils"); //Вспомогательные функции
+const { makeErrorText, validateObject, getAppSrvFunction } = require("./utils"); //Вспомогательные функции
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const objOutQueueProcessorSchema = require("../models/obj_out_queue_processor"); //Схема валидации сообщений обмена с бработчиком очереди исходящих сообщений
 const prmsOutQueueProcessorSchema = require("../models/prms_out_queue_processor"); //Схема валидации параметров функций модуля
 const objQueueSchema = require("../models/obj_queue"); //Схемы валидации сообщения очереди
-const {
-    SERR_UNEXPECTED,
-    SERR_MODULES_BAD_INTERFACE,
-    SERR_OBJECT_BAD_INTERFACE,
-    SERR_MODULES_NO_MODULE_SPECIFIED
-} = require("./constants"); //Глобальные константы
+const { SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Глобальные константы
 const { NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 
 //--------------------------
@@ -90,6 +85,17 @@ const appProcess = async prms => {
                 }, ${prms.queue.sExecState}, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
                 { nQueueId: prms.queue.nId }
             );
+            //Выполняем обработчик "До"
+            if (prms.function.sAppSrvBefore) {
+                const fnBefore = getAppSrvFunction(prms.function.sAppSrvBefore);
+                await fnBefore(prms);
+            }
+            //Отправляем сообщение удалённому серверу
+            //Выполняем обработчик "После"
+            if (prms.function.sAppSrvAfter) {
+                const fnAfter = getAppSrvFunction(prms.function.sAppSrvAfter);
+                await fnAfter(prms);
+            }
             let sMsg =
                 (prms.queue.blMsg ? prms.queue.blMsg.toString() : "null") + " MODIFICATION FOR " + prms.queue.nId;
             //Фиксируем успех исполнения
