@@ -22,3 +22,9 @@ exports.SERR_MODULES_BAD_INTERFACE = "ERR_MODULES_BAD_INTERFACE"; //Ошибоч
 
 //Типовые коды ошибок работы с объектами
 exports.SERR_OBJECT_BAD_INTERFACE = "ERR_OBJECT_BAD_INTERFACE"; //Ошибочный интерфейс объекта
+
+//Типовые коды ошибок проверки доступности удалённых сервисов
+exports.SERR_SERVICE_UNAVAILABLE = "ERR_SERVICE_UNAVAILABLE"; //Удалённый сервис недоступен
+
+//Типовые коды ошибок отправки e-mail уведомлений
+exports.SERR_MAIL_FAILED = "ERR_MAIL_FAILED"; //Ошибка отправки почтового уведомления
