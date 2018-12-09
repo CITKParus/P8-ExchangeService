@@ -100,6 +100,56 @@ const outGoing = new Schema({
     }
 });
 
+//Схема валидации параметров отправки E-Mail уведомлений
+const mail = new Schema({
+    //Адреc сервера SMTP
+    sHost: {
+        type: String,
+        required: true,
+        message: {
+            type: "Адреc сервера SMTP (sHost) имеет некорректный тип данных (ожидалось - String)",
+            required: "Не указан aдреc сервера SMTP (sHost)"
+        }
+    },
+    //Порт сервера SMTP
+    nPort: {
+        type: Number,
+        required: true,
+        message: {
+            type: "Порт сервера SMTP (nPort) имеет некорректный тип данных (ожидалось - Number)",
+            required: "Не указан порт сервера SMTP (nPort)"
+        }
+    },
+    //Имя пользователя SMTP-сервера
+    sUser: {
+        type: String,
+        required: true,
+        message: {
+            type: "Имя пользователя SMTP-сервера (sUser) имеет некорректный тип данных (ожидалось - String)",
+            required: "Не указано имя пользователя SMTP-сервера (sUser)"
+        }
+    },
+    //Пароль пользователя SMTP-сервера
+    sPass: {
+        type: String,
+        required: true,
+        message: {
+            type: "Пароль пользователя SMTP-сервера (sPass) имеет некорректный тип данных (ожидалось - String)",
+            required: "Не указан пароль пользователя SMTP-сервера (sPass)"
+        }
+    },
+    //Наименование отправителя для исходящих сообщений
+    sFrom: {
+        type: String,
+        required: true,
+        message: {
+            type:
+                "Наименование отправителя для исходящих сообщений (sFrom) имеет некорректный тип данных (ожидалось - String)",
+            required: "Не указано наименование отправителя для исходящих сообщений (sFrom)"
+        }
+    }
+});
+
 //Схема валидации файла конфигурации
 const config = new Schema({
     //Параметры подключения к БД
@@ -117,6 +167,14 @@ const config = new Schema({
         message: {
             required: "Не указаны параметры обработки очереди исходящих сообщений (outGoing)"
         }
+    },
+    //Параметры отправки E-Mail уведомлений
+    mail: {
+        schema: mail,
+        required: true,
+        message: {
+            required: "Не указаны параметры отправки E-Mail уведомлений (mail)"
+        }
     }
 });
 
@@ -128,5 +186,7 @@ const config = new Schema({
 exports.dbConnect = dbConnect;
 //Схема валидации параметров обработки очереди исходящих сообщений
 exports.outGoing = outGoing;
+//Схема валидации параметров отправки E-Mail уведомлений
+exports.mail = mail;
 //Схема валидации файла конфигурации
 exports.config = config;

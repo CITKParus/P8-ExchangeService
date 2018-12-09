@@ -14,7 +14,7 @@ let dbConnect = {
     //Пароль пользователя БД
     sPassword: "parus",
     //Строка подключения к БД
-    sConnectString: "DEMOP_CITKSERV",
+    sConnectString: "DEMOP_CITKSERV_WAN",
     //Наименование сервера приложений в сессии БД
     sSessionAppName: "PARUS$ExchangeServer",
     //Подключаемый модуль обслуживания БД (низкоуровневые функции работы с СУБД)
@@ -29,11 +29,26 @@ let outGoing = {
     nCheckTimeout: 1
 };
 
+//Параметры отправки E-Mail уведомлений
+let mail = {
+    //Адреc сервера SMTP
+    sHost: "smtp.mail.ru",
+    //Порт сервера SMTP
+    nPort: 465,
+    //Имя пользователя SMTP-сервера
+    sUser: "chechnev@citk-parus.ru",
+    //Пароль пользователя SMTP-сервера
+    sPass: "Rxt67A",
+    //Наименование отправителя для исходящих сообщений
+    sFrom: "'Сервис интеграции с WEB-API' <chechnev@citk-parus.ru>"
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
 
 module.exports = {
     dbConnect,
-    outGoing
+    outGoing,
+    mail
 };
