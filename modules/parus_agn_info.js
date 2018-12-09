@@ -9,14 +9,23 @@
 
 //Формирование запроса к тестовому стенду на получение сведений о контрагенте
 const buildAgentQuery = async prms => {
-    console.log(`Начал обработку ДО - ${prms.queue.nId}`);
-    console.log(`Закончил обработку ДО - ${prms.queue.nId}`);
+    let sURL = `${prms.service.sSrvRoot}/${prms.function.sFnURL}`;
+    let sPayLoad = prms.queue.blMsg.toString();
+    return {
+        options: { url: sURL.replace("<NRN>", sPayLoad), method: prms.function.sFnPrmsType }
+    };
 };
 
 //Обработка ответа тестового стенда на запрос сведений о контрагенте
 const parseAgentInfo = async prms => {
-    console.log(`Начал обработку ПОСЛЕ - ${prms.queue.nId}`);
-    console.log(`Закончил обработку ПОСЛЕ - ${prms.queue.nId}`);
+    let r = JSON.parse(prms.serverResp);
+    if (r.STATE === 0) {
+        throw Error(r.MSG);
+    } else {
+        return {
+            blResp: new Buffer(r.SAGNABBR + "$#$" + r.SAGNNAME)
+        };
+    }
 };
 
 //-----------------
