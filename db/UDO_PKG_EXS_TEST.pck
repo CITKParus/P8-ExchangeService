@@ -92,8 +92,8 @@ create or replace package body UDO_PKG_EXS_TEST as
     /* Регистрируем контрагента */
     P_AGNLIST_BASE_INSERT(NCOMPANY => NCOMPANY,
                           NCRN     => NCRN,
-                          SAGNABBR => SAGNABBR,
-                          SAGNNAME => SAGNNAME,
+                          SAGNABBR => SUBSTR(NIDENT || SAGNABBR, 1, 20),
+                          SAGNNAME => SAGNNAME || ' ' || NIDENT,
                           NRN      => NAGENT);
   end;
 
