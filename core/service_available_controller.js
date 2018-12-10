@@ -138,24 +138,30 @@ class ServiceAvailableController extends EventEmitter {
                             let nDiffMins = Math.round(((nDiffMs % 86400000) % 3600000) / 60000);
                             //Если простой больше указанного в настройках - будем оповещать по почте
                             if (nDiffMins >= this.services[i].nUnavlblNtfTime) {
+                                //Подготовим тему для уведомления
                                 let sSubject = `Удалённый сервис ${this.services[i].sCode} неотвечает на запросы`;
+                                //Подготовим сообщение для уведомления
                                 let sMessage = `Сервис недоступен более ${
                                     this.services[i].nUnavlblNtfTime
                                 } мин. (${nDiffMins} мин. с момента запуска сервера приложений).\nАдрес сервиса: ${
                                     this.services[i].sSrvRoot
                                 }`;
+                                //Положим уведомление в протокол работы сервера приложений
                                 await this.logger.error(sMessage, { nServiceId: this.services[i].nId });
-                                try {
-                                    await sendMail({
-                                        mail: this.mail,
-                                        sTo: this.services[i].sUnavlblNtfMail,
-                                        sSubject,
-                                        sMessage
-                                    });
-                                } catch (e) {
-                                    await this.logger.error(makeErrorText(e), {
-                                        nServiceId: this.services[i].nId
-                                    });
+                                //И в почту, если есть список адресов
+                                if (this.services[i].sUnavlblNtfMail) {
+                                    try {
+                                        await sendMail({
+                                            mail: this.mail,
+                                            sTo: this.services[i].sUnavlblNtfMail,
+                                            sSubject,
+                                            sMessage
+                                        });
+                                    } catch (e) {
+                                        await this.logger.error(makeErrorText(e), {
+                                            nServiceId: this.services[i].nId
+                                        });
+                                    }
                                 }
                             }
                         }
