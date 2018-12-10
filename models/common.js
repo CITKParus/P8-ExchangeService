@@ -14,9 +14,9 @@ const validateMailList = sMailList => {
         //Объявим разделитель списка адресов
         let sSpr = ",";
         //Регулярное выражение для контроля адреса E-Mail
-        let sMailRegExp = /^(([A-Za-z0-9_-]+\.)*[A-Za-z0-9_-]+@[a-z0-9_-]+(\.[a-z0-9_-]+)*\.[a-z]+)/;
+        let sMailRegExp = /^(([a-z0-9_-]+\.)*[a-z0-9_-]+@[a-z0-9_-]+(\.[a-z0-9_-]+)*\.[a-z]+)/;
         //Развалим строку с разделителями на массив адресов
-        let addrs = sMailList.split(sSpr);
+        let addrs = sMailList.toLowerCase().split(sSpr);
         //Обходим массив адресов
         for (i = 0; i < addrs.length; i++) {
             //Проверяем адрес на соответствие регулярному выражению
