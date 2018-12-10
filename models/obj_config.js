@@ -14,10 +14,10 @@ const Schema = require("validate"); //Схемы валидации
 //------------------
 
 //Функция проверки значения размера блока одновременно обрабатываемых исходящих сообщений
-const checkMaxWorkers = val => val >= 1 && val <= 100 && Number.isInteger(val);
+const validateMaxWorkers = val => val >= 1 && val <= 100 && Number.isInteger(val);
 
 //Функция проверки значения интервала проверки наличия исходящих сообщений
-const checkCheckTimeout = val => val >= 1 && val <= 60000 && Number.isInteger(val);
+const validateCheckTimeout = val => val >= 1 && val <= 60000 && Number.isInteger(val);
 
 //Схема валидации параметров подключения к БД
 const dbConnect = new Schema({
@@ -76,12 +76,12 @@ const outGoing = new Schema({
     nMaxWorkers: {
         type: Number,
         required: true,
-        use: { checkMaxWorkers },
+        use: { validateMaxWorkers },
         message: {
             type:
                 "Количество одновременно обрабатываемых исходящих сообщений (nMaxWorkers) имеет некорректный тип данных (ожидалось - Number)",
             required: "Не указано количество одновременно обрабатываемых исходящих сообщений (nMaxWorkers)",
-            checkMaxWorkers:
+            validateMaxWorkers:
                 "Количество одновременно обрабатываемых исходящих сообщений (nMaxWorkers) должно быть целым числом в диапазоне от 1 до 100"
         }
     },
@@ -89,12 +89,12 @@ const outGoing = new Schema({
     nCheckTimeout: {
         type: Number,
         required: true,
-        use: { checkCheckTimeout },
+        use: { validateCheckTimeout },
         message: {
             type:
                 "Интервал проверки наличия исходящих сообщений (nCheckTimeout) имеет некорректный тип данных (ожидалось - Number)",
             required: "Не указан интервал проверки наличия исходящих сообщений (nCheckTimeout)",
-            checkCheckTimeout:
+            validateCheckTimeout:
                 "Значение интервала проверки наличия исходящих сообщений (nCheckTimeout) должно быть целым числом в диапазоне от 100 до 60000"
         }
     }
