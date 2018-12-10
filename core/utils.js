@@ -9,13 +9,17 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const Schema = require("validate"); //Схемы валидации
+const nodemailer = require("nodemailer"); //Отправка E-Mail сообщений
 const {
     SERR_UNEXPECTED,
     SMODULES_PATH_MODULES,
+    SERR_OBJECT_BAD_INTERFACE,
     SERR_MODULES_NO_MODULE_SPECIFIED,
-    SERR_MODULES_BAD_INTERFACE
+    SERR_MODULES_BAD_INTERFACE,
+    SERR_MAIL_FAILED
 } = require("./constants"); //Глобавльные константы системы
 const { ServerError } = require("./server_errors"); //Ошибка сервера
+const prmsUtilsSchema = require("../models/prms_utils"); //Схемы валидации параметров функций
 
 //------------
 // Тело модуля
@@ -25,12 +29,17 @@ const { ServerError } = require("./server_errors"); //Ошибка сервер�
 const validateObject = (obj, schema, sObjName) => {
     //Объявим результат
     let sRes = "";
+    //Если пришла верная схема
     if (schema instanceof Schema) {
+        //И есть что проверять
         if (obj) {
+            //Сделаем это
             const objTmp = _.cloneDeep(obj);
             const errors = schema.validate(objTmp, { strip: false });
+            //Если есть ошибки
             if (errors && Array.isArray(errors)) {
                 if (errors.length > 0) {
+                    //Сформируем из них сообщение об ошибке валидации
                     let a = errors.map(e => {
                         return e.message;
                     });
@@ -41,12 +50,15 @@ const validateObject = (obj, schema, sObjName) => {
                         _.uniq(a).join("; ");
                 }
             } else {
+                //Валидатор вернул не то, что мы ожидали
                 sRes = "Неожиданный ответ валидатора";
             }
         } else {
+            //Нам не передали объект на проверку
             sRes = "Объект" + (sObjName ? " '" + sObjName + "' " : " ") + "не указан";
         }
     } else {
+        //Пришла не схема валидации а непонятно что
         sRes = "Ошибочный формат схемы валидации";
     }
     //Вернем результат
@@ -55,50 +67,70 @@ const validateObject = (obj, schema, sObjName) => {
 
 //Формирование полного пути к подключаемому модулю
 const makeModuleFullPath = sModuleName => {
+    //Если имя модуля передано
     if (sModuleName) {
+        //Объединим его с шаблоном пути до библиотеки модулей
         return SMODULES_PATH_MODULES + "/" + sModuleName;
     } else {
+        //Нет имени модуля - нет полного пути
         return "";
     }
 };
 
 //Формирование текста ошибки
 const makeErrorText = e => {
+    //Сообщение об ошибке по умолчанию
     let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
+    //Если это наше внутреннее сообщение, с кодом, то сделаем ошибку более информативной
     if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
+    //Вернем ответ
     return sErr;
 };
 
 //Считывание наименования модуля-обработчика сервера приложений (ожидаемый формат - <МОДУЛЬ>/<ФУНКЦИЯ>)
 const getAppSrvModuleName = sAppSrv => {
+    //Если есть что разбирать
     if (sAppSrv) {
+        //И если это строка
         if (sAppSrv instanceof String || typeof sAppSrv === "string") {
+            //Проверим наличие разделителя между именем модуля и функции
             if (sAppSrv.indexOf("/") === -1) {
+                //Нет разделителя - нечего вернуть
                 return null;
             } else {
+                //Вернём всё, что левее разделителя
                 return sAppSrv.substring(0, sAppSrv.indexOf("/"));
             }
         } else {
+            //Пришла не строка
             return null;
         }
     } else {
+        //Ничего не пришло
         return null;
     }
 };
 
 //Считывание наименования функции модуля-обработчика сервера приложений (ожидаемый формат - <МОДУЛЬ>/<ФУНКЦИЯ>)
 const getAppSrvFunctionName = sAppSrv => {
+    //Если есть что разбирать
     if (sAppSrv) {
+        //И если это строка
         if (sAppSrv instanceof String || typeof sAppSrv === "string") {
+            //Проверим наличие разделителя между именем модуля и функции
             if (sAppSrv.indexOf("/") === -1) {
+                //Нет разделителя - нечего вернуть
                 return null;
             } else {
+                //Вернём всё, что правее разделителя
                 return sAppSrv.substring(sAppSrv.indexOf("/") + 1, sAppSrv.length);
             }
         } else {
+            //Пришла не строка
             return null;
         }
     } else {
+        //Ничего не пришло
         return null;
     }
 };
@@ -139,6 +171,57 @@ const getAppSrvFunction = sAppSrv => {
     }
 };
 
+//Отправка E-Mail уведомления
+const sendMail = prms => {
+    return new Promise((resolve, reject) => {
+        //Проверяем структуру переданного объекта для старта
+        let sCheckResult = validateObject(
+            prms,
+            prmsUtilsSchema.sendMail,
+            "Параметры функции отправки E-Mail уведомления"
+        );
+        //Если структура объекта в норме
+        if (!sCheckResult) {
+            //Параметры подключения к SMTP-серверу
+            let transporter = nodemailer.createTransport({
+                host: prms.mail.sHost,
+                port: prms.mail.nPort,
+                secure: prms.mail.nPort == 465,
+                auth: {
+                    user: prms.mail.sUser,
+                    pass: prms.mail.sPass
+                }
+            });
+            //Параметры отправляемого сообщения
+            let mailOptions = {
+                from: prms.mail.sFrom,
+                to: prms.sTo,
+                subject: prms.sSubject,
+                text: prms.sMessage
+            };
+            //Отправляем сообщение
+            transporter.sendMail(mailOptions, (error, info) => {
+                if (error) {
+                    reject(new ServerError(SERR_MAIL_FAILED, `${error.code}: ${error.response}`));
+                } else {
+                    if (info.rejected && Array.isArray(info.rejected) && info.rejected.length > 0) {
+                        reject(
+                            new ServerError(
+                                SERR_MAIL_FAILED,
+                                `Сообщение не доствлено адресатам: ${info.rejected.join(", ")}`
+                            )
+                        );
+                    } else {
+                        resolve(info);
+                    }
+                }
+            });
+        } else {
+            reject(new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult));
+        }
+    });
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -149,3 +232,4 @@ exports.makeErrorText = makeErrorText;
 exports.getAppSrvModuleName = getAppSrvModuleName;
 exports.getAppSrvFunctionName = getAppSrvFunctionName;
 exports.getAppSrvFunction = getAppSrvFunction;
+exports.sendMail = sendMail;

@@ -38,38 +38,6 @@ exports.ServiceAvailableController = new Schema({
     }
 });
 
-//Схема валидации параметров функции отправки E-Mail уведомления о недоступности сервиса
-exports.sendUnAvailableMail = new Schema({
-    //Список адресов E-Mail для отправки уведомления
-    sTo: {
-        type: String,
-        required: true,
-        message: {
-            type: path =>
-                `Список адресов E-Mail для отправки уведомления (${path}) имеет некорректный тип данных (ожидалось - String)`,
-            required: path => `Не указан cписок адресов E-Mail для отправки уведомления (${path})`
-        }
-    },
-    //Заголовок сообщения
-    sSubject: {
-        type: String,
-        required: true,
-        message: {
-            type: path => `Заголовок сообщения (${path}) имеет некорректный тип данных (ожидалось - String)`,
-            required: path => `Не указан заголовок сообщения (${path})`
-        }
-    },
-    //Текст уведомления
-    sMessage: {
-        type: String,
-        required: true,
-        message: {
-            type: path => `Текст уведомления (${path}) имеет некорректный тип данных (ожидалось - String)`,
-            required: path => `Не указан текст уведомления (${path})`
-        }
-    }
-});
-
 //Схема валидации параметров функции запуска контроллера
 exports.startController = new Schema({
     //Список обслуживаемых сервисов

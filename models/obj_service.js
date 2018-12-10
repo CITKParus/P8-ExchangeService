@@ -9,6 +9,7 @@
 
 const Schema = require("validate"); //Схемы валидации
 const { defServiceFunctions } = require("./obj_service_functions"); //Схема валидации списка функций сервиса
+const { validateMailList } = require("./common"); //Общие объекты валидации моделей данных
 
 //----------
 // Константы
@@ -25,6 +26,15 @@ const NUNAVLBL_NTF_SIGN_NO = 0; //Не оповещать о простое
 const NUNAVLBL_NTF_SIGN_YES = 1; //Оповещать о простое
 const SUNAVLBL_NTF_SIGN_NO = "UNAVLBL_NTF_NO"; //Не оповещать о простое (строковый код)
 const SUNAVLBL_NTF_SIGN_YES = "UNAVLBL_NTF_YES"; //Оповещать о простое (строковый код)
+
+//-------------
+//  Тело модуля
+//-------------
+
+//Валидация списка адресов E-Mail для оповещения о простое внешнего сервиса
+const validateUnavlblNtfMail = val => {
+    return validateMailList(val);
+};
 
 //------------------
 //  Интерфейс модуля
@@ -151,10 +161,13 @@ exports.Service = new Schema({
     sUnavlblNtfMail: {
         type: String,
         required: false,
+        use: { validateUnavlblNtfMail },
         message: {
             type:
                 "Список адресов E-Mail для оповещения о простое внешнего сервиса (sUnavlblNtfMail) имеет некорректный тип данных (ожидалось - String)",
-            required: "Не указан список адресов E-Mail для оповещения о простое внешнего сервиса (sUnavlblNtfMail)"
+            required: "Не указан список адресов E-Mail для оповещения о простое внешнего сервиса (sUnavlblNtfMail)",
+            validateUnavlblNtfMail:
+                "Неверный формат списка адресов E-Mail для оповещения о простое внешнего сервиса (sUnavlblNtfMail), для указания нескольких адресов следует использовать запятую в качестве разделителя (без пробелов)"
         }
     },
     //Список функций сервиса

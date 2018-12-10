@@ -10,10 +10,9 @@
 const _ = require("lodash"); //Работа с массивами и коллекциями
 const rqp = require("request-promise"); //Работа с HTTP/HTTPS запросами
 const EventEmitter = require("events"); //Обработчик пользовательских событий
-const nodemailer = require("nodemailer"); //Отправка E-Mail сообщений
 const { ServerError } = require("./server_errors"); //Типовая ошибка
-const { SERR_SERVICE_UNAVAILABLE, SERR_MAIL_FAILED, SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
-const { makeErrorText, validateObject } = require("./utils"); //Вспомогательные функции
+const { SERR_SERVICE_UNAVAILABLE, SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
+const { makeErrorText, validateObject, sendMail } = require("./utils"); //Вспомогательные функции
 const prmsServiceAvailableControllerSchema = require("../models/prms_service_available_controller"); //Схемы валидации параметров функций класса
 const objServiceSchema = require("../models/obj_service"); //Схемы валидации сервисов
 
@@ -78,56 +77,6 @@ class ServiceAvailableController extends EventEmitter {
     notifyStopped() {
         //Оповестим подписчиков об останове
         this.emit(SEVT_SERVICE_AVAILABLE_CONTROLLER_STOPPED);
-    }
-    //Отправка E-Mail уведомления о недоступности сервиса
-    sendUnAvailableMail(prms) {
-        return new Promise((resolve, reject) => {
-            //Проверяем структуру переданного объекта для старта
-            let sCheckResult = validateObject(
-                prms,
-                prmsServiceAvailableControllerSchema.sendUnAvailableMail,
-                "Параметры функции отправки E-Mail уведомления о недоступности удалённого сервиса"
-            );
-            //Если структура объекта в норме
-            if (!sCheckResult) {
-                //Параметры подключения к SMTP-серверу
-                let transporter = nodemailer.createTransport({
-                    host: this.mail.sHost,
-                    port: this.mail.nPort,
-                    secure: this.mail.nPort == 465,
-                    auth: {
-                        user: this.mail.sUser,
-                        pass: this.mail.sPass
-                    }
-                });
-                //Параметры отправляемого сообщения
-                let mailOptions = {
-                    from: this.mail.sFrom,
-                    to: prms.sTo,
-                    subject: prms.sSubject,
-                    text: prms.sMessage
-                };
-                //Отправляем сообщение
-                transporter.sendMail(mailOptions, (error, info) => {
-                    if (error) {
-                        reject(new ServerError(SERR_MAIL_FAILED, `${error.code}: ${error.response}`));
-                    } else {
-                        if (info.rejected && Array.isArray(info.rejected) && info.rejected.length > 0) {
-                            reject(
-                                new ServerError(
-                                    SERR_MAIL_FAILED,
-                                    `Сообщение не доствлено адресатам: ${info.rejected.join(", ")}`
-                                )
-                            );
-                        } else {
-                            resolve(info);
-                        }
-                    }
-                });
-            } else {
-                reject(new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult));
-            }
-        });
     }
     //Перезапуск опроса списка сервисов
     async restartDetectingLoop() {
@@ -197,7 +146,8 @@ class ServiceAvailableController extends EventEmitter {
                                 }`;
                                 await this.logger.error(sMessage, { nServiceId: this.services[i].nId });
                                 try {
-                                    await this.sendUnAvailableMail({
+                                    await sendMail({
+                                        mail: this.mail,
                                         sTo: this.services[i].sUnavlblNtfMail,
                                         sSubject,
                                         sMessage
