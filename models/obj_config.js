@@ -19,6 +19,9 @@ const validateMaxWorkers = val => val >= 1 && val <= 100 && Number.isInteger(val
 //Функция проверки значения интервала проверки наличия исходящих сообщений
 const validateCheckTimeout = val => val >= 1 && val <= 60000 && Number.isInteger(val);
 
+//Функция проверки значения порта сервера обслуживания входящих сообщений
+const validateInComingPort = val => val >= 0 && val <= 65535 && Number.isInteger(val);
+
 //Схема валидации параметров подключения к БД
 const dbConnect = new Schema({
     //Пользователь БД
@@ -96,6 +99,22 @@ const outGoing = new Schema({
             required: "Не указан интервал проверки наличия исходящих сообщений (nCheckTimeout)",
             validateCheckTimeout:
                 "Значение интервала проверки наличия исходящих сообщений (nCheckTimeout) должно быть целым числом в диапазоне от 100 до 60000"
+        }
+    }
+});
+
+//Схема валидации параметров обработки очереди входящих сообщений
+const inComing = new Schema({
+    //Порт сервера входящих сообщений
+    nPort: {
+        type: Number,
+        required: true,
+        use: { validateInComingPort },
+        message: {
+            type: "Порт сервера входящих сообщений (nPort) имеет некорректный тип данных (ожидалось - Number)",
+            required: "Не указан порт сервера входящих сообщений (nPort)",
+            validateInComingPort:
+                "Порт сервера входящих сообщений (nPort) должен быть целым числом в диапазоне от  0 до 65535"
         }
     }
 });
@@ -186,6 +205,8 @@ const config = new Schema({
 exports.dbConnect = dbConnect;
 //Схема валидации параметров обработки очереди исходящих сообщений
 exports.outGoing = outGoing;
+//Схема валидации параметров обработки очереди входящих сообщений
+exports.inComing = inComing;
 //Схема валидации параметров отправки E-Mail уведомлений
 exports.mail = mail;
 //Схема валидации файла конфигурации
