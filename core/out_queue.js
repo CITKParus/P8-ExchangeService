@@ -36,7 +36,7 @@ const NWORKERS_WAIT_INTERVAL = 1000;
 // Тело модуля
 //------------
 
-//Класс очереди сообщений
+//Класс очереди исходящих сообщений
 class OutQueue extends EventEmitter {
     //Конструктор класса
     constructor(prms) {
