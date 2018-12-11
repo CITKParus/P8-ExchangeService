@@ -96,18 +96,44 @@ const appProcess = async prms => {
             //Выполняем обработчик "До" (если он есть)
             if (prms.function.sAppSrvBefore) {
                 const fnBefore = getAppSrvFunction(prms.function.sAppSrvBefore);
-                let resBefore = await fnBefore(prms); //!!!!!!!!!!!!!!!! КОНТРОЛЬ ФОРМАТА РЕЗУЛЬТАТА
-                options = _.cloneDeep(resBefore.options);
+                let resBefore = await fnBefore(prms);
+                //Проверяем структуру ответа функции предобработки
+                let sCheckResult = validateObject(
+                    resBefore,
+                    objOutQueueProcessorSchema.OutQueueProcessorFnBefore,
+                    "Результат функции предобработки исходящего сообщения"
+                );
+                //Если структура ответа в норме
+                if (!sCheckResult) {
+                    //Применим её
+                    options = _.cloneDeep(resBefore.options);
+                    if (resBefore.blMsg) prms.queue.blMsg = resBefore.blMsg;
+                } else {
+                    //Или расскажем об ошибке
+                    throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                }
             }
             //Отправляем сообщение удалённому серверу
             let serverResp = await rqp(options);
             _.extend(prms, { serverResp });
             //Выполняем обработчик "После"
-            let resAfter = null;
             if (prms.function.sAppSrvAfter) {
                 const fnAfter = getAppSrvFunction(prms.function.sAppSrvAfter);
-                resAfter = await fnAfter(prms); //!!!!!!!!!!!!!!!! КОНТРОЛЬ ФОРМАТА РЕЗУЛЬТАТА
-                prms.queue.blResp = resAfter.blResp;
+                let resAfter = await fnAfter(prms);
+                //Проверяем структуру ответа функции предобработки
+                let sCheckResult = validateObject(
+                    resAfter,
+                    objOutQueueProcessorSchema.OutQueueProcessorFnAfter,
+                    "Результат функции постобработки исходящего сообщения"
+                );
+                //Если структура ответа в норме
+                if (!sCheckResult) {
+                    //Применим её
+                    prms.queue.blResp = resAfter.blResp;
+                } else {
+                    //Или расскажем об ошибке
+                    throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                }
             } else {
                 prms.queue.blResp = new Buffer(serverResp.toString());
             }

@@ -93,3 +93,41 @@ exports.OutQueueProcessorTaskResult = new Schema({
 }).validator({
     required: val => typeof val != "undefined"
 });
+
+//Схема валидации результата работы функции "предобработки" сообщения очереди сервером приложений
+exports.OutQueueProcessorFnBefore = new Schema({
+    //Параметры запроса удалённому сервису
+    options: {
+        type: Object,
+        required: true,
+        message: {
+            type: path =>
+                `Параметры запроса удалённому сервису (${path}) имеют некорректный тип данных (ожидалось - Object, см. документацию к REQUEST - https://github.com/request/request)`,
+            required: path => `Не указаны параметры запроса удалённому сервису (${path})`
+        }
+    },
+    //Обработанное сообщение очереди
+    blMsg: {
+        type: Buffer,
+        required: false,
+        message: {
+            type: path =>
+                `Обработанное сообщение очереди  (${path}) имеет некорректный тип данных (ожидалось - Buffer)`,
+            required: path => `Не указано обработанное сообщение очереди (${path})`
+        }
+    }
+});
+
+//Схема валидации результата работы функции "постобработки" сообщения очереди сервером приложений
+exports.OutQueueProcessorFnAfter = new Schema({
+    //Результат обработки ответа удалённого сервиса
+    blResp: {
+        type: Buffer,
+        required: true,
+        message: {
+            type: path =>
+                `Результат обработки ответа удалённого сервиса  (${path}) имеет некорректный тип данных (ожидалось - Buffer)`,
+            required: path => `Не указан результат обработки ответа удалённого сервиса (${path})`
+        }
+    }
+});
