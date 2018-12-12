@@ -84,6 +84,16 @@ exports.dbConnectorModule = new Schema({
             required: "Не реализована функция считывания записи очереди обмена (getQueue)"
         }
     },
+    //Добавление сообщения очереди
+    putQueue: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType:
+                "Функция добавления сообщения очереди (putQueue) имеет неверный формат (ожидалось - AsyncFunction)",
+            required: "Не реализована функция добавления сообщения очереди (putQueue)"
+        }
+    },
     //Считывание записей исходящих сообщений очереди
     getQueueOutgoing: {
         use: { validateAsyncFunctionType },
@@ -92,16 +102,6 @@ exports.dbConnectorModule = new Schema({
             validateAsyncFunctionType:
                 "Функция считывания записей исходящих сообщений очереди (getQueueOutgoing) имеет неверный формат (ожидалось - AsyncFunction)",
             required: "Не реализована функция считывания записей исходящих сообщений очереди (getQueueOutgoing)"
-        }
-    },
-    //Добавление входящего сообщения очереди
-    putQueueIncoming: {
-        use: { validateAsyncFunctionType },
-        required: true,
-        message: {
-            validateAsyncFunctionType:
-                "Функция добавления входящего сообщения очереди (putQueueIncoming) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция добавления входящего сообщения очереди (putQueueIncoming)"
         }
     },
     //Уставновка состояния записи очереди

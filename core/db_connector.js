@@ -322,6 +322,41 @@ class DBConnector extends EventEmitter {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
         }
     }
+    //Добавить запись очереди обмена
+    async putQueue(prms) {
+        if (this.bConnected) {
+            //Проверяем структуру переданных параметров
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.putQueue,
+                "Параметры функции добавления позиции очереди"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                //Исполняем действие в БД
+                try {
+                    let res = await this.connector.putQueue({
+                        nServiceFnId: prms.nServiceFnId,
+                        blMsg: prms.blMsg ? prms.blMsg : new Buffer(""),
+                        nQueueId: prms.nQueueId,
+                        connection: this.connection
+                    });
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(res, objQueueSchema.Queue, "Добавленное сообщение очереди обмена");
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Вернём добавленную запись
+                    return res;
+                } catch (e) {
+                    if (e instanceof ServerError) throw e;
+                    else throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
     //Считать очередную порцию исходящих сообщений
     async getOutgoing(prms) {
         if (this.bConnected) {

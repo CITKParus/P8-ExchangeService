@@ -129,6 +129,30 @@ const getQueue = async prms => {
     }
 };
 
+//Помещение сообщения в очередь
+const putQueue = async prms => {
+    try {
+        let res = await prms.connection.execute(
+            "BEGIN PKG_EXS.QUEUE_PUT(NEXSSERVICEFN => :NEXSSERVICEFN, BMSG => :BMSG, NEXSQUEUE => :NEXSQUEUE, RCQUEUE => :RCQUEUE); END;",
+            {
+                NEXSSERVICEFN: prms.nServiceFnId,
+                BMSG: prms.blMsg,
+                NEXSQUEUE: prms.nQueueId,
+                RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+            },
+            {
+                outFormat: oracledb.OBJECT,
+                autoCommit: true,
+                fetchInfo: { blMsg: { type: oracledb.BUFFER } }
+            }
+        );
+        let rows = await readCursorData(res.outBinds.RCQUEUE);
+        return rows[0];
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
 //Считывание очередной порции исходящих сообщений из очереди
 const getQueueOutgoing = async prms => {
     try {
@@ -149,9 +173,6 @@ const getQueueOutgoing = async prms => {
         throw new Error(e.message);
     }
 };
-
-//Помещение очередного входящего сообщения в очередь
-const putQueueIncoming = async prms => {};
 
 //Установка значения состояния в сообщении очереди
 const setQueueState = async prms => {
@@ -256,8 +277,8 @@ exports.getServices = getServices;
 exports.getServiceFunctions = getServiceFunctions;
 exports.log = log;
 exports.getQueue = getQueue;
+exports.putQueue = putQueue;
 exports.getQueueOutgoing = getQueueOutgoing;
-exports.putQueueIncoming = putQueueIncoming;
 exports.setQueueState = setQueueState;
 exports.setQueueMsg = setQueueMsg;
 exports.setQueueResp = setQueueResp;
