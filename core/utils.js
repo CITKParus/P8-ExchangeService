@@ -8,6 +8,7 @@
 //----------------------
 
 const _ = require("lodash"); //Работа с массивами и объектами
+const os = require("os"); //Средства операционной системы
 const Schema = require("validate"); //Схемы валидации
 const nodemailer = require("nodemailer"); //Отправка E-Mail сообщений
 const {
@@ -222,6 +223,37 @@ const sendMail = prms => {
     });
 };
 
+//Сборка URL по адресу сервиса и функции сервиса
+const buildURL = prms => {
+    //Проверяем структуру переданного объекта для старта
+    let sCheckResult = validateObject(prms, prmsUtilsSchema.buildURL, "Параметры функции формирования URL");
+    //Если структура объекта в норме
+    if (!sCheckResult) {
+        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! КОНТРОЛЬ КОРРЕКТНОСТИ
+        return `${prms.sSrvRoot}/${prms.sFnURL}`;
+    } else {
+        throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+    }
+};
+
+//Получение списка IP-адресов хоста сервера
+const getIPs = () => {
+    let ips = [];
+    //получим список сетевых интерфейсов
+    const ifaces = os.networkInterfaces();
+    //обходим сетевые интерфейсы
+    Object.keys(ifaces).forEach(ifname => {
+        ifaces[ifname].forEach(iface => {
+            //пропускаем локальный адрес и не IPv4 адреса
+            if ("IPv4" !== iface.family || iface.internal !== false) return;
+            //добавим адрес к резульату
+            ips.push(iface.address);
+        });
+    });
+    //вернем ответ
+    return ips;
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -233,3 +265,5 @@ exports.getAppSrvModuleName = getAppSrvModuleName;
 exports.getAppSrvFunctionName = getAppSrvFunctionName;
 exports.getAppSrvFunction = getAppSrvFunction;
 exports.sendMail = sendMail;
+exports.buildURL = buildURL;
+exports.getIPs = getIPs;
