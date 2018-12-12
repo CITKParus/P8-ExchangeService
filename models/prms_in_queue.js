@@ -8,10 +8,13 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
+const { IncomingMessage, ServerResponse } = require("http"); //Работа с HTTP протоколом
 const { inComing } = require("./obj_config"); //Схемы валидации конфигурации сервера приложений
 const { defServices } = require("./obj_services"); //Схема валидации списка сервисов
 const { DBConnector } = require("../core/db_connector"); //Класс взаимодействия в БД
 const { Logger } = require("../core/logger"); //Класс для протоколирования работы
+const { Service } = require("./obj_service"); //Схема валидации сервиса
+const { ServiceFunction } = require("./obj_service_function"); //Схема валидации функции сервиса
 
 //------------------
 //  Интерфейс модуля
@@ -45,6 +48,46 @@ exports.InQueue = new Schema({
             type: path =>
                 `Объект для протоколирования работы (${path}) имеет некорректный тип данных (ожидалось - Logger)`,
             required: path => `Не указаны объект для протоколирования работы (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции обработки входящего сообщения
+exports.processMessage = new Schema({
+    //Входящее сообщение
+    req: {
+        type: IncomingMessage,
+        required: true,
+        message: {
+            type: path =>
+                `Входящее сообщение (${path}) имеет некорректный тип данных (ожидалось - IncomingMessage, см. документацию к Node.JS HTTP - https://nodejs.org/dist/latest-v10.x/docs/api/http.html#http_class_http_incomingmessage)`,
+            required: path => `Не указано входящее сообщение (${path})`
+        }
+    },
+    //Ответ на входящее сообщение
+    res: {
+        type: ServerResponse,
+        required: true,
+        message: {
+            type: path =>
+                `Ответ на входящие сообщение (${path}) имеет некорректный тип данных (ожидалось - ServerResponse, см. документацию к Node.JS HTTP - https://nodejs.org/dist/latest-v10.x/docs/api/http.html#http_class_http_serverresponse)`,
+            required: path => `Не указан ответ на входящее сообщение (${path})`
+        }
+    },
+    //Cервис-обработчик
+    service: {
+        schema: Service,
+        required: true,
+        message: {
+            required: path => `Не указан сервис для обработки входящего сообщения (${path})`
+        }
+    },
+    //Функция сервиса-обработчика
+    function: {
+        schema: ServiceFunction,
+        required: true,
+        message: {
+            required: path => `Не указана функция сервиса для обработки входящего сообщения (${path})`
         }
     }
 });
