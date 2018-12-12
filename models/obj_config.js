@@ -22,6 +22,9 @@ const validateCheckTimeout = val => val >= 1 && val <= 60000 && Number.isInteger
 //Функция проверки значения порта сервера обслуживания входящих сообщений
 const validateInComingPort = val => val >= 0 && val <= 65535 && Number.isInteger(val);
 
+//Функция проверки значения порта сервера обслуживания входящих сообщений
+const validateMsgMaxSize = val => val >= 1 && val <= 1000 && Number.isInteger(val);
+
 //Схема валидации параметров подключения к БД
 const dbConnect = new Schema({
     //Пользователь БД
@@ -116,6 +119,19 @@ const inComing = new Schema({
             validateInComingPort:
                 "Порт сервера входящих сообщений (nPort) должен быть целым числом в диапазоне от  0 до 65535"
         }
+    },
+    //Максимальный размер входящего сообщения (мб)
+    nMsgMaxSize: {
+        type: Number,
+        required: true,
+        use: { validateMsgMaxSize },
+        message: {
+            type:
+                "Максимальный размер входящего сообщения (nMsgMaxSize) имеет некорректный тип данных (ожидалось - Number)",
+            required: "Не указан максимальный размер входящего сообщения (nMsgMaxSize)",
+            validateMsgMaxSize:
+                "Максимальный размер входящего сообщения (nMsgMaxSize) должен быть целым числом в диапазоне от  1 до 1000"
+        }
     }
 });
 
@@ -185,6 +201,14 @@ const config = new Schema({
         required: true,
         message: {
             required: "Не указаны параметры обработки очереди исходящих сообщений (outGoing)"
+        }
+    },
+    //Параметры обработки очереди входящих сообщений
+    inComing: {
+        schema: inComing,
+        required: true,
+        message: {
+            required: "Не указаны параметры обработки очереди входящих сообщений (inComing)"
         }
     },
     //Параметры отправки E-Mail уведомлений
