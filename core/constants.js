@@ -28,3 +28,6 @@ exports.SERR_SERVICE_UNAVAILABLE = "ERR_SERVICE_UNAVAILABLE"; //Удалённы
 
 //Типовые коды ошибок отправки e-mail уведомлений
 exports.SERR_MAIL_FAILED = "ERR_MAIL_FAILED"; //Ошибка отправки почтового уведомления
+
+//Типовые коды ошибок WEB-сервера
+exports.SERR_WEB_SERVER = "SERR_WEB_SERVER"; //Ошибка WEB-сервера
