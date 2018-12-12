@@ -92,9 +92,12 @@ create or replace package body UDO_PKG_EXS_TEST as
     /* Регистрируем контрагента */
     P_AGNLIST_BASE_INSERT(NCOMPANY => NCOMPANY,
                           NCRN     => NCRN,
-                          SAGNABBR => SUBSTR(NIDENT || SAGNABBR, 1, 20),
+                          SAGNABBR => SUBSTR(NIDENT || SAGNABBR, 1, 20),                          
                           SAGNNAME => SAGNNAME || ' ' || NIDENT,
                           NRN      => NAGENT);
+  exception
+    when others then
+      PKG_EXS.PRC_RESP_ARG_STR_SET(NIDENT => NIDENT, SARG => PKG_EXS.SCONT_FLD_SERR, SVALUE => sqlerrm);
   end;
 
 end;
