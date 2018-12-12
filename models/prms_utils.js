@@ -66,3 +66,25 @@ exports.sendMail = new Schema({
         }
     }
 });
+
+//Схема валидации параметров функции сборки URL
+exports.buildURL = new Schema({
+    //Корневой каталог сервиса
+    sSrvRoot: {
+        type: String,
+        required: true,
+        message: {
+            type: path => `Корневой каталог сервиса (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан корневой каталог сервиса (${path})`
+        }
+    },
+    //Адрес функции сервиса
+    sFnURL: {
+        type: String,
+        required: true,
+        message: {
+            type: path => `Адрес функции сервиса (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан адрес функции сервиса (${path})`
+        }
+    }
+});
