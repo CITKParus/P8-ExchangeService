@@ -70,6 +70,15 @@ exports.Service = new Schema({
             required: "Не указан код сервиса (sCode)"
         }
     },
+    //Наименование сервиса
+    sName: {
+        type: String,
+        required: true,
+        message: {
+            type: "Наименование сервиса (sName) имеет некорректный тип данных (ожидалось - String)",
+            required: "Не указано наименование сервиса (sName)"
+        }
+    },
     //Тип сервиса
     nSrvType: {
         type: Number,

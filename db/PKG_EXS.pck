@@ -965,6 +965,7 @@ create or replace package body PKG_EXS as
     open RCSERVICE for
       select T.RN "nId",
              T.CODE "sCode",
+             T.NAME "sName",
              T.SRV_TYPE "nSrvType",
              DECODE(T.SRV_TYPE, NSRV_TYPE_SEND, SSRV_TYPE_SEND, NSRV_TYPE_RECIVE, SSRV_TYPE_RECIVE) "sSrvType",
              T.SRV_ROOT "sSrvRoot",
