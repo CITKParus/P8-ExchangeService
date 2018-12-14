@@ -13,6 +13,30 @@ create or replace package UDO_PKG_EXS_TEST as
     NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
+  
+  /* Обработка запроса на создание сессии */
+  procedure RESP_LOGIN
+  (
+    NIDENT                  in number,  -- Идентификатор процесса
+    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
+    NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
+  );
+  
+  /* Обработка запроса на поиск контрагента */
+  procedure RESP_FIND_AGENT
+  (
+    NIDENT                  in number,  -- Идентификатор процесса
+    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
+    NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
+  );
+
+  /* Обработка запроса на поиск договора */
+  procedure RESP_FIND_CONTRACT
+  (
+    NIDENT                  in number,  -- Идентификатор процесса
+    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
+    NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
+  );  
 
 end;
 /
@@ -98,6 +122,51 @@ create or replace package body UDO_PKG_EXS_TEST as
   exception
     when others then
       PKG_EXS.PRC_RESP_ARG_STR_SET(NIDENT => NIDENT, SARG => PKG_EXS.SCONT_FLD_SERR, SVALUE => sqlerrm);
+  end;
+  
+  /* Обработка запроса на создание сессии */
+  procedure RESP_LOGIN
+  (
+    NIDENT                  in number,  -- Идентификатор процесса
+    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
+    NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
+  )
+  is
+    REXSQUEUE               EXSQUEUE%rowtype;     -- Запись позиции очереди
+    CTMP                    clob;                 -- Буфер для конвертации
+  begin
+    /* Считаем запись очереди */
+    REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
+    /* Конвертируем в кодировку БД */
+    CTMP := BLOB2CLOB(LBDATA => REXSQUEUE.MSG, SCHARSET => 'UTF8');
+    /* Выставляем результат обработки */
+    PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
+                                  SARG   => PKG_EXS.SCONT_FLD_BRESP,
+                                  BVALUE => CLOB2BLOB(LCDATA => CTMP || ' ОБРАБОТКА ПАРУС 8', SCHARSET => 'UTF8'));
+  end;
+  
+  /* Обработка запроса на поиск контрагента */
+  procedure RESP_FIND_AGENT
+  (
+    NIDENT                  in number,  -- Идентификатор процесса
+    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
+    NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
+  )
+  is
+  begin
+    null;
+  end;
+
+  /* Обработка запроса на поиск договора */
+  procedure RESP_FIND_CONTRACT
+  (
+    NIDENT                  in number,  -- Идентификатор процесса
+    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
+    NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
+  )
+  is
+  begin
+    null;
   end;
 
 end;
