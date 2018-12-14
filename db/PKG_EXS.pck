@@ -1072,6 +1072,7 @@ create or replace package body PKG_EXS as
                     SRETRY_SCHEDULE_MONTH) "sRetrySchedule",
              T.EXSMSGTYPE "nMsgId",
              M.CODE "sMsgCode",
+             DECODE(M.PRC_RESP, null, null, UTL_STORED_MAKE_LINK(SPROCEDURE => M.PRC_RESP, SPACKAGE => M.PKG_RESP)) "sPrcResp",
              M.APPSRV_BEFORE "sAppSrvBefore",
              M.APPSRV_AFTER "sAppSrvAfter"
         from EXSSERVICEFN T,
