@@ -17,7 +17,7 @@ const { ServerError } = require("./server_errors"); //Типовая ошибк�
 const objOutQueueProcessorSchema = require("../models/obj_out_queue_processor"); //Схема валидации сообщений обмена с бработчиком очереди исходящих сообщений
 const prmsOutQueueProcessorSchema = require("../models/prms_out_queue_processor"); //Схема валидации параметров функций модуля
 const objQueueSchema = require("../models/obj_queue"); //Схемы валидации сообщения очереди
-const { SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Глобальные константы
+const { SERR_OBJECT_BAD_INTERFACE, SERR_APP_SERVER_BEFORE, SERR_APP_SERVER_AFTER } = require("./constants"); //Глобальные константы
 const { NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 
 //--------------------------
@@ -96,7 +96,12 @@ const appProcess = async prms => {
             //Выполняем обработчик "До" (если он есть)
             if (prms.function.sAppSrvBefore) {
                 const fnBefore = getAppSrvFunction(prms.function.sAppSrvBefore);
-                let resBefore = await fnBefore(prms);
+                let resBefore = null;
+                try {
+                    resBefore = await fnBefore(prms);
+                } catch (e) {
+                    throw new ServerError(SERR_APP_SERVER_BEFORE, e.message);
+                }
                 //Проверяем структуру ответа функции предобработки
                 let sCheckResult = validateObject(
                     resBefore,
@@ -116,10 +121,15 @@ const appProcess = async prms => {
             //Отправляем сообщение удалённому серверу
             let serverResp = await rqp(options);
             _.extend(prms, { serverResp });
-            //Выполняем обработчик "После"
+            //Выполняем обработчик "После" (если он есть)
             if (prms.function.sAppSrvAfter) {
                 const fnAfter = getAppSrvFunction(prms.function.sAppSrvAfter);
-                let resAfter = await fnAfter(prms);
+                let resAfter = null;
+                try {
+                    resAfter = await fnAfter(prms);
+                } catch (e) {
+                    throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
+                }
                 //Проверяем структуру ответа функции предобработки
                 let sCheckResult = validateObject(
                     resAfter,
