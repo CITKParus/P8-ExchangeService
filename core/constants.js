@@ -30,4 +30,8 @@ exports.SERR_SERVICE_UNAVAILABLE = "ERR_SERVICE_UNAVAILABLE"; //Удалённы
 exports.SERR_MAIL_FAILED = "ERR_MAIL_FAILED"; //Ошибка отправки почтового уведомления
 
 //Типовые коды ошибок WEB-сервера
-exports.SERR_WEB_SERVER = "SERR_WEB_SERVER"; //Ошибка WEB-сервера
+exports.SERR_WEB_SERVER = "ERR_WEB_SERVER"; //Ошибка WEB-сервера
+
+//Типовые коди ошибок пользовательских обработчиков сервера приложений
+exports.SERR_APP_SERVER_BEFORE = "ERR_APP_SERVER_BEFORE"; //Ошибка предобработчика
+exports.SERR_APP_SERVER_AFTER = "ERR_APP_SERVER_AFTER"; //Ошибка постобработчика
