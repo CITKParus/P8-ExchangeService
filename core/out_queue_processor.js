@@ -103,19 +103,21 @@ const appProcess = async prms => {
                     throw new ServerError(SERR_APP_SERVER_BEFORE, e.message);
                 }
                 //Проверяем структуру ответа функции предобработки
-                let sCheckResult = validateObject(
-                    resBefore,
-                    objOutQueueProcessorSchema.OutQueueProcessorFnBefore,
-                    "Результат функции предобработки исходящего сообщения"
-                );
-                //Если структура ответа в норме
-                if (!sCheckResult) {
-                    //Применим её
-                    options = _.cloneDeep(resBefore.options);
-                    if (resBefore.blMsg) prms.queue.blMsg = resBefore.blMsg;
-                } else {
-                    //Или расскажем об ошибке
-                    throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                if (resBefore) {
+                    let sCheckResult = validateObject(
+                        resBefore,
+                        objOutQueueProcessorSchema.OutQueueProcessorFnBefore,
+                        "Результат функции предобработки исходящего сообщения"
+                    );
+                    //Если структура ответа в норме
+                    if (!sCheckResult) {
+                        //Применим её
+                        options = _.cloneDeep(resBefore.options);
+                        if (resBefore.blMsg) prms.queue.blMsg = resBefore.blMsg;
+                    } else {
+                        //Или расскажем об ошибке
+                        throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    }
                 }
             }
             //Отправляем сообщение удалённому серверу
@@ -131,18 +133,22 @@ const appProcess = async prms => {
                     throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
                 }
                 //Проверяем структуру ответа функции предобработки
-                let sCheckResult = validateObject(
-                    resAfter,
-                    objOutQueueProcessorSchema.OutQueueProcessorFnAfter,
-                    "Результат функции постобработки исходящего сообщения"
-                );
-                //Если структура ответа в норме
-                if (!sCheckResult) {
-                    //Применим её
-                    prms.queue.blResp = resAfter.blResp;
+                if (resAfter) {
+                    let sCheckResult = validateObject(
+                        resAfter,
+                        objOutQueueProcessorSchema.OutQueueProcessorFnAfter,
+                        "Результат функции постобработки исходящего сообщения"
+                    );
+                    //Если структура ответа в норме
+                    if (!sCheckResult) {
+                        //Применим её
+                        prms.queue.blResp = resAfter.blResp;
+                    } else {
+                        //Или расскажем об ошибке
+                        throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    }
                 } else {
-                    //Или расскажем об ошибке
-                    throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    prms.queue.blResp = new Buffer(serverResp.toString());
                 }
             } else {
                 prms.queue.blResp = new Buffer(serverResp.toString());

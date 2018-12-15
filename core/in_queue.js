@@ -127,29 +127,31 @@ class InQueue extends EventEmitter {
                         throw new ServerError(SERR_APP_SERVER_BEFORE, e.message);
                     }
                     //Проверяем структуру ответа функции предобработки
-                    let sCheckResult = validateObject(
-                        resBefore,
-                        objInQueueSchema.InQueueProcessorFnBefore,
-                        "Результат функции предобработки входящего сообщения"
-                    );
-                    //Если структура ответа в норме
-                    if (!sCheckResult) {
-                        //Выставим статус сообщению очереди - исполнено сервером приложений
-                        q = await this.dbConn.setQueueState({
-                            nQueueId: q.nId,
-                            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
-                        });
-                        //Фиксируем успех исполнения
-                        if (resBefore.blMsg) {
-                            q = await this.dbConn.setQueueAppSrvResult({
+                    if (resBefore) {
+                        let sCheckResult = validateObject(
+                            resBefore,
+                            objInQueueSchema.InQueueProcessorFnBefore,
+                            "Результат функции предобработки входящего сообщения"
+                        );
+                        //Если структура ответа в норме
+                        if (!sCheckResult) {
+                            //Выставим статус сообщению очереди - исполнено сервером приложений
+                            q = await this.dbConn.setQueueState({
                                 nQueueId: q.nId,
-                                blMsg: resBefore.blMsg,
-                                blResp: null
+                                nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
                             });
+                            //Фиксируем успех исполнения
+                            if (resBefore.blMsg) {
+                                q = await this.dbConn.setQueueAppSrvResult({
+                                    nQueueId: q.nId,
+                                    blMsg: resBefore.blMsg,
+                                    blResp: null
+                                });
+                            }
+                        } else {
+                            //Или расскажем об ошибке
+                            throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
                         }
-                    } else {
-                        //Или расскажем об ошибке
-                        throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
                     }
                 }
                 //Вызываем обработчик со стороны БД (если он есть)
@@ -184,27 +186,29 @@ class InQueue extends EventEmitter {
                         throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
                     }
                     //Проверяем структуру ответа функции предобработки
-                    let sCheckResult = validateObject(
-                        resAfter,
-                        objInQueueSchema.InQueueProcessorFnAfter,
-                        "Результат функции постобработки входящего сообщения"
-                    );
-                    //Если структура ответа в норме
-                    if (!sCheckResult) {
-                        //Выставим статус сообщению очереди - исполнено сервером приложений
-                        q = await this.dbConn.setQueueState({
-                            nQueueId: q.nId,
-                            nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
-                        });
-                        //Фиксируем успех исполнения
-                        q = await this.dbConn.setQueueAppSrvResult({
-                            nQueueId: q.nId,
-                            blMsg: q.blMsg,
-                            blResp: resAfter.blResp
-                        });
-                    } else {
-                        //Или расскажем об ошибке
-                        throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    if (resAfter) {
+                        let sCheckResult = validateObject(
+                            resAfter,
+                            objInQueueSchema.InQueueProcessorFnAfter,
+                            "Результат функции постобработки входящего сообщения"
+                        );
+                        //Если структура ответа в норме
+                        if (!sCheckResult) {
+                            //Выставим статус сообщению очереди - исполнено сервером приложений
+                            q = await this.dbConn.setQueueState({
+                                nQueueId: q.nId,
+                                nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
+                            });
+                            //Фиксируем успех исполнения
+                            q = await this.dbConn.setQueueAppSrvResult({
+                                nQueueId: q.nId,
+                                blMsg: q.blMsg,
+                                blResp: resAfter.blResp
+                            });
+                        } else {
+                            //Или расскажем об ошибке
+                            throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                        }
                     }
                 }
                 //Всё успешно - отдаём результат клиенту
