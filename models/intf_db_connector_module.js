@@ -114,24 +114,44 @@ exports.dbConnectorModule = new Schema({
             required: "Не реализована функция установки состояния записи очереди (setQueueState)"
         }
     },
-    //Установка данных сообщения записи очереди
+    //Считывание данных сообщения очереди
+    getQueueMsg: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType:
+                "Функция считывания данных сообщения очереди (getQueueMsg) имеет неверный формат (ожидалось - AsyncFunction)",
+            required: "Не реализована функция считывания данных сообщения очереди (getQueueMsg)"
+        }
+    },
+    //Установка данных сообщения очереди
     setQueueMsg: {
         use: { validateAsyncFunctionType },
         required: true,
         message: {
             validateAsyncFunctionType:
-                "Функция установки данных сообщения записи очереди (setQueueMsg) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция установки данных сообщения записи очереди (setQueueMsg)"
+                "Функция установки данных сообщения очереди (setQueueMsg) имеет неверный формат (ожидалось - AsyncFunction)",
+            required: "Не реализована функция установки данных сообщения очереди (setQueueMsg)"
         }
     },
-    //Установка результата обработки записи очереди
+    //Считывание результата обработки сообщения очереди
+    getQueueResp: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType:
+                "Функция считывания результата обработки сообщения очереди (getQueueResp) имеет неверный формат (ожидалось - AsyncFunction)",
+            required: "Не реализована функция считывания результата обработки сообщения очереди (getQueueResp)"
+        }
+    },
+    //Установка результата обработки сообщения очереди
     setQueueResp: {
         use: { validateAsyncFunctionType },
         required: true,
         message: {
             validateAsyncFunctionType:
-                "Функция установки результата обработки записи очереди (setQueueResp) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция установки результата обработки записи очереди (setQueueResp)"
+                "Функция установки результата обработки сообщения очереди (setQueueResp) имеет неверный формат (ожидалось - AsyncFunction)",
+            required: "Не реализована функция установки результата обработки сообщения очереди (setQueueResp)"
         }
     },
     //Исполнение обработчика со стороны БД для сообщения очереди

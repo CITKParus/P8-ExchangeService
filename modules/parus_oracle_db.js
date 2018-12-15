@@ -116,11 +116,7 @@ const getQueue = async prms => {
                 NEXSQUEUE: prms.nQueueId,
                 RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
-            {
-                outFormat: oracledb.OBJECT,
-                autoCommit: true,
-                fetchInfo: { blMsg: { type: oracledb.BUFFER }, blResp: { type: oracledb.BUFFER } }
-            }
+            { outFormat: oracledb.OBJECT, autoCommit: true }
         );
         let rows = await readCursorData(res.outBinds.RCQUEUE);
         return rows[0];
@@ -140,11 +136,7 @@ const putQueue = async prms => {
                 NEXSQUEUE: prms.nQueueId,
                 RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
-            {
-                outFormat: oracledb.OBJECT,
-                autoCommit: true,
-                fetchInfo: { blMsg: { type: oracledb.BUFFER } }
-            }
+            { outFormat: oracledb.OBJECT, autoCommit: true }
         );
         let rows = await readCursorData(res.outBinds.RCQUEUE);
         return rows[0];
@@ -162,10 +154,7 @@ const getQueueOutgoing = async prms => {
                 NPORTION_SIZE: prms.nPortionSize,
                 RCQUEUES: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
-            {
-                outFormat: oracledb.OBJECT,
-                fetchInfo: { blMsg: { type: oracledb.BUFFER }, blResp: { type: oracledb.BUFFER } }
-            }
+            { outFormat: oracledb.OBJECT }
         );
         let rows = await readCursorData(res.outBinds.RCQUEUES);
         return rows;
@@ -186,13 +175,31 @@ const setQueueState = async prms => {
                 NINC_EXEC_CNT: prms.nIncExecCnt,
                 RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
+            { outFormat: oracledb.OBJECT, autoCommit: true }
+        );
+        let rows = await readCursorData(res.outBinds.RCQUEUE);
+        return rows[0];
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
+//Считывание данных сообщения очереди
+const getQueueMsg = async prms => {
+    try {
+        let res = await prms.connection.execute(
+            "BEGIN PKG_EXS.QUEUE_MSG_GET(NEXSQUEUE => :NEXSQUEUE, RCQUEUE_MSG => :RCQUEUE_MSG); END;",
+            {
+                NEXSQUEUE: prms.nQueueId,
+                RCQUEUE_MSG: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+            },
             {
                 outFormat: oracledb.OBJECT,
                 autoCommit: true,
-                fetchInfo: { blMsg: { type: oracledb.BUFFER }, blResp: { type: oracledb.BUFFER } }
+                fetchInfo: { blMsg: { type: oracledb.BUFFER } }
             }
         );
-        let rows = await readCursorData(res.outBinds.RCQUEUE);
+        let rows = await readCursorData(res.outBinds.RCQUEUE_MSG);
         return rows[0];
     } catch (e) {
         throw new Error(e.message);
@@ -209,13 +216,31 @@ const setQueueMsg = async prms => {
                 BMSG: prms.blMsg,
                 RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
+            { outFormat: oracledb.OBJECT, autoCommit: true }
+        );
+        let rows = await readCursorData(res.outBinds.RCQUEUE);
+        return rows[0];
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
+//Считывание результата обработки сообщения очереди
+const getQueueResp = async prms => {
+    try {
+        let res = await prms.connection.execute(
+            "BEGIN PKG_EXS.QUEUE_RESP_GET(NEXSQUEUE => :NEXSQUEUE, RCQUEUE_RESP => :RCQUEUE_RESP); END;",
+            {
+                NEXSQUEUE: prms.nQueueId,
+                RCQUEUE_RESP: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+            },
             {
                 outFormat: oracledb.OBJECT,
                 autoCommit: true,
-                fetchInfo: { blMsg: { type: oracledb.BUFFER }, blResp: { type: oracledb.BUFFER } }
+                fetchInfo: { blResp: { type: oracledb.BUFFER } }
             }
         );
-        let rows = await readCursorData(res.outBinds.RCQUEUE);
+        let rows = await readCursorData(res.outBinds.RCQUEUE_RESP);
         return rows[0];
     } catch (e) {
         throw new Error(e.message);
@@ -232,11 +257,7 @@ const setQueueResp = async prms => {
                 BRESP: prms.blResp,
                 RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
-            {
-                outFormat: oracledb.OBJECT,
-                autoCommit: true,
-                fetchInfo: { blMsg: { type: oracledb.BUFFER }, blResp: { type: oracledb.BUFFER } }
-            }
+            { outFormat: oracledb.OBJECT, autoCommit: true }
         );
         let rows = await readCursorData(res.outBinds.RCQUEUE);
         return rows[0];
@@ -254,11 +275,7 @@ const execQueuePrc = async prms => {
                 NEXSQUEUE: prms.nQueueId,
                 RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
-            {
-                outFormat: oracledb.OBJECT,
-                autoCommit: true,
-                fetchInfo: { blMsg: { type: oracledb.BUFFER }, blResp: { type: oracledb.BUFFER } }
-            }
+            { outFormat: oracledb.OBJECT, autoCommit: true }
         );
         let rows = await readCursorData(res.outBinds.RCQUEUE);
         return rows[0];
@@ -280,6 +297,8 @@ exports.getQueue = getQueue;
 exports.putQueue = putQueue;
 exports.getQueueOutgoing = getQueueOutgoing;
 exports.setQueueState = setQueueState;
+exports.getQueueMsg = getQueueMsg;
 exports.setQueueMsg = setQueueMsg;
+exports.getQueueResp = getQueueResp;
 exports.setQueueResp = setQueueResp;
 exports.execQueuePrc = execQueuePrc;

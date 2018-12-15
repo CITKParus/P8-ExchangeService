@@ -233,24 +233,6 @@ exports.Queue = new Schema({
             required: "Не указана информация от обработчика сообщения очереди обмена (sExecMsg)"
         }
     },
-    //Данные сообщения очереди обмена
-    blMsg: {
-        type: Buffer,
-        required: false,
-        message: {
-            type: "Данные сообщения очереди обмена (blMsg) имеют некорректный тип данных (ожидалось - Buffer)",
-            required: "Не указаны данные сообщения очереди обмена (blMsg)"
-        }
-    },
-    //Данные ответа сообщения очереди обмена
-    blResp: {
-        type: Buffer,
-        required: false,
-        message: {
-            type: "Данные ответа сообщения очереди обмена (blResp) имеют некорректный тип данных (ожидалось - Buffer)",
-            required: "Не указаны данные ответа сообщения очереди обмена (blResp)"
-        }
-    },
     //Идентификатор связанного сообщения очереди обмена
     nQueueId: {
         type: Number,
@@ -262,3 +244,29 @@ exports.Queue = new Schema({
         }
     }
 });
+
+//Схема валидации данных сообщения очереди обмена
+exports.QueueMsg = new Schema({
+    //Данные сообщения очереди обмена
+    blMsg: {
+        type: Buffer,
+        required: true,
+        message: {
+            type: "Данные сообщения очереди обмена (blMsg) имеют некорректный тип данных (ожидалось - Buffer)",
+            required: "Не указаны данные сообщения очереди обмена (blMsg)"
+        }
+    }
+}).validator({ required: val => val === null || val });
+
+//Схема валидации данных ответа сообщения очереди обмена
+exports.QueueResp = new Schema({
+    //Данные ответа сообщения очереди обмена
+    blResp: {
+        type: Buffer,
+        required: true,
+        message: {
+            type: "Данные ответа сообщения очереди обмена (blResp) имеют некорректный тип данных (ожидалось - Buffer)",
+            required: "Не указаны данные ответа сообщения очереди обмена (blResp)"
+        }
+    }
+}).validator({ required: val => val === null || val });

@@ -250,6 +250,19 @@ exports.setQueueState = new Schema({
     }
 });
 
+//Схема валидации параметров функции считывание данных сообщения из позиции очереди
+exports.getQueueMsg = new Schema({
+    //Идентификатор позиции очереди
+    nQueueId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор позиции очереди ((${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди ((${path})`
+        }
+    }
+});
+
 //Схема валидации параметров функции записи данных сообщения в позицию очереди
 exports.setQueueMsg = new Schema({
     //Идентификатор позиции очереди
@@ -272,6 +285,19 @@ exports.setQueueMsg = new Schema({
         }
     }
 }).validator({ required: val => val === null || val });
+
+//Схема валидации параметров функции считывание ответа на сообщение из позиции очереди
+exports.getQueueResp = new Schema({
+    //Идентификатор позиции очереди
+    nQueueId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор позиции очереди ((${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди ((${path})`
+        }
+    }
+});
 
 //Схема валидации параметров функции записи ответа на сообщение в позицию очереди
 exports.setQueueResp = new Schema({
