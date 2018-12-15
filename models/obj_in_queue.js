@@ -24,6 +24,15 @@ exports.InQueueProcessorFnBefore = new Schema({
                 `Обработанный запрос внешней системы (${path}) имеет некорректный тип данных (ожидалось - Buffer)`,
             required: path => `Не указан Обработанный запрос внешней системы (${path})`
         }
+    },
+    //Ответ системы
+    blResp: {
+        type: Buffer,
+        required: false,
+        message: {
+            type: path => `Ответ системы (${path}) имеет некорректный тип данных (ожидалось - Buffer)`,
+            required: path => `Не указан ответ системы (${path})`
+        }
     }
 });
 
