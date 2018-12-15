@@ -180,7 +180,7 @@ class InQueue extends EventEmitter {
                         nExecState: objQueueSchema.NQUEUE_EXEC_STATE_DB_OK
                     });
                     //Считаем ответ полученный от системы
-                    let qData = await this.dbConn.getQueueResp({ nQueueId: prms.queue.nId });
+                    let qData = await this.dbConn.getQueueResp({ nQueueId: q.nId });
                     blResp = qData.blResp;
                 }
                 //Выполняем обработчик "После" (если он есть)
