@@ -89,7 +89,7 @@ create or replace package PKG_EXS as
   /* Константы - признак инкремента количества попыток исполнения позиции очереди */
   NQUEUE_EXEC_NO            constant number(1) := 0; -- Не исполнять
   NQUEUE_EXEC_YES           constant number(1) := 1; -- Исполнять
-
+  
   /* Константы - ожидаемый интерфейс процедуры обработки сообщения очереди на стороне БД */
   SPRC_RESP_ARGS            constant varchar2(80) := 'NIDENT,IN,NUMBER;NSRV_TYPE,IN,NUMBER;NEXSQUEUE,IN,NUMBER;'; -- Список параметров процедуры обработки
 
@@ -345,6 +345,13 @@ create or replace package PKG_EXS as
     RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
   );
 
+  /* Считывание данных результата обработки записи очереди */
+  procedure QUEUE_RESP_GET
+  (
+    NEXSQUEUE               in number,        -- Рег. номер записи очереди
+    RCQUEUE_RESP            out sys_refcursor -- Курсор с данными результата обработки записи очереди
+  );
+
   /* Установка результата обработки записи очереди */
   procedure QUEUE_RESP_SET
   (
@@ -353,6 +360,13 @@ create or replace package PKG_EXS as
     RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
   );
 
+  /* Считывание данных сообщения записи очереди */
+  procedure QUEUE_MSG_GET
+  (
+    NEXSQUEUE               in number,        -- Рег. номер записи очереди
+    RCQUEUE_MSG             out sys_refcursor -- Курсор с данными сообщения записи очереди
+  ); 
+  
   /* Установка сообщения записи очереди */
   procedure QUEUE_MSG_SET
   (
@@ -1316,8 +1330,6 @@ create or replace package body PKG_EXS as
                     NQUEUE_EXEC_STATE_ERR,
                     SQUEUE_EXEC_STATE_ERR) "sExecState",
              T.EXEC_MSG "sExecMsg",
-             T.MSG "blMsg",
-             T.RESP "blResp",
              T.EXSQUEUE "nQueueId"
         from EXSQUEUE     T,
              EXSSERVICEFN F,
@@ -1350,7 +1362,7 @@ create or replace package body PKG_EXS as
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
   end QUEUE_GET;
-
+  
   /* Проверка необходимости исполнения позиции очереди */
   function QUEUE_SRV_TYPE_SEND_EXEC_CHECK
   (
@@ -1478,6 +1490,22 @@ create or replace package body PKG_EXS as
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_EXEC_STATE_SET;
 
+  /* Считывание данных результата обработки записи очереди */
+  procedure QUEUE_RESP_GET
+  (
+    NEXSQUEUE               in number,        -- Рег. номер записи очереди
+    RCQUEUE_RESP            out sys_refcursor -- Курсор с данными результата обработки записи очереди
+  )
+  is
+    REXSQUEUE               EXSQUEUE%rowtype; -- Запись позиции очереди
+  begin
+    /* Считаем запись очереди */
+    REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
+    /* Вернем данные в виде курсора */
+    open RCQUEUE_RESP for
+      select REXSQUEUE.RESP "blResp" from DUAL;
+  end QUEUE_RESP_GET;
+  
   /* Установка результата обработки записи очереди */
   procedure QUEUE_RESP_SET
   (
@@ -1495,6 +1523,22 @@ create or replace package body PKG_EXS as
     /* Вернем измененную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_RESP_SET;
+
+  /* Считывание данных сообщения записи очереди */
+  procedure QUEUE_MSG_GET
+  (
+    NEXSQUEUE               in number,        -- Рег. номер записи очереди
+    RCQUEUE_MSG             out sys_refcursor -- Курсор с данными сообщения записи очереди
+  )
+  is
+    REXSQUEUE               EXSQUEUE%rowtype; -- Запись позиции очереди
+  begin
+    /* Считаем запись очереди */
+    REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
+    /* Вернем данные в виде курсора */
+    open RCQUEUE_MSG for
+      select REXSQUEUE.MSG "blMsg" from DUAL;
+  end QUEUE_MSG_GET;
 
   /* Установка сообщения записи очереди */
   procedure QUEUE_MSG_SET
