@@ -576,8 +576,8 @@ class DBConnector extends EventEmitter {
             //Если структура объекта в норме
             if (!sCheckResult) {
                 //Исполняем действие в БД
-                let res = await this.setQueueMsg({ prms });
-                res = await this.setQueueResp({ prms });
+                let res = await this.setQueueMsg(prms);
+                res = await this.setQueueResp(prms);
                 //Вернём измененную запись
                 return res;
             } else {
