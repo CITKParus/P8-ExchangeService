@@ -122,10 +122,11 @@ class InQueue extends EventEmitter {
                     const fnBefore = getAppSrvFunction(prms.function.sAppSrvBefore);
                     let resBefore = null;
                     try {
-                        prms.queue = q;
-                        prms.queue.blMsg = blMsg;
-                        prms.queue.blResp = blResp;
-                        resBefore = await fnBefore(prms);
+                        let resBeforePrms = _.cloneDeep(prms);
+                        resBeforePrms.queue = _.cloneDeep(q);
+                        resBeforePrms.queue.blMsg = blMsg;
+                        resBeforePrms.queue.blResp = blResp;
+                        resBefore = await fnBefore(resBeforePrms);
                     } catch (e) {
                         throw new ServerError(SERR_APP_SERVER_BEFORE, e.message);
                     }
@@ -193,10 +194,11 @@ class InQueue extends EventEmitter {
                     const fnAfter = getAppSrvFunction(prms.function.sAppSrvAfter);
                     let resAfter = null;
                     try {
-                        prms.queue = q;
-                        prms.queue.blMsg = blMsg;
-                        prms.queue.blResp = blResp;
-                        resAfter = await fnAfter(prms);
+                        let resAfterPrms = _.cloneDeep(prms);
+                        resAfterPrms.queue = _.cloneDeep(q);
+                        resAfterPrms.queue.blMsg = blMsg;
+                        resAfterPrms.queue.blResp = blResp;
+                        resAfter = await fnAfter(resAfterPrms);
                     } catch (e) {
                         throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
                     }

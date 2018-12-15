@@ -110,7 +110,8 @@ const appProcess = async prms => {
                 const fnBefore = getAppSrvFunction(prms.function.sAppSrvBefore);
                 let resBefore = null;
                 try {
-                    resBefore = await fnBefore(prms);
+                    let resBeforePrms = _.cloneDeep(prms);
+                    resBefore = await fnBefore(resBeforePrms);
                 } catch (e) {
                     throw new ServerError(SERR_APP_SERVER_BEFORE, e.message);
                 }
@@ -140,7 +141,8 @@ const appProcess = async prms => {
                 const fnAfter = getAppSrvFunction(prms.function.sAppSrvAfter);
                 let resAfter = null;
                 try {
-                    resAfter = await fnAfter(prms);
+                    let resAfterPrms = _.cloneDeep(prms);
+                    resAfter = await fnAfter(resAfterPrms);
                 } catch (e) {
                     throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
                 }
