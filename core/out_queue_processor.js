@@ -12,11 +12,12 @@ const _ = require("lodash"); //Работа с массивами и объек�
 const rqp = require("request-promise"); //Работа с HTTP/HTTPS запросами
 const lg = require("./logger"); //Протоколирование работы
 const db = require("./db_connector"); //Взаимодействие с БД
-const { makeErrorText, validateObject, getAppSrvFunction } = require("./utils"); //Вспомогательные функции
+const { makeErrorText, validateObject, getAppSrvFunction, buildURL } = require("./utils"); //Вспомогательные функции
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const objOutQueueProcessorSchema = require("../models/obj_out_queue_processor"); //Схема валидации сообщений обмена с бработчиком очереди исходящих сообщений
 const prmsOutQueueProcessorSchema = require("../models/prms_out_queue_processor"); //Схема валидации параметров функций модуля
 const objQueueSchema = require("../models/obj_queue"); //Схемы валидации сообщения очереди
+const objServiceFnSchema = require("../models/obj_service_function"); //Схемы валидации функции сервиса
 const { SERR_OBJECT_BAD_INTERFACE, SERR_APP_SERVER_BEFORE, SERR_APP_SERVER_AFTER } = require("./constants"); //Глобальные константы
 const { NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 
@@ -87,12 +88,23 @@ const appProcess = async prms => {
                 }, ${prms.queue.sExecState}, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
                 { nQueueId: prms.queue.nId }
             );
+            //Считаем тело сообщения
+            let qData = await dbConn.getQueueMsg({ nQueueId: prms.queue.nId });
+            //Кладём данные тела в объект сообщения и инициализируем поле для ответа
+            _.extend(prms.queue, { blMsg: qData.blMsg, blResp: null });
             //Собираем параметры для передачи серверу
-            let options = {
-                url: `${prms.service.sSrvRoot}/${prms.function.sFnURL}`,
-                method: prms.service.sFnPrmsType,
-                body: prms.queue.sMsg
-            };
+            let options = { method: prms.service.sFnPrmsType };
+            //Определимся с URL и телом сообщения в зависимости от способа передачи параметров
+            if (prms.service.sFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
+                options.url = buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL });
+                options.body = prms.queue.blMsg;
+            } else {
+                options.url = buildURL({
+                    sSrvRoot: prms.service.sSrvRoot,
+                    sFnURL: prms.function.sFnURL,
+                    sQuery: prms.queue.blMsg.toString()
+                });
+            }
             //Выполняем обработчик "До" (если он есть)
             if (prms.function.sAppSrvBefore) {
                 const fnBefore = getAppSrvFunction(prms.function.sAppSrvBefore);

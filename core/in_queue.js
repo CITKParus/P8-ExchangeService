@@ -78,7 +78,7 @@ class InQueue extends EventEmitter {
     }
     //Обработка сообщения
     async processMessage(prms) {
-        //Проверяем структуру переданного объекта для старта
+        //Проверяем структуру переданного объекта для обработки
         let sCheckResult = validateObject(
             prms,
             prmsInQueueSchema.processMessage,
@@ -89,9 +89,10 @@ class InQueue extends EventEmitter {
             //Буфер для сообщения очереди
             let q = null;
             try {
-                //Определимся с телом сообщения
+                //Тело сообщения и ответ на него
                 let blMsg = null;
-                //Для POST сообщений - это тело запроса
+                let blResp = null;
+                //Определимся с телом сообщения - для POST сообщений - это тело запроса
                 if (prms.function.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
                     blMsg = prms.req.body && !_.isEmpty(prms.req.body) ? prms.req.body : null;
                 } else {
@@ -122,6 +123,8 @@ class InQueue extends EventEmitter {
                     let resBefore = null;
                     try {
                         prms.queue = q;
+                        prms.queue.blMsg = blMsg;
+                        prms.queue.blResp = blResp;
                         resBefore = await fnBefore(prms);
                     } catch (e) {
                         throw new ServerError(SERR_APP_SERVER_BEFORE, e.message);
@@ -142,10 +145,17 @@ class InQueue extends EventEmitter {
                             });
                             //Фиксируем успех исполнения
                             if (resBefore.blMsg) {
-                                q = await this.dbConn.setQueueAppSrvResult({
+                                blMsg = resBefore.blMsg;
+                                q = await this.dbConn.setQueueMsg({
                                     nQueueId: q.nId,
-                                    blMsg: resBefore.blMsg,
-                                    blResp: null
+                                    blMsg
+                                });
+                            }
+                            if (resBefore.blResp) {
+                                blResp = resBefore.blResp;
+                                q = await this.dbConn.setQueueResp({
+                                    nQueueId: q.nId,
+                                    blResp
                                 });
                             }
                         } else {
@@ -168,6 +178,9 @@ class InQueue extends EventEmitter {
                         nQueueId: q.nId,
                         nExecState: objQueueSchema.NQUEUE_EXEC_STATE_DB_OK
                     });
+                    //Считаем ответ полученный от системы
+                    let qData = await this.dbConn.getQueueResp({ nQueueId: prms.queue.nId });
+                    blResp = qData.blResp;
                 }
                 //Выполняем обработчик "После" (если он есть)
                 if (prms.function.sAppSrvAfter) {
@@ -181,6 +194,8 @@ class InQueue extends EventEmitter {
                     let resAfter = null;
                     try {
                         prms.queue = q;
+                        prms.queue.blMsg = blMsg;
+                        prms.queue.blResp = blResp;
                         resAfter = await fnAfter(prms);
                     } catch (e) {
                         throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
@@ -200,11 +215,13 @@ class InQueue extends EventEmitter {
                                 nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
                             });
                             //Фиксируем успех исполнения
-                            q = await this.dbConn.setQueueAppSrvResult({
-                                nQueueId: q.nId,
-                                blMsg: q.blMsg,
-                                blResp: resAfter.blResp
-                            });
+                            if (resAfter.blResp) {
+                                blResp = resAfter.blResp;
+                                q = await this.dbConn.setQueueResp({
+                                    nQueueId: q.nId,
+                                    blResp
+                                });
+                            }
                         } else {
                             //Или расскажем об ошибке
                             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
@@ -212,7 +229,7 @@ class InQueue extends EventEmitter {
                     }
                 }
                 //Всё успешно - отдаём результат клиенту
-                prms.res.status(200).send(q.blResp);
+                prms.res.status(200).send(blResp);
                 //Фиксируем успех обработки - в статусе сообщения
                 q = await this.dbConn.setQueueState({
                     nQueueId: q.nId,
