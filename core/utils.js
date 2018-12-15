@@ -230,7 +230,7 @@ const buildURL = prms => {
     //Если структура объекта в норме
     if (!sCheckResult) {
         //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! КОНТРОЛЬ КОРРЕКТНОСТИ
-        return `${prms.sSrvRoot}/${prms.sFnURL}`;
+        return `${prms.sSrvRoot}/${prms.sFnURL}${prms.sQuery ? "?" + prms.sQuery : ""}`;
     } else {
         throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
     }
