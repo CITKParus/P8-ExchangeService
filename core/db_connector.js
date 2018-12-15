@@ -426,14 +426,14 @@ class DBConnector extends EventEmitter {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
         }
     }
-    //Установить результат обработки записи сервером приложений
-    async setQueueAppSrvResult(prms) {
+    //Запись данных сообщения в позицию очереди
+    async setQueueMsg(prms) {
         if (this.bConnected) {
             //Проверяем структуру переданных параметров
             let sCheckResult = validateObject(
                 prms,
-                prmsDBConnectorSchema.setQueueAppSrvResult,
-                "Параметры функции установки результата обработки позиции очереди"
+                prmsDBConnectorSchema.setQueueMsg,
+                "Параметры функции сохранения данных сообщения позиции очереди"
             );
             //Если структура объекта в норме
             if (!sCheckResult) {
@@ -444,7 +444,36 @@ class DBConnector extends EventEmitter {
                         blMsg: prms.blMsg ? prms.blMsg : new Buffer(""),
                         connection: this.connection
                     });
-                    res = await this.connector.setQueueResp({
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(res, objQueueSchema.Queue, "Изменённое сообщение очереди обмена");
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Вернём измененную запись
+                    return res;
+                } catch (e) {
+                    if (e instanceof ServerError) throw e;
+                    else throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Запись ответа на сообщение в позицию очереди
+    async setQueueResp(prms) {
+        if (this.bConnected) {
+            //Проверяем структуру переданных параметров
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.setQueueResp,
+                "Параметры функции сохранения данных ответа на сообщение позиции очереди"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                //Исполняем действие в БД
+                try {
+                    let res = await this.connector.setQueueResp({
                         nQueueId: prms.nQueueId,
                         blResp: prms.blResp ? prms.blResp : new Buffer(""),
                         connection: this.connection
@@ -458,6 +487,29 @@ class DBConnector extends EventEmitter {
                     if (e instanceof ServerError) throw e;
                     else throw new ServerError(SERR_DB_EXECUTE, e.message);
                 }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Установить результат обработки записи сервером приложений
+    async setQueueAppSrvResult(prms) {
+        if (this.bConnected) {
+            //Проверяем структуру переданных параметров
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.setQueueAppSrvResult,
+                "Параметры функции установки результата обработки позиции очереди"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                //Исполняем действие в БД
+                let res = await this.setQueueMsg({ prms });
+                res = await this.setQueueResp({ prms });
+                //Вернём измененную запись
+                return res;
             } else {
                 throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
             }

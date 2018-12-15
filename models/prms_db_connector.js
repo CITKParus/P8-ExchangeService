@@ -250,6 +250,52 @@ exports.setQueueState = new Schema({
     }
 });
 
+//Схема валидации параметров функции записи данных сообщения в позицию очереди
+exports.setQueueMsg = new Schema({
+    //Идентификатор позиции очереди
+    nQueueId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор позиции очереди ((${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди ((${path})`
+        }
+    },
+    //Данные сообщения очереди обмена
+    blMsg: {
+        use: { validateBuffer },
+        required: true,
+        message: {
+            validateBuffer: path =>
+                `Данные сообщения очереди обмена (${path}) имеют некорректный тип данных (ожидалось - null или Buffer)`,
+            required: path => `Не указаны данные сообщения очереди обмена (${path})`
+        }
+    }
+}).validator({ required: val => val === null || val });
+
+//Схема валидации параметров функции записи ответа на сообщение в позицию очереди
+exports.setQueueResp = new Schema({
+    //Идентификатор позиции очереди
+    nQueueId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор позиции очереди ((${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди ((${path})`
+        }
+    },
+    //Данные ответа сообщения очереди обмена
+    blResp: {
+        use: { validateBuffer },
+        required: true,
+        message: {
+            validateBuffer: path =>
+                `Данные ответа сообщения очереди обмена (${path}) имеют некорректный тип данных (ожидалось - null или Buffer)`,
+            required: path => `Не указаны данные ответа сообщения очереди обмена (${path})`
+        }
+    }
+}).validator({ required: val => val === null || val });
+
 //Схема валидации параметров функции установки результата обработки позиции очереди
 exports.setQueueAppSrvResult = new Schema({
     //Идентификатор позиции очереди
