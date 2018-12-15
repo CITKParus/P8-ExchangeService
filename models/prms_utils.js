@@ -86,5 +86,14 @@ exports.buildURL = new Schema({
             type: path => `Адрес функции сервиса (${path}) имеет некорректный тип данных (ожидалось - String)`,
             required: path => `Не указан адрес функции сервиса (${path})`
         }
+    },
+    //Параметры запроса
+    sQuery: {
+        type: String,
+        required: false,
+        message: {
+            type: path => `Параметры запроса (${path}) имеют некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указаны параметры запроса (${path})`
+        }
     }
 });
