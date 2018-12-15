@@ -8,22 +8,22 @@
 //------------
 
 //ДО функции "Алиса/Начало сеанса"
-const beforeLogin = async prms => {
-    const d = `${prms.queue.blMsg.toString()} BEFORE LOGIN`;
-    return {
-        blMsg: new Buffer(d)
-    };
-};
+const beforeLogin = async prms => {};
 
 //ПОСЛЕ функции "Алиса/Начало сеанса"
-const afterLogin = async prms => {
-    let d = "";
-    if (prms.queue.blResp) d = `${prms.queue.blResp.toString()} AFTER LOGIN`;
-    else d = `${prms.queue.blMsg.toString()} AFTER LOGIN`;
-    return {
-        blResp: new Buffer(d)
-    };
-};
+const afterLogin = async prms => {};
+
+//ДО функции "Алиса/Поиск контрагента"
+const beforeFindAgent = async prms => {};
+
+//ПОСЛЕ функции "Алиса/Поиск контрагента"
+const afterFindAgent = async prms => {};
+
+//ДО функции "Алиса/Поиск договора"
+const beforeFindContract = async prms => {};
+
+//ПОСЛЕ функции "Алиса/Поиск договора"
+const afterFindContract = async prms => {};
 
 //-----------------
 // Интерфейс модуля
@@ -31,3 +31,7 @@ const afterLogin = async prms => {
 
 exports.beforeLogin = beforeLogin;
 exports.afterLogin = afterLogin;
+exports.beforeFindAgent = beforeFindAgent;
+exports.afterFindAgent = afterFindAgent;
+exports.beforeFindContract = beforeFindContract;
+exports.afterFindContract = afterFindContract;
