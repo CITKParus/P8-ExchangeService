@@ -3,18 +3,18 @@
   Дополнительный модуль: тестовый модуль для ПМИ - получение сведений о контрагентах на тестовом стенде
 */
 
+//------------------------------
+// Подключение внешних библиотек
+//------------------------------
+
+const js2xmlparser = require("js2xmlparser"); //Конвертация JSON в XML
+
 //------------
 // Тело модуля
 //------------
 
 //Формирование запроса к тестовому стенду на получение сведений о контрагенте
-const buildAgentQuery = async prms => {
-    let sURL = `${prms.service.sSrvRoot}/${prms.function.sFnURL}`;
-    let sPayLoad = prms.queue.blMsg.toString();
-    return {
-        options: { url: sURL.replace("<NRN>", sPayLoad), method: prms.function.sFnPrmsType }
-    };
-};
+const buildAgentQuery = async prms => {};
 
 //Обработка ответа тестового стенда на запрос сведений о контрагенте
 const parseAgentInfo = async prms => {
@@ -23,7 +23,7 @@ const parseAgentInfo = async prms => {
         throw Error(r.MSG);
     } else {
         return {
-            blResp: new Buffer(r.SAGNABBR + "$#$" + r.SAGNNAME)
+            blResp: new Buffer(js2xmlparser.parse("AGENT", r))
         };
     }
 };
