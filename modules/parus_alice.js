@@ -7,12 +7,6 @@
 // Тело модуля
 //------------
 
-//ДО функции "Алиса/Начало сеанса"
-const beforeLogin = async prms => {};
-
-//ПОСЛЕ функции "Алиса/Начало сеанса"
-const afterLogin = async prms => {};
-
 //ДО функции "Алиса/Поиск контрагента"
 const beforeFindAgent = async prms => {};
 
@@ -25,13 +19,19 @@ const beforeFindContract = async prms => {};
 //ПОСЛЕ функции "Алиса/Поиск договора"
 const afterFindContract = async prms => {};
 
+//ДО функции "Алиса/Поиск заказа потребителя"
+const beforeFindConsumerOrd = async prms => {};
+
+//ПОСЛЕ функции "Алиса/Поиск заказа потребителя"
+const afterFindConsumerOrd = async prms => {};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
 
-exports.beforeLogin = beforeLogin;
-exports.afterLogin = afterLogin;
 exports.beforeFindAgent = beforeFindAgent;
 exports.afterFindAgent = afterFindAgent;
 exports.beforeFindContract = beforeFindContract;
 exports.afterFindContract = afterFindContract;
+exports.beforeFindConsumerOrd = beforeFindConsumerOrd;
+exports.afterFindConsumerOrd = afterFindConsumerOrd;
