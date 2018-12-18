@@ -25,6 +25,12 @@ const beforeFindConsumerOrd = async prms => {};
 //ПОСЛЕ функции "Алиса/Поиск заказа потребителя"
 const afterFindConsumerOrd = async prms => {};
 
+//ДО функции "Алиса/Поиск контактной информации"
+const beforeFindContact = async prms => {};
+
+//ПОСЛЕ функции "Алиса/Поиск контактной информации"
+const afterFindContact = async prms => {};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -35,3 +41,5 @@ exports.beforeFindContract = beforeFindContract;
 exports.afterFindContract = afterFindContract;
 exports.beforeFindConsumerOrd = beforeFindConsumerOrd;
 exports.afterFindConsumerOrd = afterFindConsumerOrd;
+exports.beforeFindContact = beforeFindContact;
+exports.afterFindContact = afterFindContact;

@@ -24,6 +24,14 @@ create or replace package UDO_PKG_EXS_ALICE as
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );  
 
+  /* Обработка запроса на поиск контактной информации */
+  procedure FIND_CONTACT
+  (
+    NIDENT                  in number,        -- Идентификатор процесса
+    NSRV_TYPE               in number,        -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
+    NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
+  );
+
 end;
 /
 create or replace package body UDO_PKG_EXS_ALICE as
@@ -76,6 +84,10 @@ create or replace package body UDO_PKG_EXS_ALICE as
     end if;
     /* Наполним её общими поисковыми вспомогательными фразами */
     HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'скажи';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'подскажи';
+    HELPER_PATTERNS.EXTEND();
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'расскажи';
     HELPER_PATTERNS.EXTEND();
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'про';
@@ -97,6 +109,8 @@ create or replace package body UDO_PKG_EXS_ALICE as
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'инфы';
     HELPER_PATTERNS.EXTEND();
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'инфу';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'инфа';
     HELPER_PATTERNS.EXTEND();
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'дай';
     HELPER_PATTERNS.EXTEND();
@@ -125,6 +139,12 @@ create or replace package body UDO_PKG_EXS_ALICE as
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'номер%';
     HELPER_PATTERNS.EXTEND();
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'за';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'как';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'я';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'с';
   end UTL_HELPER_INIT_COMMON;
   
   /* Подготовка поисковой фразы к участию в выборке */
@@ -140,7 +160,24 @@ create or replace package body UDO_PKG_EXS_ALICE as
   begin
     /* Обходим слова поисковой фразы */
     for W in (select REGEXP_SUBSTR(T.STR, '[^' || SDELIM || ']+', 1, level) SWRD
-                from (select replace(replace(SSEARCH_STR, ',', ''), '.', '') STR from DUAL) T
+                from (select replace(replace(replace(replace(replace(replace(replace(replace(replace(SSEARCH_STR, ',', ''),
+                                                                                             '.',
+                                                                                             ''),
+                                                                                     '/',
+                                                                                     ''),
+                                                                             '\',
+                                                                             ''),
+                                                                     '''',
+                                                                     ''),
+                                                             '"',
+                                                             ''),
+                                                     ':',
+                                                     ''),
+                                             '?',
+                                             ''),
+                                     '!',
+                                     '') STR
+                        from DUAL) T
               connect by INSTR(T.STR, SDELIM, 1, level - 1) > 0)
     loop
       /* Если слово не в списке вспомогательных */
@@ -194,23 +231,18 @@ create or replace package body UDO_PKG_EXS_ALICE as
                        (select sum(CN.DOC_SUM) from CONTRACTS CN where CN.AGENT = T.RN) NSUM_CONTRACTS,
                        T.PHONE SPHONE,
                        T.MAIL SMAIL,
-                       T.AGN_COMMENT SCONTACT_PERSON,
-                       NVL((select 1 from DUAL where LOWER(T.AGN_COMMENT) like LOWER(CTMP)), 0) NLINKED_SIGN
+                       T.AGN_COMMENT SCONTACT_PERSON
                   from AGNLIST  T,
                        ACATALOG CAT
                  where ((LOWER(T.AGNABBR) like LOWER(CTMP)) or (LOWER(T.AGNNAME) like LOWER(CTMP)) or
-                       (LOWER(T.AGN_COMMENT) like LOWER(CTMP)))
+                       (LOWER(T.AGNFAMILYNAME_AC) like LOWER(CTMP)) or (LOWER(T.AGNFAMILYNAME_ABL) like LOWER(CTMP)) or
+                       (LOWER(T.AGNFAMILYNAME_TO) like LOWER(CTMP)) or (LOWER(T.AGNFAMILYNAME_FR) like LOWER(CTMP)))
                    and T.CRN = CAT.RN
                    and CAT.NAME = SSEARCH_CATALOG_NAME
                    and ROWNUM <= 1)
       loop
         /* Основная информация */
-        if (C.NLINKED_SIGN = 1) then
-          CRESP := 'Не является самостоятельным, найден по совпадению в дополнительной информации к контрагенту:' ||
-                   CHR(10) || CHR(10) || C.SAGENT;
-        else
-          CRESP := C.SAGENT;
-        end if;
+        CRESP := C.SAGENT;
         /* Далее - в зависимости от типа, для ЮЛ - сведения о договорах и контактном лице */
         if (C.NAGNTYPE = 0) then
           if (C.NCNT_CONTRACTS = 0) then
@@ -386,13 +418,14 @@ create or replace package body UDO_PKG_EXS_ALICE as
                          where V.UNIT_RN = T.RN
                            and V.DOCS_PROP_RN = DP.RN
                            and DP.CODE = 'СостояниеЗаказаПотр') SSTATE,
-                       CN.ALTNAME10 SCUR
+                       CN.ALTNAME10 SCUR,
+                       AG.AGNNAME SMANAGER
                   from CONSUMERORD T,
                        AGNLIST     AG,
                        CURNAMES    CN,
                        ACATALOG    CAT
                  where (LOWER(trim(T.ORD_NUMB)) like LOWER(CTMP))
-                   and T.AGENT = AG.RN
+                   and T.ACC_AGENT = AG.RN
                    and T.CURRENCY = CN.RN
                    and T.CRN = CAT.RN
                    and CAT.NAME = SSEARCH_CATALOG_NAME
@@ -404,7 +437,7 @@ create or replace package body UDO_PKG_EXS_ALICE as
         if (C.SSTATE is not null) then
           CRESP := CRESP || ', находится в состоянии "' || C.SSTATE || '"';
         else
-          CRESP := CRESP || ', к сожалению не удалось определить состояние заказа, но мы можно сказать что';
+          CRESP := CRESP || ', к сожалению не удалось определить состояние заказа, но можно сказать что';
         end if;
         /* Сумма зазаза */
         if (C.NSUM <> 0) then
@@ -412,6 +445,10 @@ create or replace package body UDO_PKG_EXS_ALICE as
         end if;
         /* Плановый срок исполнения */
         CRESP := CRESP || ', плановая дата исполнения заказа ' || TO_CHAR(C.DRELEASE_DATE, 'dd.mm.yyyy');
+        /* Менеджер */
+        if (C.SMANAGER is not null) then
+          CRESP := CRESP || ', менеджер: ' || C.SMANAGER;
+        end if;
       end loop;
     else
       CRESP := 'Не указан поисковый запрос';
@@ -421,6 +458,86 @@ create or replace package body UDO_PKG_EXS_ALICE as
                                   SARG   => PKG_EXS.SCONT_FLD_BRESP,
                                   BVALUE => CLOB2BLOB(LCDATA => CRESP, SCHARSET => 'UTF8'));
   end FIND_CONSUMERORD;
-
+  
+  /* Обработка запроса на поиск контактной информации */
+  procedure FIND_CONTACT
+  (
+    NIDENT                  in number,        -- Идентификатор процесса
+    NSRV_TYPE               in number,        -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
+    NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
+  )
+  is
+    HELPER_PATTERNS         THELPER_PATTERNS; -- Коллекция шаблонов вспомогательных слов поиска
+    REXSQUEUE               EXSQUEUE%rowtype; -- Запись позиции очереди
+    CTMP                    clob;             -- Буфер для конвертации
+    CRESP                   clob;             -- Данные для ответа
+    RCTMP                   sys_refcursor;    -- Буфер для измененной позиции очереди
+  begin
+    /* Считаем запись очереди */
+    REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
+    /* Инициализируем коллекцию слов-помошников */
+    UTL_HELPER_INIT_COMMON(HELPER_PATTERNS => HELPER_PATTERNS);
+    /* Наполняем её значениями индивидуальными для данного запроса */
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := '%звонить';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'контакт%';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'связ%';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'найти';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'менеджер%';
+    /* Забираем данные сообщения и конвертируем в кодировку БД */
+    CTMP := BLOB2CLOB(LBDATA => REXSQUEUE.MSG, SCHARSET => 'UTF8');
+    /* Кладём конвертированное обратно (просто для удобства мониторинга) */
+    PKG_EXS.QUEUE_MSG_SET(NEXSQUEUE => REXSQUEUE.RN, BMSG => CLOB2BLOB(LCDATA => CTMP), RCQUEUE => RCTMP);
+    /* Если есть что искать */
+    if (CTMP is not null) then
+      /* Подготовим поисковую фразу */
+      CTMP := UTL_SEARCH_STR_PREPARE(SSEARCH_STR => CTMP, SDELIM => ' ', HELPER_PATTERNS => HELPER_PATTERNS);
+      /* Инициализируем ответ */
+      CRESP := 'Контакт не найден';
+      /* Ищем запрошенного контрагента */
+      for C in (select T.AGNNAME     SAGENT,
+                       T.AGNTYPE     NAGNTYPE,
+                       T.PHONE       SPHONE,
+                       T.MAIL        SMAIL,
+                       T.AGN_COMMENT SCONTACT_PERSON
+                  from AGNLIST  T,
+                       ACATALOG CAT
+                 where ((LOWER(T.AGNABBR) like LOWER(CTMP)) or (LOWER(T.AGNNAME) like LOWER(CTMP)) or
+                       (LOWER(T.AGNFAMILYNAME_AC) like LOWER(CTMP)) or (LOWER(T.AGNFAMILYNAME_ABL) like LOWER(CTMP)) or
+                       (LOWER(T.AGNFAMILYNAME_TO) like LOWER(CTMP)) or (LOWER(T.AGNFAMILYNAME_FR) like LOWER(CTMP)))
+                   and T.CRN = CAT.RN
+                   and CAT.NAME = SSEARCH_CATALOG_NAME
+                   and ROWNUM <= 1)
+      loop
+        /* Основная информация */
+        CRESP := C.SAGENT;
+        /* Далее - в зависимости от типа, для ЮЛ - сведения о договорах и контактном лице */
+        if (C.NAGNTYPE = 0) then
+          if (C.SCONTACT_PERSON is not null) then
+            CRESP := CRESP || ', контактное лицо: ' || C.SCONTACT_PERSON;
+          end if;
+        end if;
+        /* Контакты контрагента - телефон */
+        if (C.SPHONE is not null) then
+          CRESP := CRESP || ', телефон: ' || C.SPHONE;
+        end if;
+        /* Контакты контрагента - e-mail */
+        if (C.SMAIL is not null) then
+          CRESP := CRESP || ',а можно не звонить, а написать e-mail: ' || C.SMAIL;
+        end if;
+      end loop;
+    else
+      CRESP := 'Не указан поисковый запрос';
+    end if;
+    /* Возвращаем ответ */
+    PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
+                                  SARG   => PKG_EXS.SCONT_FLD_BRESP,
+                                  BVALUE => CLOB2BLOB(LCDATA => CRESP, SCHARSET => 'UTF8'));
+  end FIND_CONTACT;
+  
 end;
 /
