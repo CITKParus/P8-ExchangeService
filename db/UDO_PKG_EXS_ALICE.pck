@@ -342,8 +342,8 @@ create or replace package body UDO_PKG_EXS_ALICE as
                        AGNLIST   AG,
                        CURNAMES  CN,
                        ACATALOG  CAT
-                 where ((LOWER(CTMP) like LOWER('%' || T.EXT_NUMBER || '%')) or
-                       (LOWER(CTMP) like LOWER('%' || trim(T.DOC_NUMB) || '%')))
+                 where (((T.EXT_NUMBER is not null) and (LOWER(CTMP) like LOWER('%' || T.EXT_NUMBER || '%'))) or
+                       ((T.EXT_NUMBER is null) and (LOWER(CTMP) like LOWER('%' || trim(T.DOC_NUMB) || '%'))))
                    and T.AGENT = AG.RN
                    and T.CURRENCY = CN.RN
                    and T.CRN = CAT.RN
