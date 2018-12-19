@@ -145,6 +145,10 @@ create or replace package body UDO_PKG_EXS_ALICE as
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'я';
     HELPER_PATTERNS.EXTEND();
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'с';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'найти';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'можно';    
   end UTL_HELPER_INIT_COMMON;
   
   /* Подготовка поисковой фразы к участию в выборке */
@@ -158,36 +162,49 @@ create or replace package body UDO_PKG_EXS_ALICE as
   is
     SRES                    varchar2(32000);    -- Результат работы
   begin
-    /* Обходим слова поисковой фразы */
-    for W in (select REGEXP_SUBSTR(T.STR, '[^' || SDELIM || ']+', 1, level) SWRD
-                from (select replace(replace(replace(replace(replace(replace(replace(replace(replace(SSEARCH_STR, ',', ''),
-                                                                                             '.',
-                                                                                             ''),
-                                                                                     '/',
-                                                                                     ''),
-                                                                             '\',
-                                                                             ''),
-                                                                     '''',
-                                                                     ''),
-                                                             '"',
-                                                             ''),
-                                                     ':',
-                                                     ''),
-                                             '?',
-                                             ''),
-                                     '!',
-                                     '') STR
-                        from DUAL) T
-              connect by INSTR(T.STR, SDELIM, 1, level - 1) > 0)
-    loop
-      /* Если слово не в списке вспомогательных */
-      if (not UTL_HELPER_CHECK(SWORD => W.SWRD, HELPER_PATTERNS => HELPER_PATTERNS)) then
-        /* Оставляем его в итоговой выборке */
-        SRES := SRES || '%' || W.SWRD;
+    /* Если поисковая фраза задана */
+    if (SSEARCH_STR is not null) then
+      /* Обходим слова поисковой фразы */
+      for W in (select REGEXP_SUBSTR(T.STR, '[^' || SDELIM || ']+', 1, level) SWRD
+                  from (select replace(replace(replace(replace(replace(replace(replace(replace(replace(SSEARCH_STR,
+                                                                                                       ',',
+                                                                                                       ''),
+                                                                                               '.',
+                                                                                               ''),
+                                                                                       '/',
+                                                                                       ''),
+                                                                               '\',
+                                                                               ''),
+                                                                       '''',
+                                                                       ''),
+                                                               '"',
+                                                               ''),
+                                                       ':',
+                                                       ''),
+                                               '?',
+                                               ''),
+                                       '!',
+                                       '') STR
+                          from DUAL) T
+                connect by INSTR(T.STR, SDELIM, 1, level - 1) > 0)
+      loop
+        /* Если слово не в списке вспомогательных */
+        if (not UTL_HELPER_CHECK(SWORD => W.SWRD, HELPER_PATTERNS => HELPER_PATTERNS)) then
+          /* Оставляем его в итоговой выборке */
+          SRES := SRES || '%' || W.SWRD;
+        end if;
+      end loop;
+      /* Уберем лишние пробелы и готовим для поиска */
+      SRES := '%' || trim(SRES) || '%';
+      /* Проверим, что хоть какая-то зацепка осталось для поиска */
+      if (replace(SRES, '%', '') is null) then
+        /* Искать всё продряд - не верно, считаем что поисковой фразы нет */
+        SRES := null;
       end if;
-    end loop;
-    /* Уберем лишние пробелы и готовим для поиска */
-    SRES := '%' || trim(SRES) || '%';
+    else
+      /* Нет поисковой фразы - нет результата */
+      SRES := null;
+    end if;
     /* Вернем ответ */
     return SRES;
   end UTL_SEARCH_STR_PREPARE;
@@ -215,12 +232,12 @@ create or replace package body UDO_PKG_EXS_ALICE as
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'контрагент%';
     /* Забираем данные сообщения и конвертируем в кодировку БД */
     CTMP := BLOB2CLOB(LBDATA => REXSQUEUE.MSG, SCHARSET => 'UTF8');
-    /* Кладём конвертированное обратно (просто для удобства мониторинга) */
-    PKG_EXS.QUEUE_MSG_SET(NEXSQUEUE => REXSQUEUE.RN, BMSG => CLOB2BLOB(LCDATA => CTMP), RCQUEUE => RCTMP);
+    /* Подготовим поисковую фразу */
+    CTMP := UTL_SEARCH_STR_PREPARE(SSEARCH_STR => CTMP, SDELIM => ' ', HELPER_PATTERNS => HELPER_PATTERNS);
     /* Если есть что искать */
     if (CTMP is not null) then
-      /* Подготовим поисковую фразу */
-      CTMP := UTL_SEARCH_STR_PREPARE(SSEARCH_STR => CTMP, SDELIM => ' ', HELPER_PATTERNS => HELPER_PATTERNS);
+      /* Кладём конвертированное обратно (просто для удобства мониторинга) */
+      PKG_EXS.QUEUE_MSG_SET(NEXSQUEUE => REXSQUEUE.RN, BMSG => CLOB2BLOB(LCDATA => CTMP), RCQUEUE => RCTMP);
       /* Инициализируем ответ */
       CRESP := 'Контрагент не найден';
       /* Ищем запрошенного контрагента */
@@ -234,9 +251,14 @@ create or replace package body UDO_PKG_EXS_ALICE as
                        T.AGN_COMMENT SCONTACT_PERSON
                   from AGNLIST  T,
                        ACATALOG CAT
-                 where ((LOWER(T.AGNABBR) like LOWER(CTMP)) or (LOWER(T.AGNNAME) like LOWER(CTMP)) or
-                       (LOWER(T.AGNFAMILYNAME_AC) like LOWER(CTMP)) or (LOWER(T.AGNFAMILYNAME_ABL) like LOWER(CTMP)) or
-                       (LOWER(T.AGNFAMILYNAME_TO) like LOWER(CTMP)) or (LOWER(T.AGNFAMILYNAME_FR) like LOWER(CTMP)))
+                 where ((LOWER(CTMP) like LOWER('%' || replace(T.AGNABBR, ' ', '%') || '%')) or
+                       (LOWER(CTMP) like LOWER('%' || replace(T.AGNNAME, ' ', '%') || '%')) or
+                       ((T.AGNFAMILYNAME is not null) and (LOWER(CTMP) like LOWER('%' || T.AGNFAMILYNAME || '%'))) or
+                       ((T.AGNFAMILYNAME_AC is not null) and (LOWER(CTMP) like LOWER('%' || T.AGNFAMILYNAME_AC || '%'))) or
+                       ((T.AGNFAMILYNAME_ABL is not null) and
+                       (LOWER(CTMP) like LOWER('%' || T.AGNFAMILYNAME_ABL || '%'))) or
+                       ((T.AGNFAMILYNAME_TO is not null) and (LOWER(CTMP) like LOWER('%' || T.AGNFAMILYNAME_TO || '%'))) or
+                       ((T.AGNFAMILYNAME_FR is not null) and (LOWER(CTMP) like LOWER('%' || T.AGNFAMILYNAME_FR || '%'))))
                    and T.CRN = CAT.RN
                    and CAT.NAME = SSEARCH_CATALOG_NAME
                    and ROWNUM <= 1)
@@ -267,7 +289,7 @@ create or replace package body UDO_PKG_EXS_ALICE as
         end if;
       end loop;
     else
-      CRESP := 'Не указан поисковый запрос';
+      CRESP := 'Не понятно какого контрагента Вы хотите найти, извините...';
     end if;
     /* Возвращаем ответ */
     PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
@@ -298,12 +320,12 @@ create or replace package body UDO_PKG_EXS_ALICE as
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'договор%';
     /* Забираем данные сообщения и конвертируем в кодировку БД */
     CTMP := BLOB2CLOB(LBDATA => REXSQUEUE.MSG, SCHARSET => 'UTF8');
-    /* Кладём конвертированное обратно (просто для удобства мониторинга) */
-    PKG_EXS.QUEUE_MSG_SET(NEXSQUEUE => REXSQUEUE.RN, BMSG => CLOB2BLOB(LCDATA => CTMP), RCQUEUE => RCTMP);
+    /* Подготовим поисковую фразу */
+    CTMP := UTL_SEARCH_STR_PREPARE(SSEARCH_STR => CTMP, SDELIM => ' ', HELPER_PATTERNS => HELPER_PATTERNS);
     /* Если есть что искать */
     if (CTMP is not null) then
-      /* Подготовим поисковую фразу */
-      CTMP := UTL_SEARCH_STR_PREPARE(SSEARCH_STR => CTMP, SDELIM => ' ', HELPER_PATTERNS => HELPER_PATTERNS);
+      /* Кладём конвертированное обратно (просто для удобства мониторинга) */
+      PKG_EXS.QUEUE_MSG_SET(NEXSQUEUE => REXSQUEUE.RN, BMSG => CLOB2BLOB(LCDATA => CTMP), RCQUEUE => RCTMP);
       /* Инициализируем ответ */
       CRESP := 'Договор не найден';
       /* Ищем запрошенный договор */
@@ -320,8 +342,8 @@ create or replace package body UDO_PKG_EXS_ALICE as
                        AGNLIST   AG,
                        CURNAMES  CN,
                        ACATALOG  CAT
-                 where ((LOWER(T.EXT_NUMBER) like LOWER(CTMP)) or
-                       (LOWER(trim(T.DOC_NUMB)) like LOWER(CTMP)))
+                 where ((LOWER(CTMP) like LOWER('%' || T.EXT_NUMBER || '%')) or
+                       (LOWER(CTMP) like LOWER('%' || trim(T.DOC_NUMB) || '%')))
                    and T.AGENT = AG.RN
                    and T.CURRENCY = CN.RN
                    and T.CRN = CAT.RN
@@ -368,7 +390,7 @@ create or replace package body UDO_PKG_EXS_ALICE as
         end if;
       end loop;
     else
-      CRESP := 'Не указан поисковый запрос';
+      CRESP := 'Не понятно какой договор Вы хотите найти, извините...';
     end if;
     /* Возвращаем ответ */
     PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
@@ -400,16 +422,16 @@ create or replace package body UDO_PKG_EXS_ALICE as
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'заказ%';
     /* Забираем данные сообщения и конвертируем в кодировку БД */
     CTMP := BLOB2CLOB(LBDATA => REXSQUEUE.MSG, SCHARSET => 'UTF8');
-    /* Кладём конвертированное обратно (просто для удобства мониторинга) */
-    PKG_EXS.QUEUE_MSG_SET(NEXSQUEUE => REXSQUEUE.RN, BMSG => CLOB2BLOB(LCDATA => CTMP), RCQUEUE => RCTMP);
+    /* Подготовим поисковую фразу */
+    CTMP := UTL_SEARCH_STR_PREPARE(SSEARCH_STR => CTMP, SDELIM => ' ', HELPER_PATTERNS => HELPER_PATTERNS);
     /* Если есть что искать */
     if (CTMP is not null) then
-      /* Подготовим поисковую фразу */
-      CTMP := UTL_SEARCH_STR_PREPARE(SSEARCH_STR => CTMP, SDELIM => ' ', HELPER_PATTERNS => HELPER_PATTERNS);
+      /* Кладём конвертированное обратно (просто для удобства мониторинга) */
+      PKG_EXS.QUEUE_MSG_SET(NEXSQUEUE => REXSQUEUE.RN, BMSG => CLOB2BLOB(LCDATA => CTMP), RCQUEUE => RCTMP);
       /* Инициализируем ответ */
       CRESP := 'Заказ не найден';
       /* Ищем запрошенный заказ */
-      for C in (select 'Заказ №' || trim(T.ORD_NUMB) || ' от ' || TO_CHAR(T.ORD_DATE, 'dd.mm.yyyy') SDOC,
+      for C in (select 'Ваш заказ №' || trim(T.ORD_NUMB) || ' от ' || TO_CHAR(T.ORD_DATE, 'dd.mm.yyyy') SDOC,
                        T.PSUMWTAX NSUM,
                        T.RELEASE_DATE DRELEASE_DATE,
                        (select V.STR_VALUE
@@ -424,7 +446,7 @@ create or replace package body UDO_PKG_EXS_ALICE as
                        AGNLIST     AG,
                        CURNAMES    CN,
                        ACATALOG    CAT
-                 where (LOWER(trim(T.ORD_NUMB)) like LOWER(CTMP))
+                 where (LOWER(CTMP) like LOWER('%' || trim(T.ORD_NUMB) || '%'))
                    and T.ACC_AGENT = AG.RN
                    and T.CURRENCY = CN.RN
                    and T.CRN = CAT.RN
@@ -451,7 +473,7 @@ create or replace package body UDO_PKG_EXS_ALICE as
         end if;
       end loop;
     else
-      CRESP := 'Не указан поисковый запрос';
+      CRESP := 'Не понятно какой заказ Вы хотите найти, извините...';
     end if;
     /* Возвращаем ответ */
     PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
@@ -485,17 +507,17 @@ create or replace package body UDO_PKG_EXS_ALICE as
     HELPER_PATTERNS.EXTEND();
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'связ%';
     HELPER_PATTERNS.EXTEND();
-    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'найти';
-    HELPER_PATTERNS.EXTEND();
     HELPER_PATTERNS(HELPER_PATTERNS.LAST) := 'менеджер%';
+    HELPER_PATTERNS.EXTEND();
+    HELPER_PATTERNS(HELPER_PATTERNS.LAST) := '%говорит%';
     /* Забираем данные сообщения и конвертируем в кодировку БД */
     CTMP := BLOB2CLOB(LBDATA => REXSQUEUE.MSG, SCHARSET => 'UTF8');
-    /* Кладём конвертированное обратно (просто для удобства мониторинга) */
-    PKG_EXS.QUEUE_MSG_SET(NEXSQUEUE => REXSQUEUE.RN, BMSG => CLOB2BLOB(LCDATA => CTMP), RCQUEUE => RCTMP);
+    /* Подготовим поисковую фразу */
+    CTMP := UTL_SEARCH_STR_PREPARE(SSEARCH_STR => CTMP, SDELIM => ' ', HELPER_PATTERNS => HELPER_PATTERNS);
     /* Если есть что искать */
     if (CTMP is not null) then
-      /* Подготовим поисковую фразу */
-      CTMP := UTL_SEARCH_STR_PREPARE(SSEARCH_STR => CTMP, SDELIM => ' ', HELPER_PATTERNS => HELPER_PATTERNS);
+      /* Кладём конвертированное обратно (просто для удобства мониторинга) */
+      PKG_EXS.QUEUE_MSG_SET(NEXSQUEUE => REXSQUEUE.RN, BMSG => CLOB2BLOB(LCDATA => CTMP), RCQUEUE => RCTMP);
       /* Инициализируем ответ */
       CRESP := 'Контакт не найден';
       /* Ищем запрошенного контрагента */
@@ -506,9 +528,14 @@ create or replace package body UDO_PKG_EXS_ALICE as
                        T.AGN_COMMENT SCONTACT_PERSON
                   from AGNLIST  T,
                        ACATALOG CAT
-                 where ((LOWER(T.AGNABBR) like LOWER(CTMP)) or (LOWER(T.AGNNAME) like LOWER(CTMP)) or
-                       (LOWER(T.AGNFAMILYNAME_AC) like LOWER(CTMP)) or (LOWER(T.AGNFAMILYNAME_ABL) like LOWER(CTMP)) or
-                       (LOWER(T.AGNFAMILYNAME_TO) like LOWER(CTMP)) or (LOWER(T.AGNFAMILYNAME_FR) like LOWER(CTMP)))
+                 where ((LOWER(CTMP) like LOWER('%' || replace(T.AGNABBR, ' ', '%') || '%')) or
+                       (LOWER(CTMP) like LOWER('%' || replace(T.AGNNAME, ' ', '%') || '%')) or
+                       ((T.AGNFAMILYNAME is not null) and (LOWER(CTMP) like LOWER('%' || T.AGNFAMILYNAME || '%'))) or
+                       ((T.AGNFAMILYNAME_AC is not null) and (LOWER(CTMP) like LOWER('%' || T.AGNFAMILYNAME_AC || '%'))) or
+                       ((T.AGNFAMILYNAME_ABL is not null) and
+                       (LOWER(CTMP) like LOWER('%' || T.AGNFAMILYNAME_ABL || '%'))) or
+                       ((T.AGNFAMILYNAME_TO is not null) and (LOWER(CTMP) like LOWER('%' || T.AGNFAMILYNAME_TO || '%'))) or
+                       ((T.AGNFAMILYNAME_FR is not null) and (LOWER(CTMP) like LOWER('%' || T.AGNFAMILYNAME_FR || '%'))))
                    and T.CRN = CAT.RN
                    and CAT.NAME = SSEARCH_CATALOG_NAME
                    and ROWNUM <= 1)
@@ -527,11 +554,11 @@ create or replace package body UDO_PKG_EXS_ALICE as
         end if;
         /* Контакты контрагента - e-mail */
         if (C.SMAIL is not null) then
-          CRESP := CRESP || ',а можно не звонить, а написать e-mail: ' || C.SMAIL;
+          CRESP := CRESP || ', а можно не звонить, а написать e-mail: ' || C.SMAIL;
         end if;
       end loop;
     else
-      CRESP := 'Не указан поисковый запрос';
+      CRESP := 'Не понятно какую контактную информацию Вы хотите найти, извините...';
     end if;
     /* Возвращаем ответ */
     PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
