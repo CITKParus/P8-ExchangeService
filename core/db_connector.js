@@ -138,6 +138,7 @@ class DBConnector extends EventEmitter {
                 let srvs = await this.connector.getServices({ connection: this.connection });
                 srvs.forEach(s => {
                     s.functions = [];
+                    s.context = {};
                 });
                 //Валидируем его
                 let sCheckResult = validateObject({ services: srvs }, objServicesSchema.Services, "Список сервисов");

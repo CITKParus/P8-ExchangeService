@@ -180,5 +180,14 @@ exports.Service = new Schema({
         }
     },
     //Список функций сервиса
-    functions: defServiceFunctions(true, "functions")
+    functions: defServiceFunctions(true, "functions"),
+    //Контекст работы сервиса
+    context: {
+        type: Object,
+        required: true,
+        message: {
+            type: "Контекст работы сервиса (context) имеет некорректный тип данных (ожидалось - Object)",
+            required: "Не указан контекст работы сервиса (context)"
+        }
+    }
 });
