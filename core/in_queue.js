@@ -145,14 +145,14 @@ class InQueue extends EventEmitter {
                                 nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
                             });
                             //Фиксируем успех исполнения
-                            if (resBefore.blMsg) {
+                            if (!_.isUndefined(resBefore.blMsg)) {
                                 blMsg = resBefore.blMsg;
                                 q = await this.dbConn.setQueueMsg({
                                     nQueueId: q.nId,
                                     blMsg
                                 });
                             }
-                            if (resBefore.blResp) {
+                            if (!_.isUndefined(resBefore.blResp)) {
                                 blResp = resBefore.blResp;
                                 q = await this.dbConn.setQueueResp({
                                     nQueueId: q.nId,
@@ -217,7 +217,7 @@ class InQueue extends EventEmitter {
                                 nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
                             });
                             //Фиксируем успех исполнения
-                            if (resAfter.blResp) {
+                            if (!_.isUndefined(resAfter.blResp)) {
                                 blResp = resAfter.blResp;
                                 q = await this.dbConn.setQueueResp({
                                     nQueueId: q.nId,

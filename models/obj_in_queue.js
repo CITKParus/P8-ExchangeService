@@ -41,7 +41,7 @@ exports.InQueueProcessorFnAfter = new Schema({
     //Обработанный ответ системы
     blResp: {
         type: Buffer,
-        required: true,
+        required: false,
         message: {
             type: path => `Обработанный ответ системы (${path}) имеет некорректный тип данных (ожидалось - Buffer)`,
             required: path => `Не указан обработанный ответ системы (${path})`
