@@ -1152,24 +1152,17 @@ create or replace package body PKG_EXS as
   )
   return                    number        -- Рег. номер функции сервиса обмена
   is
+    NEXSSERVICE             PKG_STD.TREF; -- Рег. номер сервиса обработки
     NEXSSERVICEFN           PKG_STD.TREF; -- Рег. номер функции сервиса обработки
   begin
     /* Найдем функцию сервиса обработки */
-    begin
-      select T.RN
-        into NEXSSERVICEFN
-        from EXSSERVICEFN T,
-             EXSSERVICE   S
-       where S.CODE = SEXSSERVICE
-         and S.RN = T.PRN
-         and T.CODE = SEXSSERVICEFN;
-    exception
-      when NO_DATA_FOUND then
-        P_EXCEPTION(NFLAG_SMART,
-                    'Функция "%s" сервиса обмена "%s" не определена',
-                    SEXSSERVICEFN,
-                    SEXSSERVICE);
-    end;
+    FIND_EXSSERVICE_CODE(NFLAG_SMART => NFLAG_SMART, NFLAG_OPTION => 0, SCODE => SEXSSERVICE, NRN => NEXSSERVICE);
+    /* Найдем функцию сервиса обработки */
+    FIND_EXSSERVICEFN_CODE(NFLAG_SMART  => NFLAG_SMART,
+                           NFLAG_OPTION => 0,
+                           NEXSSERVICE  => NEXSSERVICE,
+                           SCODE        => SEXSSERVICEFN,
+                           NRN          => NEXSSERVICEFN);
     /* Вернем результат */
     return NEXSSERVICEFN;
   end SERVICEFN_FIND_BY_SRVCODE;
