@@ -27,7 +27,8 @@
         "oracledb": "^2.3.0",
         "request": "^2.88.0",
         "request-promise": "^4.2.2",
-        "validate": "^4.5.1"
+        "validate": "^4.5.1",
+        "xml2js": "^0.4.19"
     },
     "_moduleAliases": {
         "@core": "core",
