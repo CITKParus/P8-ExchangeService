@@ -44,22 +44,36 @@ const sendErrorResult = prms => {
     if (!sCheckResult) {
         process.send({
             sResult: objOutQueueProcessorSchema.STASK_RESULT_ERR,
-            sMsg: prms.sMessage
+            sMsg: prms.sMessage,
+            context: null
         });
     } else {
         process.send({
             sResult: objOutQueueProcessorSchema.STASK_RESULT_ERR,
-            sMsg: sCheckResult
+            sMsg: sCheckResult,
+            context: null
         });
     }
 };
 
 //Отправка родительскому процессу успеха обработки сообщения сервером приложений
-const sendOKResult = () => {
-    process.send({
-        sResult: objOutQueueProcessorSchema.STASK_RESULT_OK,
-        sMsg: null
-    });
+const sendOKResult = prms => {
+    //Проверяем структуру переданного сообщения
+    let sCheckResult = validateObject(
+        prms,
+        prmsOutQueueProcessorSchema.sendOKResult,
+        "Параметры функции отправки родительскому процессу успеха обработки сообщения"
+    );
+    //Если структура объекта в норме
+    if (!sCheckResult) {
+        process.send({
+            sResult: objOutQueueProcessorSchema.STASK_RESULT_OK,
+            sMsg: null,
+            context: prms.context
+        });
+    } else {
+        sendErrorResult({ sMessage: sCheckResult });
+    }
 };
 
 //Запуск обработки сообщения сервером приложений
@@ -125,8 +139,9 @@ const appProcess = async prms => {
                     //Если структура ответа в норме
                     if (!sCheckResult) {
                         //Применим её
-                        options = _.cloneDeep(resBefore.options);
-                        if (resBefore.blMsg) prms.queue.blMsg = resBefore.blMsg;
+                        if (!_.isUndefined(resBefore.options)) options = _.cloneDeep(resBefore.options);
+                        if (!_.isUndefined(resBefore.blMsg)) prms.queue.blMsg = resBefore.blMsg;
+                        if (!_.isUndefined(resBefore.context)) prms.service.context = _.cloneDeep(resBefore.context);
                     } else {
                         //Или расскажем об ошибке
                         throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
@@ -134,7 +149,8 @@ const appProcess = async prms => {
                 }
             }
             //Отправляем сообщение удалённому серверу
-            let serverResp = await rqp(options);
+            //let serverResp = await rqp(options);
+            serverResp = { state: "OK" };
             _.extend(prms, { serverResp });
             //Выполняем обработчик "После" (если он есть)
             if (prms.function.sAppSrvAfter) {
@@ -156,7 +172,8 @@ const appProcess = async prms => {
                     //Если структура ответа в норме
                     if (!sCheckResult) {
                         //Применим её
-                        prms.queue.blResp = resAfter.blResp;
+                        if (!_.isUndefined(resAfter.blResp)) prms.queue.blResp = resAfter.blResp;
+                        if (!_.isUndefined(resAfter.context)) prms.service.context = _.cloneDeep(resAfter.context);
                     } else {
                         //Или расскажем об ошибке
                         throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
@@ -518,7 +535,7 @@ const processTask = async prms => {
             //Отключаемся от БД
             if (dbConn) await dbConn.disconnect();
             //Отправляем успех
-            sendOKResult();
+            sendOKResult({ context: prms.task.service.context });
         } catch (e) {
             //Отключаемся от БД
             if (dbConn) await dbConn.disconnect();

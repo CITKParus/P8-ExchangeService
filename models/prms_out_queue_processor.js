@@ -30,6 +30,19 @@ exports.sendErrorResult = new Schema({
     }
 });
 
+//Схема валидации параметров функции отправки успеха обработки
+exports.sendOKResult = new Schema({
+    //Контекст работы сервиса
+    context: {
+        type: Object,
+        required: true,
+        message: {
+            type: path => `Контекст работы сервиса (${path}) имеет некорректный тип данных (ожидалось - Object)`,
+            required: path => `Не указан контекст работы сервиса (${path})`
+        }
+    }
+});
+
 //Схема валидации параметров функции обработчки сообщения сервером приложений
 exports.appProcess = new Schema({
     //Обрабатываемое сообщение очереди

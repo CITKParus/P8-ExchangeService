@@ -89,6 +89,15 @@ exports.OutQueueProcessorTaskResult = new Schema({
                 `Информация от обработчика сообщения очереди обмена (${path}) имеет некорректный тип данных (ожидалось - String)`,
             required: path => `Не указана информация от обработчика сообщения очереди обмена (${path})`
         }
+    },
+    //Контекст работы сервиса
+    context: {
+        type: Object,
+        required: true,
+        message: {
+            type: path => `Контекст работы сервиса (${path}) имеет некорректный тип данных (ожидалось - Object)`,
+            required: path => `Не указан контекст работы сервиса (${path})`
+        }
     }
 }).validator({
     required: val => typeof val != "undefined"
@@ -99,7 +108,7 @@ exports.OutQueueProcessorFnBefore = new Schema({
     //Параметры запроса удалённому сервису
     options: {
         type: Object,
-        required: true,
+        required: false,
         message: {
             type: path =>
                 `Параметры запроса удалённому сервису (${path}) имеют некорректный тип данных (ожидалось - Object, см. документацию к REQUEST - https://github.com/request/request)`,
@@ -115,6 +124,15 @@ exports.OutQueueProcessorFnBefore = new Schema({
                 `Обработанное сообщение очереди  (${path}) имеет некорректный тип данных (ожидалось - Buffer)`,
             required: path => `Не указано обработанное сообщение очереди (${path})`
         }
+    },
+    //Контекст работы сервиса
+    context: {
+        type: Object,
+        required: false,
+        message: {
+            type: path => `Контекст работы сервиса (${path}) имеет некорректный тип данных (ожидалось - Object)`,
+            required: path => `Не указан контекст работы сервиса (${path})`
+        }
     }
 });
 
@@ -123,11 +141,20 @@ exports.OutQueueProcessorFnAfter = new Schema({
     //Результат обработки ответа удалённого сервиса
     blResp: {
         type: Buffer,
-        required: true,
+        required: false,
         message: {
             type: path =>
                 `Результат обработки ответа удалённого сервиса  (${path}) имеет некорректный тип данных (ожидалось - Buffer)`,
             required: path => `Не указан результат обработки ответа удалённого сервиса (${path})`
+        }
+    },
+    //Контекст работы сервиса
+    context: {
+        type: Object,
+        required: false,
+        message: {
+            type: path => `Контекст работы сервиса (${path}) имеет некорректный тип данных (ожидалось - Object)`,
+            required: path => `Не указан контекст работы сервиса (${path})`
         }
     }
 });

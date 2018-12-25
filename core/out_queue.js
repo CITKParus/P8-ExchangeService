@@ -209,7 +209,7 @@ class OutQueue extends EventEmitter {
                     );
                     //Если структура сообщения в норме
                     if (!sCheckResult) {
-                        //Анализируем результат обработки
+                        //Анализируем результат обработки - если ошибка - фиксируем
                         if (result.sResult == objOutQueueProcessorSchema.STASK_RESULT_ERR) {
                             //Фиксируем ошибку обработки - протокол работы сервиса
                             await self.logger.error(`Ошибка обработки исходящего сообщения: ${result.sMsg}`, {
@@ -228,8 +228,13 @@ class OutQueue extends EventEmitter {
                                         ? prms.queue.nExecState
                                         : objQueueSchema.NQUEUE_EXEC_STATE_ERR
                             });
+                        } else {
+                            //Ошибки нет, но если есть контекст для сервиса - сохраним его для дальнейшего использования
+                            if (!_.isUndefined(result.context)) {
+                                let tmpSrv = _.find(this.services, { nId: prms.queue.nServiceId });
+                                tmpSrv.context = _.cloneDeep(result.context);
+                            }
                         }
-                        //Если есть контекст для сервиса - сохраним его для дальнейшего использования
                     } else {
                         //Пришел неожиданный ответ обработчика - запись в протокол работы сервиса
                         await self.logger.error(
