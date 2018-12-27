@@ -378,39 +378,51 @@ create or replace package PKG_EXS as
   /* Помещение сообщения обмена в очередь */
   procedure QUEUE_PUT
   (
-    NEXSSERVICEFN           in number,         -- Рег. номер функции обработки
-    BMSG                    in blob,           -- Данные
-    NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
-    NNEW_EXSQUEUE           out number         -- Курсор с добавленной позицией очереди
+    NEXSSERVICEFN           in number,           -- Рег. номер функции обработки
+    BMSG                    in blob,             -- Данные
+    NEXSQUEUE               in number := null,   -- Рег. номер связанной позиции очереди
+    NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
+    NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
+    SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
   );
   
   /* Помещение сообщения обмена в очередь (возвращает курсор с добавленной записью) */
   procedure QUEUE_PUT
   (
-    NEXSSERVICEFN           in number,         -- Рег. номер функции обработки
-    BMSG                    in blob,           -- Данные
-    NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
-    RCQUEUE                 out sys_refcursor  -- Курсор с добавленной позицией очереди
+    NEXSSERVICEFN           in number,           -- Рег. номер функции обработки
+    BMSG                    in blob,             -- Данные
+    NEXSQUEUE               in number := null,   -- Рег. номер связанной позиции очереди
+    NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
+    NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
+    SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    RCQUEUE                 out sys_refcursor    -- Курсор с добавленной позицией очереди
   );
 
   /* Помещение сообщения обмена в очередь (по коду сервиса и функции обрабоки) */
   procedure QUEUE_PUT
   (
-    SEXSSERVICE             in varchar2,       -- Мнемокод сервиса для обработки
-    SEXSSERVICEFN           in varchar2,       -- Мнемокод функции сервиса для обработки
-    BMSG                    in blob,           -- Данные
-    NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
-    NNEW_EXSQUEUE           out number         -- Курсор с добавленной позицией очереди
+    SEXSSERVICE             in varchar2,         -- Мнемокод сервиса для обработки
+    SEXSSERVICEFN           in varchar2,         -- Мнемокод функции сервиса для обработки
+    BMSG                    in blob,             -- Данные
+    NEXSQUEUE               in number := null,   -- Рег. номер связанной позиции очереди
+    NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
+    NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
+    SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
   );
 
   /* Помещение сообщения обмена в очередь (по коду сервиса и функции обрабоки, возвращает курсор с добавленной записью) */
   procedure QUEUE_PUT
   (
-    SEXSSERVICE             in varchar2,       -- Мнемокод сервиса для обработки
-    SEXSSERVICEFN           in varchar2,       -- Мнемокод функции сервиса для обработки
-    BMSG                    in blob,           -- Данные
-    NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
-    RCQUEUE                 out sys_refcursor  -- Курсор с добавленной позицией очереди
+    SEXSSERVICE             in varchar2,         -- Мнемокод сервиса для обработки
+    SEXSSERVICEFN           in varchar2,         -- Мнемокод функции сервиса для обработки
+    BMSG                    in blob,             -- Данные
+    NEXSQUEUE               in number := null,   -- Рег. номер связанной позиции очереди
+    NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
+    NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
+    SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    RCQUEUE                 out sys_refcursor    -- Курсор с добавленной позицией очереди
   );
 
   /* Исполнение обработчика для сообщения обмена */
@@ -1573,10 +1585,13 @@ create or replace package body PKG_EXS as
   /* Помещение сообщения обмена в очередь */
   procedure QUEUE_PUT
   (
-    NEXSSERVICEFN           in number,         -- Рег. номер функции обработки
-    BMSG                    in blob,           -- Данные
-    NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
-    NNEW_EXSQUEUE           out number         -- Курсор с добавленной позицией очереди
+    NEXSSERVICEFN           in number,           -- Рег. номер функции обработки
+    BMSG                    in blob,             -- Данные
+    NEXSQUEUE               in number := null,   -- Рег. номер связанной позиции очереди
+    NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
+    NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
+    SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
   )
   is
   begin
@@ -1595,22 +1610,34 @@ create or replace package body PKG_EXS as
                            BMSG          => BMSG,
                            BRESP         => null,
                            NEXSQUEUE     => NEXSQUEUE,
+                           NLNK_COMPANY  => NLNK_COMPANY,
+                           NLNK_DOCUMENT => NLNK_DOCUMENT,
+                           SLNK_UNITCODE => SLNK_UNITCODE,
                            NRN           => NNEW_EXSQUEUE);
   end QUEUE_PUT;
 
   /* Помещение сообщения обмена в очередь (возвращает курсор с добавленной записью) */
   procedure QUEUE_PUT
   (
-    NEXSSERVICEFN           in number,         -- Рег. номер функции обработки
-    BMSG                    in blob,           -- Данные
-    NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
-    RCQUEUE                 out sys_refcursor  -- Курсор с добавленной позицией очереди
+    NEXSSERVICEFN           in number,           -- Рег. номер функции обработки
+    BMSG                    in blob,             -- Данные
+    NEXSQUEUE               in number := null,   -- Рег. номер связанной позиции очереди
+    NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
+    NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
+    SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    RCQUEUE                 out sys_refcursor    -- Курсор с добавленной позицией очереди
   )
   is
     NRN                     EXSQUEUE.RN%type;  -- Рег. номер добавленной записи очереди
   begin
     /* Проверяем параметры */
-    QUEUE_PUT(NEXSSERVICEFN => NEXSSERVICEFN, BMSG => BMSG, NEXSQUEUE => NEXSQUEUE, NNEW_EXSQUEUE => NRN);
+    QUEUE_PUT(NEXSSERVICEFN => NEXSSERVICEFN,
+              BMSG          => BMSG,
+              NEXSQUEUE     => NEXSQUEUE,
+              NLNK_COMPANY  => NLNK_COMPANY,
+              NLNK_DOCUMENT => NLNK_DOCUMENT,
+              SLNK_UNITCODE => SLNK_UNITCODE,
+              NNEW_EXSQUEUE => NRN);
     /* Возвращаем добавленную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NRN, RCQUEUE => RCQUEUE);
   end QUEUE_PUT;
@@ -1618,11 +1645,14 @@ create or replace package body PKG_EXS as
   /* Помещение сообщения обмена в очередь (по коду сервиса и функции обрабоки) */
   procedure QUEUE_PUT
   (
-    SEXSSERVICE             in varchar2,       -- Мнемокод сервиса для обработки
-    SEXSSERVICEFN           in varchar2,       -- Мнемокод функции сервиса для обработки
-    BMSG                    in blob,           -- Данные
-    NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
-    NNEW_EXSQUEUE           out number         -- Курсор с добавленной позицией очереди
+    SEXSSERVICE             in varchar2,         -- Мнемокод сервиса для обработки
+    SEXSSERVICEFN           in varchar2,         -- Мнемокод функции сервиса для обработки
+    BMSG                    in blob,             -- Данные
+    NEXSQUEUE               in number := null,   -- Рег. номер связанной позиции очереди
+    NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
+    NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
+    SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
   )
   is
     NEXSSERVICEFN           PKG_STD.TREF;      -- Рег. номер функции сервиса обработки
@@ -1639,17 +1669,26 @@ create or replace package body PKG_EXS as
                                                SEXSSERVICE   => SEXSSERVICE,
                                                SEXSSERVICEFN => SEXSSERVICEFN);
     /* Ставим запись в очередь */
-    QUEUE_PUT(NEXSSERVICEFN => NEXSSERVICEFN, BMSG => BMSG, NEXSQUEUE => NEXSQUEUE, NNEW_EXSQUEUE => NNEW_EXSQUEUE);
+    QUEUE_PUT(NEXSSERVICEFN => NEXSSERVICEFN,
+              BMSG          => BMSG,
+              NEXSQUEUE     => NEXSQUEUE,
+              NLNK_COMPANY  => NLNK_COMPANY,
+              NLNK_DOCUMENT => NLNK_DOCUMENT,
+              SLNK_UNITCODE => SLNK_UNITCODE,              
+              NNEW_EXSQUEUE => NNEW_EXSQUEUE);
   end QUEUE_PUT;
 
   /* Помещение сообщения обмена в очередь (по коду сервиса и функции обрабоки, возвращает курсор с добавленной записью) */
   procedure QUEUE_PUT
   (
-    SEXSSERVICE             in varchar2,       -- Мнемокод сервиса для обработки
-    SEXSSERVICEFN           in varchar2,       -- Мнемокод функции сервиса для обработки
-    BMSG                    in blob,           -- Данные
-    NEXSQUEUE               in number := null, -- Рег. номер связанной позиции очереди
-    RCQUEUE                 out sys_refcursor  -- Курсор с добавленной позицией очереди
+    SEXSSERVICE             in varchar2,         -- Мнемокод сервиса для обработки
+    SEXSSERVICEFN           in varchar2,         -- Мнемокод функции сервиса для обработки
+    BMSG                    in blob,             -- Данные
+    NEXSQUEUE               in number := null,   -- Рег. номер связанной позиции очереди
+    NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
+    NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
+    SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    RCQUEUE                 out sys_refcursor    -- Курсор с добавленной позицией очереди
   )
   is
     NRN                     EXSQUEUE.RN%type;  -- Рег. номер добавленной записи очереди
@@ -1659,6 +1698,9 @@ create or replace package body PKG_EXS as
               SEXSSERVICEFN => SEXSSERVICEFN,
               BMSG          => BMSG,
               NEXSQUEUE     => NEXSQUEUE,
+              NLNK_COMPANY  => NLNK_COMPANY,
+              NLNK_DOCUMENT => NLNK_DOCUMENT,
+              SLNK_UNITCODE => SLNK_UNITCODE,
               NNEW_EXSQUEUE => NRN);
     /* Возвращаем добавленную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NRN, RCQUEUE => RCQUEUE);
