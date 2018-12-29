@@ -146,6 +146,15 @@ const appProcess = async prms => {
                                 nQueueId: prms.queue.nId,
                                 blMsg: prms.queue.blMsg
                             });
+                            if (prms.service.sFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
+                                options.body = prms.queue.blMsg;
+                            } else {
+                                options.url = buildURL({
+                                    sSrvRoot: prms.service.sSrvRoot,
+                                    sFnURL: prms.function.sFnURL,
+                                    sQuery: prms.queue.blMsg.toString()
+                                });
+                            }
                         }
                         if (!_.isUndefined(resBefore.context)) prms.service.context = _.cloneDeep(resBefore.context);
                     } else {
@@ -156,7 +165,12 @@ const appProcess = async prms => {
             }
             //Отправляем сообщение удалённому серверу
             let serverResp = await rqp(options);
+            //Сохраняем полученный ответ
             _.extend(prms, { serverResp });
+            await dbConn.setQueueResp({
+                nQueueId: prms.queue.nId,
+                blResp: new Buffer(prms.serverResp)
+            });
             //Выполняем обработчик "После" (если он есть)
             if (prms.function.sAppSrvAfter) {
                 const fnAfter = getAppSrvFunction(prms.function.sAppSrvAfter);
@@ -167,7 +181,7 @@ const appProcess = async prms => {
                 } catch (e) {
                     throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
                 }
-                //Проверяем структуру ответа функции предобработки
+                //Проверяем структуру ответа функции постобработки
                 if (resAfter) {
                     let sCheckResult = validateObject(
                         resAfter,
