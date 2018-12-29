@@ -167,7 +167,7 @@ begin
                   and P.ATTRIBUTE = A.RN)
     loop
       /* Свойство фискального документа */
-      NODE(SNAME => 'FISCDOC_PROPS');
+      NODE(SNAME => 'FISCDOC_PROP');
       /* Данные свойства фискального документа */
       NODE(SNAME => 'SCODE', SVALUE => SP.SCODE);
       NODE(SNAME => 'SNAME', SVALUE => SP.SNAME);
@@ -189,7 +189,7 @@ begin
   /* Отправляем сформированный документ */
   PKG_EXS.QUEUE_PUT(SEXSSERVICE   => SEXSSERVICE,
                     SEXSSERVICEFN => SEXSSERVICEFN,
-                    BMSG          => CLOB2BLOB(LCDATA => CDATA, SCHARSET => 'CL8MSWIN1251'),
+                    BMSG          => CLOB2BLOB(LCDATA => CDATA, SCHARSET => 'UTF8'),
                     NNEW_EXSQUEUE => NEXSQUEUE);
 end;
 /
