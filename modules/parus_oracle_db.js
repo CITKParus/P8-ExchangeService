@@ -129,7 +129,7 @@ const getQueue = async prms => {
 const putQueue = async prms => {
     try {
         let res = await prms.connection.execute(
-            "BEGIN PKG_EXS.QUEUE_PUT(NEXSSERVICEFN => :NEXSSERVICEFN, BMSG => :BMSG, NEXSQUEUE => :NEXSQUEUE, NLNK_COMPANY => :NLNK_COMPANY, NLNK_DOCUMENT => :NLNK_DOCUMENT, SLNK_UNITCODE => :SLNK_UNITCODE, RCQUEUE => :RCQUEUE); END;",
+            "BEGIN PKG_EXS.QUEUE_PUT(NEXSSERVICEFN => :NEXSSERVICEFN, BMSG => :BMSG, NEXSQUEUE => :NEXSQUEUE, NLNK_COMPANY => :NLNK_COMPANY, NLNK_DOCUMENT => :NLNK_DOCUMENT, SLNK_UNITCODE => :SLNK_UNITCODE, SOPTIONS => :SOPTIONS, RCQUEUE => :RCQUEUE); END;",
             {
                 NEXSSERVICEFN: prms.nServiceFnId,
                 BMSG: prms.blMsg,
@@ -137,6 +137,7 @@ const putQueue = async prms => {
                 NLNK_COMPANY: prms.nLnkCompanyId,
                 NLNK_DOCUMENT: prms.nLnkDocumentId,
                 SLNK_UNITCODE: prms.sLnkUnitcode,
+                SOPTIONS: prms.sOptions,
                 RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
             { outFormat: oracledb.OBJECT, autoCommit: true }

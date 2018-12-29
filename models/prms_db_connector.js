@@ -207,6 +207,15 @@ exports.putQueue = new Schema({
             type: path => `Код связанного раздела (${path}) имеет некорректный тип данных (ожидалось - String)`,
             required: path => `Не указан код связанного раздела (${path})`
         }
+    },
+    //Параметры сообщения
+    sOptions: {
+        type: String,
+        required: false,
+        message: {
+            type: path => `Параметры сообщения (${path}) имеют некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указаны параметры сообщения (${path})`
+        }
     }
 });
 

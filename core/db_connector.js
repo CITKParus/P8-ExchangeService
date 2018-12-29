@@ -334,14 +334,13 @@ class DBConnector extends EventEmitter {
             );
             //Если структура объекта в норме
             if (!sCheckResult) {
+                //Подготовим параметры
+                let putQueueData = _.cloneDeep(prms);
+                putQueueData.blMsg = prms.blMsg ? prms.blMsg : new Buffer("");
+                putQueueData.connection = this.connection;
                 //Исполняем действие в БД
                 try {
-                    let res = await this.connector.putQueue({
-                        nServiceFnId: prms.nServiceFnId,
-                        blMsg: prms.blMsg ? prms.blMsg : new Buffer(""),
-                        nQueueId: prms.nQueueId,
-                        connection: this.connection
-                    });
+                    let res = await this.connector.putQueue(putQueueData);
                     //Валидируем полученный ответ
                     sCheckResult = validateObject(res, objQueueSchema.Queue, "Добавленное сообщение очереди обмена");
                     if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
