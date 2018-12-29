@@ -140,7 +140,13 @@ const appProcess = async prms => {
                     if (!sCheckResult) {
                         //Применим её
                         if (!_.isUndefined(resBefore.options)) options = _.cloneDeep(resBefore.options);
-                        if (!_.isUndefined(resBefore.blMsg)) prms.queue.blMsg = resBefore.blMsg;
+                        if (!_.isUndefined(resBefore.blMsg)) {
+                            prms.queue.blMsg = resBefore.blMsg;
+                            await dbConn.setQueueMsg({
+                                nQueueId: prms.queue.nId,
+                                blMsg: prms.queue.blMsg
+                            });
+                        }
                         if (!_.isUndefined(resBefore.context)) prms.service.context = _.cloneDeep(resBefore.context);
                     } else {
                         //Или расскажем об ошибке
@@ -149,8 +155,7 @@ const appProcess = async prms => {
                 }
             }
             //Отправляем сообщение удалённому серверу
-            //let serverResp = await rqp(options);
-            serverResp = { state: "OK" };
+            let serverResp = await rqp(options);
             _.extend(prms, { serverResp });
             //Выполняем обработчик "После" (если он есть)
             if (prms.function.sAppSrvAfter) {
