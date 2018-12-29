@@ -384,6 +384,7 @@ create or replace package PKG_EXS as
     NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    SOPTIONS                in varchar2 := null, -- Параметры сообщения    
     NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
   );
   
@@ -396,6 +397,7 @@ create or replace package PKG_EXS as
     NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    SOPTIONS                in varchar2 := null, -- Параметры сообщения    
     RCQUEUE                 out sys_refcursor    -- Курсор с добавленной позицией очереди
   );
 
@@ -409,6 +411,7 @@ create or replace package PKG_EXS as
     NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    SOPTIONS                in varchar2 := null, -- Параметры сообщения    
     NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
   );
 
@@ -422,6 +425,7 @@ create or replace package PKG_EXS as
     NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    SOPTIONS                in varchar2 := null, -- Параметры сообщения    
     RCQUEUE                 out sys_refcursor    -- Курсор с добавленной позицией очереди
   );
 
@@ -1591,6 +1595,7 @@ create or replace package body PKG_EXS as
     NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    SOPTIONS                in varchar2 := null, -- Параметры сообщения
     NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
   )
   is
@@ -1613,6 +1618,7 @@ create or replace package body PKG_EXS as
                            NLNK_COMPANY  => NLNK_COMPANY,
                            NLNK_DOCUMENT => NLNK_DOCUMENT,
                            SLNK_UNITCODE => SLNK_UNITCODE,
+                           SOPTIONS      => SOPTIONS,
                            NRN           => NNEW_EXSQUEUE);
   end QUEUE_PUT;
 
@@ -1625,6 +1631,7 @@ create or replace package body PKG_EXS as
     NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    SOPTIONS                in varchar2 := null, -- Параметры сообщения    
     RCQUEUE                 out sys_refcursor    -- Курсор с добавленной позицией очереди
   )
   is
@@ -1637,6 +1644,7 @@ create or replace package body PKG_EXS as
               NLNK_COMPANY  => NLNK_COMPANY,
               NLNK_DOCUMENT => NLNK_DOCUMENT,
               SLNK_UNITCODE => SLNK_UNITCODE,
+              SOPTIONS      => SOPTIONS,
               NNEW_EXSQUEUE => NRN);
     /* Возвращаем добавленную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NRN, RCQUEUE => RCQUEUE);
@@ -1652,6 +1660,7 @@ create or replace package body PKG_EXS as
     NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    SOPTIONS                in varchar2 := null, -- Параметры сообщения    
     NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
   )
   is
@@ -1675,6 +1684,7 @@ create or replace package body PKG_EXS as
               NLNK_COMPANY  => NLNK_COMPANY,
               NLNK_DOCUMENT => NLNK_DOCUMENT,
               SLNK_UNITCODE => SLNK_UNITCODE,              
+              SOPTIONS      => SOPTIONS,              
               NNEW_EXSQUEUE => NNEW_EXSQUEUE);
   end QUEUE_PUT;
 
@@ -1688,6 +1698,7 @@ create or replace package body PKG_EXS as
     NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
+    SOPTIONS                in varchar2 := null, -- Параметры сообщения    
     RCQUEUE                 out sys_refcursor    -- Курсор с добавленной позицией очереди
   )
   is
@@ -1701,6 +1712,7 @@ create or replace package body PKG_EXS as
               NLNK_COMPANY  => NLNK_COMPANY,
               NLNK_DOCUMENT => NLNK_DOCUMENT,
               SLNK_UNITCODE => SLNK_UNITCODE,
+              SOPTIONS      => SOPTIONS,
               NNEW_EXSQUEUE => NRN);
     /* Возвращаем добавленную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NRN, RCQUEUE => RCQUEUE);
