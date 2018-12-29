@@ -21,11 +21,29 @@ create or replace package body UDO_PKG_EXS_ATOL as
   )
   is
     REXSQUEUE               EXSQUEUE%rowtype; -- Запись позиции очереди
+    CTMP                    clob;             -- Буфер для хранения данных ответа сервера
   begin
     /* Считаем запись очереди */
     REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
+    /* Проверим что позиция очереди корректна */
+    if (REXSQUEUE.LNK_DOCUMENT is null) then
+      P_EXCEPTION(0, 'Для позиции очереди не указан связанный документ.');
+    end if;
+    if (REXSQUEUE.LNK_UNITCODE is null) then
+      P_EXCEPTION(0, 'Для позиции очереди не указан связанный раздел.');
+    end if;
+    if (REXSQUEUE.LNK_UNITCODE <> 'UDO_FiscalDocuments') then
+      P_EXCEPTION(0,
+                  'Связанный раздел "%s", указанный в позиции очереди, не поддерживается.',
+                  REXSQUEUE.LNK_UNITCODE);
+    end if;
     /* Разбираем ответ */
-    null;
+    CTMP := BLOB2CLOB(LBDATA => REXSQUEUE.RESP, SCHARSET => 'UTF8');
+    if (CTMP is null) then
+      P_EXCEPTION(0, 'Нет ответа от сервера.');
+    end if;
+    /* Выставляем идентификатор АТОЛ в ФД */
+    update UDO_FISCDOCS T set T.NUMB_FD = CTMP where T.RN = REXSQUEUE.LNK_DOCUMENT;
   end V4_FFD105_PROCESS_REG_BILL_SIR;
 
 end;

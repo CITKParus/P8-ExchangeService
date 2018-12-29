@@ -190,6 +190,9 @@ begin
   PKG_EXS.QUEUE_PUT(SEXSSERVICE   => SEXSSERVICE,
                     SEXSSERVICEFN => SEXSSERVICEFN,
                     BMSG          => CLOB2BLOB(LCDATA => CDATA, SCHARSET => 'UTF8'),
+                    NLNK_COMPANY  => NCOMPANY,
+                    NLNK_DOCUMENT => NFISCDOC,
+                    SLNK_UNITCODE => 'UDO_FiscalDocuments',                    
                     NNEW_EXSQUEUE => NEXSQUEUE);
 end;
 /

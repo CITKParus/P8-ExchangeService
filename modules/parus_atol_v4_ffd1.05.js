@@ -1,6 +1,103 @@
 /*
   Сервис интеграции ПП Парус 8 с WEB API
   Дополнительный модуль: Взаимодействие с "АТОЛ-Онлайн" (v4) в формате ФФД 1.05
+
+  Полный формат формируемой посылки:
+    reqBody = {
+        timestamp: doc.SDDOC_DATE,
+        external_id: doc.NRN,
+        service: {
+            callback_url: ""
+        },
+        receipt: {
+            client: {
+                email: "",
+                phone: ""
+            },
+            company: {
+                email: "",
+                sno: "",
+                inn: "",
+                payment_address: ""
+            },
+            agent_info: {
+                type: "",
+                paying_agent: {
+                    operation: "",
+                    phones: [""]
+                },
+                receive_payments_operator: {
+                    phones: [""]
+                },
+                money_transfer_operator: {
+                    phones: [""],
+                    name: "",
+                    address: "",
+                    inn: ""
+                }
+            },
+            supplier_info: {
+                phones: [""]
+            },
+            items: [
+                {
+                    name: "",
+                    price: 0,
+                    quantity: 0,
+                    sum: 0,
+                    measurement_unit: "",
+                    payment_method: "",
+                    payment_object: "",
+                    vat: {
+                        type: "",
+                        sum: 0
+                    },
+                    agent_info: {
+                        type: "",
+                        paying_agent: {
+                            operation: "",
+                            phones: [""]
+                        },
+                        receive_payments_operator: {
+                            phones: [""]
+                        },
+                        money_transfer_operator: {
+                            phones: [""],
+                            name: "",
+                            address: "",
+                            inn: ""
+                        }
+                    },
+                    supplier_info: {
+                        phones: [""],
+                        name: "",
+                        address: "",
+                        inn: ""
+                    },
+                    user_data: ""
+                }
+            ],
+            payments: [
+                {
+                    type: 0,
+                    sum: 0
+                }
+            ],
+            vats: [
+                {
+                    type: "",
+                    sum: 0
+                }
+            ],
+            total: 0,
+            additional_check_props: "",
+            cashier: "",
+            additional_user_props: {
+                name: "",
+                value: ""
+            }
+        }
+    };
 */
 
 //----------------------
@@ -10,6 +107,9 @@
 const util = require("util"); //Встроенные вспомогательные утилиты
 const parseString = require("xml2js").parseString; //Конвертация XML в JSON
 const _ = require("lodash"); //Работа с массивами и коллекциями
+const rqp = require("request-promise"); //Работа с HTTP/HTTPS запросами
+const { buildURL } = require("@core/utils"); //Вспомогательные функции
+const { NFN_TYPE_LOGIN } = require("@models/obj_service_function");
 
 //---------------------
 // Глобальные константы
@@ -51,6 +151,17 @@ const paymentObject = {
         "16": "insurance_premium",
         "17": "sales_tax",
         "18": "resort_fee"
+    }
+};
+
+//Словарь - Тип операции
+const paymensOperation = {
+    sName: "Тип операции",
+    vals: {
+        "1": "sell",
+        "2": "sell_refund",
+        "3": "buy",
+        "4": "buy_refund"
     }
 };
 
@@ -126,12 +237,51 @@ const getPropValueByCode = (props, sCode, sValType = "STR", sValField = "VALUE")
     return res;
 };
 
+//Подключение к сервису
+const connect = async prms => {
+    let authFn = _.find(prms.service.functions, { nFnType: NFN_TYPE_LOGIN });
+    if (!authFn) throw Error(`Для сервиса ${prms.service.sCode} не определена функция аутентификации`);
+    try {
+        let serverResp = JSON.parse(
+            await rqp({
+                method: authFn.sFnPrmsType,
+                url: buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: authFn.sFnURL }),
+                body: JSON.stringify({ login: prms.service.sSrvUser, pass: prms.service.sSrvPass }),
+                simple: false
+            })
+        );
+        if (serverResp.error === null) {
+            return serverResp.token;
+        } else {
+            throw Error(serverResp.error.text);
+        }
+    } catch (e) {
+        throw Error(`Ошибка аутентификации на сервере АТОЛ-Онлайн: ${e.message}`);
+    }
+};
+
 //Обработчик "До" отправки запроса на регистрацию чека (приход, расход, возврат) серверу "АТОЛ-Онлайн"
 const beforeRegBillSIR = async prms => {
     try {
+        //Код круппы ККТ
+        const sGroupCode = "v4-online-atol-ru_4179";
+        //Токен доступа
+        let sToken = null;
+        if (prms.service.context && prms.service.context.sToken) {
+            sToken = prms.service.context.sToken;
+        } else {
+            sToken = await connect(prms);
+        }
+
+        if (!sToken) throw Error("Не удалось получить токен доступа");
+        //Разберем XML-данные фискального документа
         const parseRes = await parseXML(prms.queue.blMsg.toString());
+        //Сохраним короткие ссылки на документ и его свойства
         const doc = parseRes.FISCDOC;
         const docProps = parseRes.FISCDOC.FISCDOC_PROPS.FISCDOC_PROP;
+        //Определим тип операции
+        const sOperation = mapDictionary(paymensOperation, getPropValueByCode(docProps, "1054"));
+        //Собираем тело запроса в JSON из XML-данных документа
         let reqBody = {
             timestamp: doc.SDDOC_DATE,
             external_id: doc.NRN,
@@ -140,16 +290,17 @@ const beforeRegBillSIR = async prms => {
                 callback_url: ""
             },
             */
+
             receipt: {
                 client: {
-                    email: getPropValueByCode(docProps, "1008"),
+                    email: "mim_@mail.ru", //getPropValueByCode(docProps, "1008"),
                     phone: ""
                 },
                 company: {
-                    email: getPropValueByCode(docProps, "1117"),
-                    sno: getPropValueByCode(docProps, "1117"),
+                    email: "mim_@mail.ru", //getPropValueByCode(docProps, "1117"),
+                    sno: "osn", //getPropValueByCode(docProps, "1055"),
                     inn: getPropValueByCode(docProps, "1018"),
-                    payment_address: getPropValueByCode(docProps, "1187")
+                    payment_address: "г. Казань" //getPropValueByCode(docProps, "1187")
                 },
                 /*
                 agent_info: {
@@ -179,10 +330,12 @@ const beforeRegBillSIR = async prms => {
                         quantity: getPropValueByCode(docProps, "1023", "NUM"),
                         sum: getPropValueByCode(docProps, "1043", "NUM"),
                         measurement_unit: getPropValueByCode(docProps, "1197"),
+                        //payment_method: "full_prepayment",
+                        //payment_object: "service",
                         payment_method: mapDictionary(paymentMethod, getPropValueByCode(docProps, "1214")),
                         payment_object: mapDictionary(paymentObject, getPropValueByCode(docProps, "1212")),
                         vat: {
-                            type: "none",
+                            type: "none", //getPropValueByCode(docProps, "1199")
                             sum: getPropValueByCode(docProps, "1200", "NUM")
                         } /*,
                         agent_info: {
@@ -211,36 +364,129 @@ const beforeRegBillSIR = async prms => {
                         */
                     }
                 ],
-                payments: [
-                    {
-                        type: 0,
-                        sum: 0
-                    }
-                ],
-                vats: [
-                    {
-                        type: "",
-                        sum: 0
-                    }
-                ],
-                total: 0 /*,
-                additional_check_props: "",
-                cashier: "",
-                additional_user_props: {
-                    name: "",
-                    value: ""
-                }
-                */
+                total: getPropValueByCode(docProps, "1020", "NUM")
             }
         };
-        console.log(util.inspect(reqBody, false, null));
+        //Добавим общие платежи
+        let payments = [];
+        //Сумма по чеку электронными
+        if (getPropValueByCode(docProps, "1081", "NUM") !== null) {
+            payments.push({
+                type: 1,
+                sum: getPropValueByCode(docProps, "1081", "NUM")
+            });
+        }
+        //Сумма по чеку предоплатой (зачет аванса и (или) предыдущих платежей)
+        if (getPropValueByCode(docProps, "1215", "NUM") !== null) {
+            payments.push({
+                type: 2,
+                sum: getPropValueByCode(docProps, "1215", "NUM")
+            });
+        }
+        //Сумма по чеку постоплатой (кредит)
+        if (getPropValueByCode(docProps, "1216", "NUM") !== null) {
+            payments.push({
+                type: 3,
+                sum: getPropValueByCode(docProps, "1216", "NUM")
+            });
+        }
+        //Сумма по чеку встречным представлением
+        if (getPropValueByCode(docProps, "1217", "NUM") !== null) {
+            payments.push({
+                type: 4,
+                sum: getPropValueByCode(docProps, "1217", "NUM")
+            });
+        }
+        //Если есть хоть один платёж - помещаем массив в запрос
+        if (payments.length > 0) reqBody.receipt.payments = payments;
+        //Добавим общие налоги
+        let vats = [];
+        //Сумма расчета по чеку без НДС;
+        if (getPropValueByCode(docProps, "1105", "NUM") !== null) {
+            vats.push({
+                type: "none",
+                sum: getPropValueByCode(docProps, "1105", "NUM")
+            });
+        }
+        //Сумма расчета по чеку с НДС по ставке 0%;
+        if (getPropValueByCode(docProps, "1104", "NUM") !== null) {
+            vats.push({
+                type: "vat0",
+                sum: getPropValueByCode(docProps, "1104", "NUM")
+            });
+        }
+        //Сумма НДС чека по ставке 10%;
+        if (getPropValueByCode(docProps, "1103", "NUM") !== null) {
+            vats.push({
+                type: "vat10",
+                sum: getPropValueByCode(docProps, "1103", "NUM")
+            });
+        }
+        //Сумма НДС чека по ставке 18%;
+        if (getPropValueByCode(docProps, "1102", "NUM") !== null) {
+            vats.push({
+                type: "vat18",
+                sum: getPropValueByCode(docProps, "1102", "NUM")
+            });
+        }
+        //Сумма НДС чека по расч. ставке 10/110;
+        if (getPropValueByCode(docProps, "1107", "NUM") !== null) {
+            vats.push({
+                type: "vat110",
+                sum: getPropValueByCode(docProps, "1107", "NUM")
+            });
+        }
+        //Сумма НДС чека по расч. ставке 18/118
+        if (getPropValueByCode(docProps, "1106", "NUM") !== null) {
+            vats.push({
+                type: "vat118",
+                sum: getPropValueByCode(docProps, "1106", "NUM")
+            });
+        }
+        //Если есть хоть один налог - помещаем массив в запрос
+        if (vats.length > 0) reqBody.receipt.vats = vats;
+        //Собираем общий результат работы
+        let res = {
+            options: {
+                method: prms.function.sFnPrmsType,
+                url: buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL })
+                    .replace("<group_code>", sGroupCode)
+                    .replace("<operation>", sOperation),
+                headers: {
+                    "Content-type": "application/json; charset=utf-8",
+                    Token: sToken
+                },
+                simple: false
+            },
+            blMsg: new Buffer(JSON.stringify(reqBody)),
+            context: { sToken }
+        };
+        //Выводим что получилось
+        console.log(util.inspect(res, false, null));
+        //Возврат резульатата
+        return res;
     } catch (e) {
         throw Error(e);
     }
 };
 
 //Обработчик "После" отправки запроса на регистрацию чека (приход, расход, возврат) серверу "АТОЛ-Онлайн"
-const afterRegBillSIR = async prms => {};
+const afterRegBillSIR = async prms => {
+    let tmp = null;
+    try {
+        tmp = JSON.parse(prms.serverResp);
+    } catch (e) {
+        throw Error("Неожиданный ответ сервера АТОЛ-Онлайн!");
+    }
+    if (tmp.error !== null) {
+        throw Error(tmp.error.text);
+    } else {
+        console.log(tmp);
+        return {
+            blResp: new Buffer(tmp.uuid)
+        };
+    }
+};
 
 //-----------------
 // Интерфейс модуля
