@@ -163,6 +163,10 @@ const appProcess = async prms => {
                     }
                 }
             }
+            //Фиксируем отправку сообщения в протоколе работы сервиса
+            await logger.info(`Отправляю исходящее сообщение ${prms.queue.nId} на URL: ${options.url}`, {
+                nQueueId: prms.queue.nId
+            });
             //Отправляем сообщение удалённому серверу
             let serverResp = await rqp(options);
             //Сохраняем полученный ответ
@@ -327,6 +331,8 @@ const processTask = async prms => {
             await dbConn.connect();
             //Считываем запись очереди
             q = await dbConn.getQueue({ nQueueId: prms.task.nQueueId });
+            //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Проверяем аутентификацию
+            //if(prms.task.function.)
             //Далее работаем от статуса считанной записи
             switch (q.nExecState) {
                 //Поставлено в очередь
