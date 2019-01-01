@@ -13,6 +13,7 @@ const { ServerError } = require("./server_errors"); //Типовая ошибк�
 const { makeModuleFullPath, validateObject } = require("./utils"); //Вспомогательные функции
 const prmsDBConnectorSchema = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля
 const intfDBConnectorModuleSchema = require("../models/intf_db_connector_module"); //Схема валидации интерфейса модуля взаимодействия с БД
+const objServiceSchema = require("../models/obj_service"); //Схема валидации сервиса
 const objServicesSchema = require("../models/obj_services"); //Схема валидации списка сервисов
 const objServiceFunctionsSchema = require("../models/obj_service_functions"); //Схема валидации списка функций сервиса
 const objQueueSchema = require("../models/obj_queue"); //Схема валидации сообщения очереди обмена
@@ -197,8 +198,167 @@ class DBConnector extends EventEmitter {
                         "Список функций сервиса"
                     );
                     if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
-                    //Вернём добавленную запись
+                    //Успешно - отдаём список функций сервиса
                     return res;
+                } catch (e) {
+                    throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Получить контекст сервиса
+    async getServiceContext(prms) {
+        //Работаем только при наличии подключения
+        if (this.bConnected) {
+            //Проверяем структуру переданного объекта с параметрами для получения контекста сервиса
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.getServiceContext,
+                "Параметры функции считывания контекста сервиса"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                try {
+                    //Подготовим параметры для передачи в БД
+                    let getServiceContextData = _.cloneDeep(prms);
+                    getServiceContextData.connection = this.connection;
+                    //И выполним считывание контекста сервиса
+                    let res = await this.connector.getServiceContext(getServiceContextData);
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(res, objServiceSchema.ServiceCtx, "Контекст сервиса");
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Успешно - отдаём контекст считанный сервиса
+                    return res;
+                } catch (e) {
+                    throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Установить контекст сервиса
+    async setServiceContext(prms) {
+        //Работаем только при наличии подключения
+        if (this.bConnected) {
+            //Проверяем структуру переданного объекта с параметрами для установки контекста сервиса
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.setServiceContext,
+                "Параметры функции установки контекста сервиса"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                try {
+                    //Подготовим параметры для передачи в БД
+                    let setServiceContextData = _.cloneDeep(prms);
+                    setServiceContextData.connection = this.connection;
+                    //И выполним установку контекста сервиса
+                    await this.connector.setServiceContext(setServiceContextData);
+                    //Успешно - возвращаем ничего
+                    return;
+                } catch (e) {
+                    throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Очистить контекст сервиса
+    async clearServiceContext(prms) {
+        //Работаем только при наличии подключения
+        if (this.bConnected) {
+            //Проверяем структуру переданного объекта с параметрами для очистки контекста сервиса
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.clearServiceContext,
+                "Параметры функции очистки контекста сервиса"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                try {
+                    //Подготовим параметры для передачи в БД
+                    let clearServiceContextData = _.cloneDeep(prms);
+                    clearServiceContextData.connection = this.connection;
+                    //И выполним очистку контекста сервиса
+                    await this.connector.clearServiceContext(clearServiceContextData);
+                    //Успешно - возвращаем ничего
+                    return;
+                } catch (e) {
+                    throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Проверить аутентифицированность сервиса
+    async isServiceAuth(prms) {
+        //Работаем только при наличии подключения
+        if (this.bConnected) {
+            //Проверяем структуру переданного объекта с параметрами для проверки аутентифицированности сервиса
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.isServiceAuth,
+                "Параметры функции проверки аутентифицированности сервиса"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                try {
+                    //Подготовим параметры для передачи в БД
+                    let isServiceAuthData = _.cloneDeep(prms);
+                    isServiceAuthData.connection = this.connection;
+                    //И выполним проверку атентифицированности сервиса
+                    let res = await this.connector.isServiceAuth(isServiceAuthData);
+                    //Валидируем результат
+                    if (![objServiceSchema.NIS_AUTH_NO, objServiceSchema.NIS_AUTH_YES].includes(res))
+                        throw new ServerError(
+                            SERR_OBJECT_BAD_INTERFACE,
+                            "Неожиданный ответ функции проверки аутентифицированности сервиса"
+                        );
+                    //Успешно - возвращаем то, что вернула функция проверки
+                    return res;
+                } catch (e) {
+                    throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
+    //Поставить в очередь задание на аутентификацию сервиса
+    async putServiceAuthInQueue(prms) {
+        //Работаем только при наличии подключения
+        if (this.bConnected) {
+            //Проверяем структуру переданного объекта с параметрами постановки в очередь задания на аутентификацию сервиса
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.putServiceAuthInQueue,
+                "Параметры функции постановки в очередь задания на аутентификацию сервиса"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                try {
+                    //Подготовим параметры для передачи в БД
+                    let putServiceAuthInQueueData = _.cloneDeep(prms);
+                    putServiceAuthInQueueData.connection = this.connection;
+                    //И выполним постановку в очередь задания на аутентификацию сервиса
+                    await this.connector.putServiceAuthInQueue(putServiceAuthInQueueData);
+                    //Успешно - возвращаем ничего
+                    return;
                 } catch (e) {
                     throw new ServerError(SERR_DB_EXECUTE, e.message);
                 }

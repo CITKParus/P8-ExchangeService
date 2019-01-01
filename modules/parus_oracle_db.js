@@ -85,6 +85,73 @@ const getServiceFunctions = async prms => {
     }
 };
 
+//Получение контекста сервиса
+const getServiceContext = async prms => {
+    try {
+        let res = await prms.connection.execute(
+            "BEGIN PKG_EXS.SERVICE_CTX_GET(NFLAG_SMART => 0, NEXSSERVICE => :NEXSSERVICE, RCSERVICE_CTX => :RCSERVICE_CTX); END;",
+            { NEXSSERVICE: prms.nServiceId, RCSERVICE_CTX: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT } },
+            { outFormat: oracledb.OBJECT }
+        );
+        let rows = await readCursorData(res.outBinds.RCSERVICE_CTX);
+        return rows[0];
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
+//Установка контекста сервиса
+const setServiceContext = async prms => {
+    try {
+        await prms.connection.execute(
+            "BEGIN PKG_EXS.SERVICE_CTX_SET(NEXSSERVICE => :NEXSSERVICE, SCTX => :SCTX, DCTX_EXP => :DCTX_EXP); END;",
+            { NEXSSERVICE: prms.nServiceId, SCTX: prms.sCtx, DCTX_EXP: prms.dCtxExp },
+            { autoCommit: true }
+        );
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
+//Очистка контекста сервиса
+const clearServiceContext = async prms => {
+    try {
+        await prms.connection.execute(
+            "BEGIN PKG_EXS.SERVICE_CTX_CLEAR(NEXSSERVICE => :NEXSSERVICE); END;",
+            { NEXSSERVICE: prms.nServiceId },
+            { autoCommit: true }
+        );
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
+//Проверка атуентифицированности сервиса
+const isServiceAuth = async prms => {
+    try {
+        let res = await prms.connection.execute(
+            "BEGIN :RET := PKG_EXS.SERVICE_IS_AUTH(NEXSSERVICE => :NEXSSERVICE); END;",
+            { NEXSSERVICE: prms.nServiceId, RET: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER } }
+        );
+        return res.outBinds.RET;
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
+//Постановка в очередь задания на аутентификацию сервиса
+const putServiceAuthInQueue = async prms => {
+    try {
+        await prms.connection.execute(
+            "BEGIN PKG_EXS.SERVICE_AUTH_PUT_INQUEUE(NEXSSERVICE => :NEXSSERVICE); END;",
+            { NEXSSERVICE: prms.nServiceId },
+            { autoCommit: true }
+        );
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
 //Запись в протокол работы
 const log = async prms => {
     try {
@@ -296,6 +363,11 @@ exports.connect = connect;
 exports.disconnect = disconnect;
 exports.getServices = getServices;
 exports.getServiceFunctions = getServiceFunctions;
+exports.getServiceContext = getServiceContext;
+exports.setServiceContext = setServiceContext;
+exports.clearServiceContext = clearServiceContext;
+exports.isServiceAuth = isServiceAuth;
+exports.putServiceAuthInQueue = putServiceAuthInQueue;
 exports.log = log;
 exports.getQueue = getQueue;
 exports.putQueue = putQueue;

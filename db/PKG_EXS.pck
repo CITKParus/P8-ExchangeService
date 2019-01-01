@@ -54,6 +54,12 @@ create or replace package PKG_EXS as
   SUNAVLBL_NTF_SIGN_NO      constant varchar2(40) := 'UNAVLBL_NTF_NO';      -- Не оповещать о простое (строковый код)
   SUNAVLBL_NTF_SIGN_YES     constant varchar2(40) := 'UNAVLBL_NTF_YES';     -- Оповещать о простое (строковый код)
 
+  /* Константы - признак оповещения об ошибке исполнения сообщения очереди для функции обработки */
+  NERR_NTF_SIGN_NO          constant EXSSERVICEFN.ERR_NTF_SIGN%type := 0; -- Не оповещать об ошибке исполнения
+  NERR_NTF_SIGN_YES         constant EXSSERVICEFN.ERR_NTF_SIGN%type := 1; -- Оповещать об ошибке исполнения
+  SERR_NTF_SIGN_NO          constant varchar2(40) := 'ERR_NTF_SIGN_NO';   -- Не оповещать об ошибке исполнения (строковый код)
+  SERR_NTF_SIGN_YES         constant varchar2(40) := 'ERR_NTF_SIGN_YES';  -- Оповещать об ошибке исполнения (строковый код)
+
   /* Константы - состояния записей журнала работы сервиса */
   NLOG_STATE_INF            constant EXSLOG.LOG_STATE%type := 0; -- Информация
   NLOG_STATE_WRN            constant EXSLOG.LOG_STATE%type := 1; -- Предупреждение
@@ -86,9 +92,21 @@ create or replace package PKG_EXS as
   NINC_EXEC_CNT_NO          constant number(1) := 0; -- Не инкрементировать
   NINC_EXEC_CNT_YES         constant number(1) := 1; -- Инкрементировать
 
-  /* Константы - признак инкремента количества попыток исполнения позиции очереди */
+  /* Константы - признак необходимости исполнения позиции очереди */
   NQUEUE_EXEC_NO            constant number(1) := 0; -- Не исполнять
   NQUEUE_EXEC_YES           constant number(1) := 1; -- Исполнять
+  
+  /* Константы - признак аутентифицированности сервиса */
+  NIS_AUTH_YES              constant EXSSERVICE.IS_AUTH%type := 1;  -- Аутентифицирован
+  NIS_AUTH_NO               constant EXSSERVICE.IS_AUTH%type := 0;  -- Неаутентифицирован
+  SIS_AUTH_YES              constant varchar2(40) := 'IS_AUTH_YES'; -- Аутентифицирован (строковый код)
+  SIS_AUTH_NO               constant varchar2(40) := 'IS_AUTH_NO';  -- Неаутентифицирован (строковый код)
+
+  /* Константы - признак необходимости аутентифицированности сервиса для исполнения функции */  
+  NAUTH_ONLY_YES            constant EXSSERVICEFN.AUTH_ONLY%type := 1; -- Требуется аутентификация
+  NAUTH_ONLY_NO             constant EXSSERVICEFN.AUTH_ONLY%type := 0; -- Аутентификация не требуется
+  SAUTH_ONLY_YES            constant varchar2(40) := 'AUTH_ONLY_YES';  -- Требуется аутентификация (строковый код)
+  SAUTH_ONLY_NO             constant varchar2(40) := 'AUTH_ONLY_NO';   -- Аутентификация не требуется (строковый код)
   
   /* Константы - ожидаемый интерфейс процедуры обработки сообщения очереди на стороне БД */
   SPRC_RESP_ARGS            constant varchar2(80) := 'NIDENT,IN,NUMBER;NSRV_TYPE,IN,NUMBER;NEXSQUEUE,IN,NUMBER;'; -- Список параметров процедуры обработки
@@ -119,8 +137,7 @@ create or replace package PKG_EXS as
   (
     NIDENT                  in number,          -- Идентификатор процесса
     SSUB_CONTAINER          in varchar2 := null -- Наименование контейнера второго уровня
-  )
-  return                    varchar2;           -- Полное наименование контейнера
+  ) return                  varchar2;           -- Полное наименование контейнера
 
   /* Очистка контейнера для хранения окружения вызова процедуры */
   procedure UTL_CONTAINER_PURGE
@@ -135,8 +152,7 @@ create or replace package PKG_EXS as
     DEXEC_DATE              in date,    -- Дата предыдущего исполнения
     NRETRY_SCHEDULE         in number,  -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
     NRETRY_STEP             in number   -- Шаг графика перезапуска
-  )
-  return                    date;       -- Дата следующего запуска
+  ) return                  date;       -- Дата следующего запуска
 
   /* Выяснение необходимости запуска по расписанию */
   function UTL_SCHED_CHECK_EXEC
@@ -145,8 +161,7 @@ create or replace package PKG_EXS as
     NRETRY_SCHEDULE         in number,         -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
     NRETRY_STEP             in number,         -- Шаг графика перезапуска
     DEXEC                   in date := sysdate -- Дата, относительно которой необходимо выполнить проверку
-  )
-  return                    boolean;           -- Признак необходимости запуска
+  ) return                  boolean;           -- Признак необходимости запуска
 
   /* Установка значения типа строка параметра процедуры обработки сообщения обмена */
   procedure PRC_RESP_ARG_STR_SET
@@ -243,10 +258,58 @@ create or replace package PKG_EXS as
     RCSERVICE               out sys_refcursor -- Курсор со списком сервисов
   );
 
+  /* Получение контекста сервиса */
+  procedure SERVICE_CTX_GET
+  (
+    NFLAG_SMART             in number,        -- Признак выдачи сообщения об ошибке
+    NEXSSERVICE             in number,        -- Рег. номер записи сервиса
+    RCSERVICE_CTX           out sys_refcursor -- Курсор со контектом сервиса  
+  );
+  
+  /* Установка контекста сервиса */
+  procedure SERVICE_CTX_SET
+  (
+    NEXSSERVICE             in number,   -- Рег. номер записи сервиса
+    SCTX                    in varchar2, -- Контекст
+    DCTX_EXP                in date      -- Дата истечения контекста
+  );
+
+  /* Очистка контекста сервиса */
+  procedure SERVICE_CTX_CLEAR
+  (
+    NEXSSERVICE             in number   -- Рег. номер записи сервиса
+  );
+
+  /* Проверка необходимости аутентификации */
+  function SERVICE_IS_AUTH
+  (
+    NEXSSERVICE             in number   -- Рег. номер записи сервиса
+  ) return                  number;     -- Флаг аутентификации (см. константы NIS_AUTH_*)
+
+  /* Поиск функции аутентификации для сервиса обмена */
+  procedure SERVICE_AUTH_FN_FIND
+  (
+    NFLAG_SMART             in number,               -- Признак выдачи сообщения об ошибке
+    NEXSSERVICE             in number,               -- Рег. номер записи сервиса
+    REXSSERVICEFN           out EXSSERVICEFN%rowtype -- Запись функции аутентификации
+  );
+  
+  /* Помещение задания на аутентификацию сервиса в очередь обмена */
+  procedure SERVICE_AUTH_PUT_INQUEUE
+  (
+    NEXSSERVICE             in number   -- Рег. номер сервиса обмена
+  );
+  
   /* Получение списка сервисов */
   procedure SERVICES_GET
   (
     RCSERVICES              out sys_refcursor -- Курсор со списком сервисов
+  );
+
+  /* Получение списка сервисов требующих аутентификации */
+  procedure SERVICES_AUTH_GET
+  (
+    RCSERVICES_AUTH         out sys_refcursor -- Курсор со списком сервисов требующих аутентификации
   );
 
   /* Получение функции сервиса */
@@ -277,8 +340,13 @@ create or replace package PKG_EXS as
     NFLAG_SMART             in number,   -- Признак генерации исключения (0 - да, 1 - нет)
     SEXSSERVICE             in varchar2, -- Мнемокод сервиса для обработки
     SEXSSERVICEFN           in varchar2  -- Мнемокод функции сервиса для обработки
-  )
-  return                    number;      -- Рег. номер функции сервиса обмена
+  ) return                  number;      -- Рег. номер функции сервиса обмена
+
+  /* Проверка наличия в очереди неисполненного задания для указанной функции сервиса обмена */
+  function SERVICEFN_CHECK_INCMPL_INQUEUE
+  (
+    NEXSSERVICEFN           in number   -- Рег. номер записи функции сервиса обмена
+  ) return                  boolean;    -- Результат проверки (true - в очереди есть неисполненные задания для данной функции, false - в очереди нет неисполненных заданий для данной функции)
 
   /* Считывание записи журнала работы */
   procedure LOG_GET
@@ -325,8 +393,7 @@ create or replace package PKG_EXS as
   function QUEUE_SRV_TYPE_SEND_EXEC_CHECK
   (
     NEXSQUEUE               in number -- Рег. номер записи очереди
-  )
-  return                    number;   -- Флаг необходимости исполнения позиции очереди (см. константы NQUEUE_EXEC_*)
+  ) return                  number;   -- Флаг необходимости исполнения позиции очереди (см. константы NQUEUE_EXEC_*)
 
   /* Считывание очередной порции исходящих сообщений из очереди */
   procedure QUEUE_SRV_TYPE_SEND_GET
@@ -682,8 +749,7 @@ create or replace package body PKG_EXS as
   (
     NIDENT                  in number,          -- Идентификатор процесса
     SSUB_CONTAINER          in varchar2 := null -- Наименование контейнера второго уровня
-  )
-  return                    varchar2            -- Полное наименование контейнера
+  ) return                  varchar2            -- Полное наименование контейнера
   is
     /* Формирование полного наименования контейнера */
     function CONTAINER_MAKE_NAME
@@ -731,8 +797,7 @@ create or replace package body PKG_EXS as
     DEXEC_DATE              in date,    -- Дата предыдущего исполнения
     NRETRY_SCHEDULE         in number,  -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
     NRETRY_STEP             in number   -- Шаг графика перезапуска
-  )
-  return                    date        -- Дата следующего запуска
+  ) return                  date        -- Дата следующего запуска
   is
   begin
     /* Если нет даты предыдущего запуска или расписание не определено, то дата очередного запуска - это текущая дата */
@@ -790,8 +855,7 @@ create or replace package body PKG_EXS as
     NRETRY_SCHEDULE         in number,         -- График перезапуска (см. константы NRETRY_SCHEDULE_*)
     NRETRY_STEP             in number,         -- Шаг графика перезапуска
     DEXEC                   in date := sysdate -- Дата, относительно которой необходимо выполнить проверку
-  )
-  return                    boolean            -- Признак необходимости запуска
+  ) return                  boolean            -- Признак необходимости запуска
   is
     DEXEC_NEXT              date;              -- Hасчетная дата следующего запуска
   begin
@@ -1056,6 +1120,173 @@ create or replace package body PKG_EXS as
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
   end SERVICE_GET;
 
+  /* Получение контекста сервиса */
+  procedure SERVICE_CTX_GET
+  (
+    NFLAG_SMART             in number,          -- Признак выдачи сообщения об ошибке
+    NEXSSERVICE             in number,          -- Рег. номер записи сервиса
+    RCSERVICE_CTX           out sys_refcursor   -- Курсор со контектом сервиса  
+  )
+  is
+    REXSSERVICE             EXSSERVICE%rowtype; -- Запись сервиса
+  begin
+    /* Считаем запись сервиса */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => NFLAG_SMART, NRN => NEXSSERVICE);
+    /* Открываем выходной курсор */
+    open RCSERVICE_CTX for
+      select T.RN "nId",
+             T.CTX "sCtx",
+             T.CTX_EXP "dCtxExp",
+             TO_CHAR(T.CTX_EXP, 'dd.mm.yyyy hh24:mi:ss') "sCtxExp",
+             T.IS_AUTH "nIsAuth",
+             DECODE(T.IS_AUTH, NIS_AUTH_YES, SIS_AUTH_YES, NIS_AUTH_NO, SIS_AUTH_NO) "sIsAuth"
+        from EXSSERVICE T
+       where T.RN = REXSSERVICE.RN;
+  end SERVICE_CTX_GET;
+  
+  /* Установка контекста сервиса */
+  procedure SERVICE_CTX_SET
+  (
+    NEXSSERVICE             in number,          -- Рег. номер записи сервиса
+    SCTX                    in varchar2,        -- Контекст
+    DCTX_EXP                in date             -- Дата истечения контекста
+  )
+  is
+    REXSSERVICE             EXSSERVICE%rowtype; -- Запись сервиса
+  begin
+    /* Считаем запись сервиса */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => NEXSSERVICE);
+    /* Проверим, что контекст есть */
+    if (SCTX is null) then
+      P_EXCEPTION(0, 'Не указан контекст работы сервиса.');
+    end if;
+    /* Устанавливаем контекст */
+    update EXSSERVICE T
+       set T.CTX     = SCTX,
+           T.CTX_EXP = DCTX_EXP,
+           T.IS_AUTH = NIS_AUTH_YES
+     where T.RN = REXSSERVICE.RN;
+  end SERVICE_CTX_SET;
+
+  /* Очистка контекста сервиса */
+  procedure SERVICE_CTX_CLEAR
+  (
+    NEXSSERVICE             in number           -- Рег. номер записи сервиса
+  )
+  is
+    REXSSERVICE             EXSSERVICE%rowtype; -- Запись сервиса
+  begin
+    /* Считаем запись сервиса */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => NEXSSERVICE);
+    /* Устанавливаем контекст */
+    update EXSSERVICE T
+       set T.CTX     = null,
+           T.CTX_EXP = null,
+           T.IS_AUTH = NIS_AUTH_NO
+     where T.RN = REXSSERVICE.RN;
+  end SERVICE_CTX_CLEAR;
+  
+  /* Проверка аутентифицированности сервиса */
+  function SERVICE_IS_AUTH
+  (
+    NEXSSERVICE             in number           -- Рег. номер записи сервиса
+  ) return                  number              -- Флаг аутентификации (см. константы NIS_AUTH_*)
+  is
+    NRES                    PKG_STD.TNUMBER;    -- Результат работы
+    REXSSERVICE             EXSSERVICE%rowtype; -- Запись сервиса
+  begin
+    /* инициализируем результат */
+    NRES := NIS_AUTH_NO;
+    /* Считаем запись сервиса */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => NEXSSERVICE);
+    /* Если сервис аутентифицирован */
+    if (REXSSERVICE.IS_AUTH = NIS_AUTH_YES) then
+      /* Если указана дата исчетечения аутентификации */
+      if (REXSSERVICE.CTX_EXP is not null) then
+        /* Если дата истечения ещё не наступила */
+        if (REXSSERVICE.CTX_EXP > sysdate) then
+          /* То он аутентифицирован */
+          NRES := NIS_AUTH_YES;
+        end if;
+      else
+        /* Даты нет - считаем его аутентифицированным */
+        NRES := NIS_AUTH_YES;
+      end if;
+    end if;
+    /* Вернем результат работы */
+    return NRES;
+  end SERVICE_IS_AUTH;
+  
+  /* Поиск функции аутентификации для сервиса обмена */
+  procedure SERVICE_AUTH_FN_FIND
+  (
+    NFLAG_SMART             in number,               -- Признак выдачи сообщения об ошибке
+    NEXSSERVICE             in number,               -- Рег. номер записи сервиса
+    REXSSERVICEFN           out EXSSERVICEFN%rowtype -- Запись функции аутентификации
+  )
+  is
+    REXSSERVICE             EXSSERVICE%rowtype;      -- Запись сервиса
+  begin
+    /* Считаем запись сервиса */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => NFLAG_SMART, NRN => NEXSSERVICE);
+    /* Если сервис считался */
+    if (REXSSERVICE.RN is not null) then
+      /* Ищем функцию */
+      begin
+        select T.*
+          into REXSSERVICEFN
+          from EXSSERVICEFN T
+         where T.PRN = REXSSERVICE.RN
+           and T.FN_TYPE = NFN_TYPE_LOGIN;
+      exception
+        when TOO_MANY_ROWS then
+          P_EXCEPTION(NFLAG_SMART,
+                      'Для сервиса обмена "%s" функция аутентификации определена неоднозначно.',
+                      REXSSERVICE.CODE);
+        when NO_DATA_FOUND then
+          P_EXCEPTION(NFLAG_SMART,
+                      'Для сервиса обмена "%s" не определена функция аутентификации.',
+                      REXSSERVICE.CODE);
+      end;
+    end if;
+  end SERVICE_AUTH_FN_FIND;
+  
+  /* Помещение задания на аутентификацию сервиса в очередь обмена */
+  procedure SERVICE_AUTH_PUT_INQUEUE
+  (
+    NEXSSERVICE             in number             -- Рег. номер сервиса обмена
+  )
+  is
+    pragma autonomous_transaction;
+    REXSSERVICEFN_AUTH      EXSSERVICEFN%rowtype; -- Запись функции аутентификации  
+    NAUTH_EXSQUEUE          PKG_STD.TREF;         -- Рег. номер позиции очереди для атуентификации
+  begin
+    /* Ищем функцию её осуществляющую аутентификацию */
+    SERVICE_AUTH_FN_FIND(NFLAG_SMART => 0, NEXSSERVICE => NEXSSERVICE, REXSSERVICEFN => REXSSERVICEFN_AUTH);
+    /* Проверяем, что в очереди ещё пока нет запросов на аутентификацию */
+    if (not SERVICEFN_CHECK_INCMPL_INQUEUE(NEXSSERVICEFN => REXSSERVICEFN_AUTH.RN)) then
+      /* Зачищаем текущий контекст сервиса */
+      SERVICE_CTX_CLEAR(NEXSSERVICE => REXSSERVICEFN_AUTH.PRN);
+      /* Регистрируем в очереди задание на аутентификацию */
+      P_EXSQUEUE_BASE_INSERT(DIN_DATE      => sysdate,
+                             SIN_AUTHID    => UTILIZER(),
+                             NEXSSERVICEFN => REXSSERVICEFN_AUTH.RN,
+                             DEXEC_DATE    => null,
+                             NEXEC_CNT     => 0,
+                             NEXEC_STATE   => NQUEUE_EXEC_STATE_INQUEUE,
+                             SEXEC_MSG     => null,
+                             BMSG          => null,
+                             BRESP         => null,
+                             NEXSQUEUE     => null,
+                             NLNK_COMPANY  => null,
+                             NLNK_DOCUMENT => null,
+                             SLNK_UNITCODE => null,
+                             SOPTIONS      => null,
+                             NRN           => NAUTH_EXSQUEUE);
+    end if;
+    commit;
+  end SERVICE_AUTH_PUT_INQUEUE;
+  
   /* Получение списка сервисов */
   procedure SERVICES_GET
   (
@@ -1078,7 +1309,41 @@ create or replace package body PKG_EXS as
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
   end SERVICES_GET;
-
+  
+  /* Получение списка сервисов требующих аутентификации */
+  procedure SERVICES_AUTH_GET
+  (
+    RCSERVICES_AUTH         out sys_refcursor -- Курсор со списком сервисов требующих аутентификации
+  )
+  is
+    NIDENT                  PKG_STD.TREF;     -- Идентификатор буфера
+    NTMP                    PKG_STD.TREF;     -- Рег. номер очередной записи буфера
+  begin
+    /* Сформируем идентификатор буфера */
+    NIDENT := GEN_IDENT();
+    /* Обходим нужные сервисы */
+    for C in (select T.RN
+                from EXSSERVICE T
+               where T.IS_AUTH = NIS_AUTH_NO
+                 and exists (select FN.RN
+                        from EXSSERVICEFN FN
+                       where FN.PRN = T.RN
+                         and FN.FN_TYPE = NFN_TYPE_LOGIN)
+                 and exists (select FN.RN
+                        from EXSSERVICEFN FN
+                       where FN.PRN = T.RN
+                         and FN.AUTH_ONLY = NAUTH_ONLY_YES
+                         and FN.FN_TYPE <> NFN_TYPE_LOGIN))
+    loop
+      /* Запоминаем их рег. номера в буфере */
+      RNLIST_BASE_INSERT(NIDENT => NIDENT, NDOCUMENT => C.RN, NRN => NTMP);
+    end loop;
+    /* Забираем отобранные сервисы */
+    SERVICE_GET(NIDENT => NIDENT, RCSERVICE => RCSERVICES_AUTH);
+    /* Чистим буфер */
+    RNLIST_BASE_CLEAR(NIDENT => NIDENT);
+  end SERVICES_AUTH_GET;
+  
   /* Получение функции сервиса */
   procedure SERVICEFN_GET
   (
@@ -1123,7 +1388,12 @@ create or replace package body PKG_EXS as
              M.CODE "sMsgCode",
              DECODE(M.PRC_RESP, null, null, UTL_STORED_MAKE_LINK(SPROCEDURE => M.PRC_RESP, SPACKAGE => M.PKG_RESP)) "sPrcResp",
              M.APPSRV_BEFORE "sAppSrvBefore",
-             M.APPSRV_AFTER "sAppSrvAfter"
+             M.APPSRV_AFTER "sAppSrvAfter",
+             T.AUTH_ONLY "nAuthOnly",
+             DECODE(T.AUTH_ONLY, NAUTH_ONLY_NO, SAUTH_ONLY_NO, NAUTH_ONLY_YES, SAUTH_ONLY_YES) "sAuthOnly",
+             T.ERR_NTF_SIGN "nErrNtfSign",
+             DECODE(T.ERR_NTF_SIGN, NERR_NTF_SIGN_NO, SERR_NTF_SIGN_NO, NERR_NTF_SIGN_YES, SERR_NTF_SIGN_YES) "sErrNtfSign",
+             T.ERR_NTF_MAIL "sErrNtfMail"
         from EXSSERVICEFN T,
              EXSMSGTYPE   M
        where T.RN in (select L.DOCUMENT from EXSRNLIST L where L.IDENT = NIDENT)
@@ -1184,8 +1454,7 @@ create or replace package body PKG_EXS as
     NFLAG_SMART             in number,    -- Признак генерации исключения (0 - да, 1 - нет)
     SEXSSERVICE             in varchar2,  -- Мнемокод сервиса для обработки
     SEXSSERVICEFN           in varchar2   -- Мнемокод функции сервиса для обработки
-  )
-  return                    number        -- Рег. номер функции сервиса обмена
+  ) return                  number        -- Рег. номер функции сервиса обмена
   is
     NEXSSERVICE             PKG_STD.TREF; -- Рег. номер сервиса обработки
     NEXSSERVICEFN           PKG_STD.TREF; -- Рег. номер функции сервиса обработки
@@ -1202,6 +1471,36 @@ create or replace package body PKG_EXS as
     return NEXSSERVICEFN;
   end SERVICEFN_FIND_BY_SRVCODE;
 
+  /* Проверка наличия в очереди неисполненного задания для указанной функции сервиса обмена */
+  function SERVICEFN_CHECK_INCMPL_INQUEUE
+  (
+    NEXSSERVICEFN           in number        -- Рег. номер записи функции сервиса обмена
+  ) return                  boolean          -- Результат проверки (true - в очереди есть неисполненные задания для данной функции, false - в очереди нет неисполненных заданий для данной функции)
+  is
+    NCNT                    PKG_STD.TNUMBER; -- Количество найденных записей очереди
+  begin
+    /* Проверим очередь */
+    select count(Q.RN)
+      into NCNT
+      from EXSQUEUE Q
+     where Q.EXSSERVICEFN = NEXSSERVICEFN
+       and Q.EXEC_STATE not in (NQUEUE_EXEC_STATE_OK, NQUEUE_EXEC_STATE_ERR);
+    /* Если не нашли ничего в очереди... */
+    if (NCNT = 0) then
+      /* ...скажем что заданий нет */
+      return false;
+    else
+      /* Если нашли - скажем что задания есть */
+      return true;
+    end if;
+  exception
+    when others then
+      P_EXCEPTION(0,
+                  'Ошибка определения наличия в очереди заданий для функции (RN: %s) сервиса обмена: %s',
+                  TO_CHAR(NEXSSERVICEFN),
+                  sqlerrm);
+  end SERVICEFN_CHECK_INCMPL_INQUEUE;
+  
   /* Считывание записи журнала работы */
   procedure LOG_GET
   (
@@ -1394,14 +1693,13 @@ create or replace package body PKG_EXS as
   /* Проверка необходимости исполнения позиции очереди */
   function QUEUE_SRV_TYPE_SEND_EXEC_CHECK
   (
-    NEXSQUEUE               in number -- Рег. номер записи очереди
-  )
-  return                    number    -- Флаг необходимости исполнения позиции очереди (см. константы NQUEUE_EXEC_*)
+    NEXSQUEUE               in number             -- Рег. номер записи очереди
+  ) return                  number                -- Флаг необходимости исполнения позиции очереди (см. константы NQUEUE_EXEC_*)
   is
-    REXSQUEUE               EXSQUEUE%rowtype;          -- Запись позиции очереди
-    REXSSERVICE             EXSSERVICE%rowtype;        -- Запись сервиса обработки
-    REXSSERVICEFN           EXSSERVICEFN%rowtype;      -- Запись функции обработки
-    NRESULT                 number(17); -- Результат работы
+    REXSQUEUE               EXSQUEUE%rowtype;     -- Запись позиции очереди
+    REXSSERVICE             EXSSERVICE%rowtype;   -- Запись сервиса обработки
+    REXSSERVICEFN           EXSSERVICEFN%rowtype; -- Запись функции обработки
+    NRESULT                 PKG_STD.TNUMBER;      -- Результат работы
   begin
     /* Инициализируем результат */
     NRESULT := NQUEUE_EXEC_NO;
@@ -1412,7 +1710,7 @@ create or replace package body PKG_EXS as
       REXSSERVICEFN := GET_EXSSERVICEFN_ID(NFLAG_SMART => 0, NRN => REXSQUEUE.EXSSERVICEFN);
       /* Считаем запись сервиса обработки */
       REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => REXSSERVICEFN.PRN);
-      /* Проверим условия исполнения - исходящее, недоисполнено, и остались попытки */
+      /* Проверим условия исполнения - исходящее, недоисполнено, и остались попытки, требует аутентификации и сервис аутентифицирован */
       if ((REXSSERVICE.SRV_TYPE = NSRV_TYPE_SEND) and
          (REXSQUEUE.EXEC_STATE not in
          (NQUEUE_EXEC_STATE_OK, NQUEUE_EXEC_STATE_ERR, NQUEUE_EXEC_STATE_APP, NQUEUE_EXEC_STATE_DB)) and
@@ -1421,7 +1719,9 @@ create or replace package body PKG_EXS as
          ((REXSSERVICEFN.RETRY_SCHEDULE = NRETRY_SCHEDULE_UNDEF) and (REXSQUEUE.EXEC_CNT = 0))) and
          (UTL_SCHED_CHECK_EXEC(DEXEC_DATE      => REXSQUEUE.EXEC_DATE,
                                 NRETRY_SCHEDULE => REXSSERVICEFN.RETRY_SCHEDULE,
-                                NRETRY_STEP     => REXSSERVICEFN.RETRY_STEP))) then
+                                NRETRY_STEP     => REXSSERVICEFN.RETRY_STEP)) and
+         ((REXSSERVICEFN.AUTH_ONLY = NAUTH_ONLY_NO) or
+         ((REXSSERVICEFN.AUTH_ONLY = NAUTH_ONLY_YES) and (REXSSERVICE.IS_AUTH = NIS_AUTH_YES)))) then
         /* Надо исполнять */
         NRESULT := NQUEUE_EXEC_YES;
       end if;
@@ -1461,7 +1761,7 @@ create or replace package body PKG_EXS as
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
   end QUEUE_SRV_TYPE_SEND_GET;
-
+  
   /* Установка состояние записи очереди */
   procedure QUEUE_EXEC_STATE_SET
   (
@@ -1585,29 +1885,43 @@ create or replace package body PKG_EXS as
     /* Вернем измененную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_MSG_SET;
-
+  
   /* Помещение сообщения обмена в очередь */
   procedure QUEUE_PUT
   (
-    NEXSSERVICEFN           in number,           -- Рег. номер функции обработки
-    BMSG                    in blob,             -- Данные
-    NEXSQUEUE               in number := null,   -- Рег. номер связанной позиции очереди
-    NLNK_COMPANY            in number := null,   -- Рег. номер связанной организации
-    NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
-    SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
-    SOPTIONS                in varchar2 := null, -- Параметры сообщения
-    NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
+    NEXSSERVICEFN           in number,            -- Рег. номер функции обработки
+    BMSG                    in blob,              -- Данные
+    NEXSQUEUE               in number := null,    -- Рег. номер связанной позиции очереди
+    NLNK_COMPANY            in number := null,    -- Рег. номер связанной организации
+    NLNK_DOCUMENT           in number := null,    -- Рег. номер связанной записи документа
+    SLNK_UNITCODE           in varchar2 := null,  -- Код связанного раздела
+    SOPTIONS                in varchar2 := null,  -- Параметры сообщения
+    NNEW_EXSQUEUE           out number            -- Курсор с добавленной позицией очереди
   )
   is
+    REXSSERVICE             EXSSERVICE%rowtype;   -- Запись сервиса обработки
+    REXSSERVICEFN           EXSSERVICEFN%rowtype; -- Запись функции обработки
   begin
     /* Проверяем параметры */
     if (NEXSSERVICEFN is null) then
-      P_EXCEPTION(0, 'Не указан идентификатор функции сервиса обмена');
+      P_EXCEPTION(0, 'Не указан идентификатор функции сервиса обмена.');
+    end if;
+    /* Считаем запись функции обработки */
+    REXSSERVICEFN := GET_EXSSERVICEFN_ID(NFLAG_SMART => 0, NRN => NEXSSERVICEFN);
+    /* Считаем запись сервиса обработки */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => REXSSERVICEFN.PRN);
+    /* Если это исходящее сообщение и функция требует аутентификации */
+    if ((REXSSERVICE.SRV_TYPE = NSRV_TYPE_SEND) and (REXSSERVICEFN.AUTH_ONLY = NAUTH_ONLY_YES)) then
+      /* Проверим необходимость аутентификации */
+      if (SERVICE_IS_AUTH(NEXSSERVICE => REXSSERVICE.RN) = NIS_AUTH_NO) then
+        /* Нужна аутентификация - поставим в очередь задание для неё */
+        SERVICE_AUTH_PUT_INQUEUE(NEXSSERVICE => REXSSERVICE.RN);
+      end if;
     end if;
     /* Ставим запись в очередь */
     P_EXSQUEUE_BASE_INSERT(DIN_DATE      => sysdate,
                            SIN_AUTHID    => UTILIZER(),
-                           NEXSSERVICEFN => NEXSSERVICEFN,
+                           NEXSSERVICEFN => REXSSERVICEFN.RN,
                            DEXEC_DATE    => null,
                            NEXEC_CNT     => 0,
                            NEXEC_STATE   => NQUEUE_EXEC_STATE_INQUEUE,
@@ -1635,7 +1949,7 @@ create or replace package body PKG_EXS as
     RCQUEUE                 out sys_refcursor    -- Курсор с добавленной позицией очереди
   )
   is
-    NRN                     EXSQUEUE.RN%type;  -- Рег. номер добавленной записи очереди
+    NRN                     EXSQUEUE.RN%type;    -- Рег. номер добавленной записи очереди
   begin
     /* Проверяем параметры */
     QUEUE_PUT(NEXSSERVICEFN => NEXSSERVICEFN,
@@ -1664,7 +1978,7 @@ create or replace package body PKG_EXS as
     NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
   )
   is
-    NEXSSERVICEFN           PKG_STD.TREF;      -- Рег. номер функции сервиса обработки
+    NEXSSERVICEFN           PKG_STD.TREF;        -- Рег. номер функции сервиса обработки
   begin
     /* Проверяем параметры */
     if (SEXSSERVICE is null) then
@@ -1702,7 +2016,7 @@ create or replace package body PKG_EXS as
     RCQUEUE                 out sys_refcursor    -- Курсор с добавленной позицией очереди
   )
   is
-    NRN                     EXSQUEUE.RN%type;  -- Рег. номер добавленной записи очереди
+    NRN                     EXSQUEUE.RN%type;    -- Рег. номер добавленной записи очереди
   begin
     /* Ставим запись в очередь */
     QUEUE_PUT(SEXSSERVICE   => SEXSSERVICE,

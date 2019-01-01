@@ -27,6 +27,12 @@ const NUNAVLBL_NTF_SIGN_YES = 1; //Оповещать о простое
 const SUNAVLBL_NTF_SIGN_NO = "UNAVLBL_NTF_NO"; //Не оповещать о простое (строковый код)
 const SUNAVLBL_NTF_SIGN_YES = "UNAVLBL_NTF_YES"; //Оповещать о простое (строковый код)
 
+//Признак аутентифицированности сервиса
+const NIS_AUTH_YES = 1; //Аутентифицирован
+const NIS_AUTH_NO = 0; //Неаутентифицирован
+const SIS_AUTH_YES = "IS_AUTH_YES"; //Аутентифицирован (строковый код)
+const SIS_AUTH_NO = "IS_AUTH_NO"; //Неаутентифицирован (строковый код)
+
 //-------------
 //  Тело модуля
 //-------------
@@ -49,8 +55,12 @@ exports.NUNAVLBL_NTF_SIGN_NO = NUNAVLBL_NTF_SIGN_NO;
 exports.NUNAVLBL_NTF_SIGN_YES = NUNAVLBL_NTF_SIGN_YES;
 exports.SUNAVLBL_NTF_SIGN_NO = SUNAVLBL_NTF_SIGN_NO;
 exports.SUNAVLBL_NTF_SIGN_YES = SUNAVLBL_NTF_SIGN_YES;
+exports.NIS_AUTH_YES = NIS_AUTH_YES;
+exports.NIS_AUTH_NO = NIS_AUTH_NO;
+exports.SIS_AUTH_YES = SIS_AUTH_YES;
+exports.SIS_AUTH_NO = SIS_AUTH_NO;
 
-//Схема валидации
+//Схема валидации сервиса
 exports.Service = new Schema({
     //Идентификатор сервиса
     nId: {
@@ -188,6 +198,70 @@ exports.Service = new Schema({
         message: {
             type: "Контекст работы сервиса (context) имеет некорректный тип данных (ожидалось - Object)",
             required: "Не указан контекст работы сервиса (context)"
+        }
+    }
+});
+
+//Схема валидации контекста сервиса
+exports.ServiceCtx = new Schema({
+    //Идентификатор сервиса
+    nId: {
+        type: Number,
+        required: true,
+        message: {
+            type: "Идентификатор сервиса (nId) имеет некорректный тип данных (ожидалось - Number)",
+            required: "Не указан идентификатор сервиса (nId)"
+        }
+    },
+    //Контекст
+    sCtx: {
+        type: String,
+        required: false,
+        message: {
+            type: "Контектс сервиса (sCtx) имеет некорректный тип данных (ожидалось - String)",
+            required: "Не указан контекст сервиса (sCtx)"
+        }
+    },
+    //Дата истечения контекста
+    dCtxExp: {
+        type: Date,
+        required: false,
+        message: {
+            type: "Дата истечения контекста (dCtxExp) имеет некорректный тип данных (ожидалось - Date)",
+            required: "Не указана дата истечения контекста (dCtxExp)"
+        }
+    },
+    //Дата истечения контекста (строковое представление)
+    sCtxExp: {
+        type: String,
+        required: false,
+        message: {
+            type:
+                "Строковое представление даты истечения контекста (sCtxExp) имеет некорректный тип данных (ожидалось - String)",
+            required: "Не указано строковое представление даты истечения контекста (sCtxExp)"
+        }
+    },
+    //Признак аутентицированности сервиса
+    nIsAuth: {
+        type: Number,
+        enum: [NIS_AUTH_YES, NIS_AUTH_NO],
+        required: true,
+        message: {
+            type: "Признака аутентицированности сервиса (nIsAuth) имеет некорректный тип данных (ожидалось - Number)",
+            enum: "Значение признака аутентицированности сервиса (nIsAuth) не поддерживается",
+            required: "Не указан признак аутентицированности сервиса (nIsAuth)"
+        }
+    },
+    //Признак аутентицированности сервиса (строковый код)
+    sIsAuth: {
+        type: String,
+        enum: [SIS_AUTH_YES, SIS_AUTH_NO],
+        required: true,
+        message: {
+            type:
+                "Строковый код признака аутентицированности сервиса (sIsAuth) имеет некорректный тип данных (ожидалось - String)",
+            enum: "Значение строкового кода признака аутентицированности сервиса (sIsAuth) не поддерживается",
+            required: "Не указан строковый код признака аутентицированности сервиса (sIsAuth)"
         }
     }
 });

@@ -8,6 +8,7 @@
 //----------------------
 
 const Schema = require("validate"); //Схемы валидации
+const { validateMailList } = require("./common"); //Общие объекты валидации моделей данных
 
 //----------
 // Константы
@@ -43,6 +44,18 @@ const SRETRY_SCHEDULE_DAY = "DAY"; //Сутки (строковый код)
 const SRETRY_SCHEDULE_WEEK = "WEEK"; //Неделя (строковый код)
 const SRETRY_SCHEDULE_MONTH = "MONTH"; //Месяц (строковый код)
 
+//Признак необходимости аутентифицированности сервиса для исполнения функции
+const NAUTH_ONLY_YES = 1; //Требуется аутентификация
+const NAUTH_ONLY_NO = 0; //Аутентификация не требуется
+const SAUTH_ONLY_YES = "AUTH_ONLY_YES"; //Требуется аутентификация (строковый код)
+const SAUTH_ONLY_NO = "AUTH_ONLY_NO"; //Аутентификация не требуется (строковый код)
+
+//Признак оповещения об ошибке исполнения сообщения очереди для функции обработки
+const NERR_NTF_SIGN_NO = 0; //Не оповещать об ошибке исполнения
+const NERR_NTF_SIGN_YES = 1; //Оповещать об ошибке исполнения
+const SERR_NTF_SIGN_NO = "ERR_NTF_SIGN_NO"; //Не оповещать об ошибке исполнения (строковый код)
+const SERR_NTF_SIGN_YES = "ERR_NTF_SIGN_YES"; //Оповещать об ошибке исполнения (строковый код)
+
 //-------------
 //  Тело модуля
 //-------------
@@ -54,6 +67,11 @@ const validateAppSrvFn = val => {
         return r.test(val.toLowerCase());
     }
     return true;
+};
+
+//Валидация списка адресов E-Mail для оповещения об ошибке обработки сообщения очереди
+const validateErrNtfMail = val => {
+    return validateMailList(val);
 };
 
 //------------------
@@ -85,6 +103,14 @@ exports.SRETRY_SCHEDULE_HOUR = SRETRY_SCHEDULE_HOUR;
 exports.SRETRY_SCHEDULE_DAY = SRETRY_SCHEDULE_DAY;
 exports.SRETRY_SCHEDULE_WEEK = SRETRY_SCHEDULE_WEEK;
 exports.SRETRY_SCHEDULE_MONTH = SRETRY_SCHEDULE_MONTH;
+exports.NAUTH_ONLY_YES = NAUTH_ONLY_YES;
+exports.NAUTH_ONLY_NO = NAUTH_ONLY_NO;
+exports.SAUTH_ONLY_YES = SAUTH_ONLY_YES;
+exports.SAUTH_ONLY_NO = SAUTH_ONLY_NO;
+exports.NERR_NTF_SIGN_NO = NERR_NTF_SIGN_NO;
+exports.NERR_NTF_SIGN_YES = NERR_NTF_SIGN_YES;
+exports.SERR_NTF_SIGN_NO = SERR_NTF_SIGN_NO;
+exports.SERR_NTF_SIGN_YES = SERR_NTF_SIGN_YES;
 
 //Схема валидации функции сервиса
 exports.ServiceFunction = new Schema({
@@ -269,6 +295,75 @@ exports.ServiceFunction = new Schema({
                 "Не указан обработчик сообщения 'после' на строне сервера приложений для функции сервиса (sAppSrvAfter)",
             validateAppSrvFn:
                 "Обработчик сообщения 'после' на строне сервера приложений для функции сервиса (sAppSrvBefore) имеет некорректный формат, ожидалось: <МОДУЛЬ>.js/<ФУНКЦИЯ>"
+        }
+    },
+    //Признак необходимости аутентификации для исполнения функции сервсиа обмена
+    nAuthOnly: {
+        type: Number,
+        enum: [NAUTH_ONLY_NO, NAUTH_ONLY_YES],
+        required: true,
+        message: {
+            type:
+                "Признак необходимости аутентификации для исполнения функции сервсиа обмена (nAuthOnly) имеет некорректный тип данных (ожидалось - Number)",
+            enum:
+                "Значение признака необходимости аутентификации для исполнения функции сервсиа обмена (nAuthOnly) не поддерживается",
+            required: "Не указан признак необходимости аутентификации для исполнения функции сервсиа обмена (nAuthOnly)"
+        }
+    },
+    //Признак необходимости аутентификации для исполнения функции сервсиа обмена (строковый код)
+    sAuthOnly: {
+        type: String,
+        enum: [SAUTH_ONLY_NO, SAUTH_ONLY_YES],
+        required: true,
+        message: {
+            type:
+                "Строковый код признака необходимости аутентификации для исполнения функции сервсиа обмена (sAuthOnly) имеет некорректный тип данных (ожидалось - String)",
+            enum:
+                "Значение строкового кода признака необходимости аутентификации для исполнения функции сервсиа обмена (sAuthOnly) не поддерживается",
+            required:
+                "Не указан строковый код признака необходимости аутентификации для исполнения функции сервсиа обмена (sAuthOnly)"
+        }
+    },
+    //Признак оповещения об ошибке исполнения сообщения очереди для функции обработки
+    nErrNtfSign: {
+        type: Number,
+        enum: [NERR_NTF_SIGN_NO, NERR_NTF_SIGN_YES],
+        required: true,
+        message: {
+            type:
+                "Признак оповещения об ошибке исполнения сообщения очереди для функции обработки (nErrNtfSign) имеет некорректный тип данных (ожидалось - Number)",
+            enum:
+                "Значение признака оповещения об ошибке исполнения сообщения очереди для функции обработки (nErrNtfSign) не поддерживается",
+            required:
+                "Не указан признак оповещения об ошибке исполнения сообщения очереди для функции обработки (nErrNtfSign)"
+        }
+    },
+    //Признак оповещения об ошибке исполнения сообщения очереди для функции обработки (строковый код)
+    sErrNtfSign: {
+        type: String,
+        enum: [SERR_NTF_SIGN_NO, SERR_NTF_SIGN_YES],
+        required: true,
+        message: {
+            type:
+                "Строковый код признака оповещения об ошибке исполнения сообщения очереди для функции обработки (sErrNtfSign) имеет некорректный тип данных (ожидалось - String)",
+            enum:
+                "Значение строкового кода признака оповещения об ошибке исполнения сообщения очереди для функции обработки (sErrNtfSign) не поддерживается",
+            required:
+                "Не указан строковый код признака оповещения об ошибке исполнения сообщения очереди для функции обработки (sErrNtfSign)"
+        }
+    },
+    //Список адресов E-Mail для оповещения об ошибке исполнения сообщения очереди для функции обработки
+    sErrNtfMail: {
+        type: String,
+        required: false,
+        use: { validateErrNtfMail },
+        message: {
+            type:
+                "Список адресов E-Mail для оповещения об ошибке исполнения сообщения очереди для функции обработки (sErrNtfMail) имеет некорректный тип данных (ожидалось - String)",
+            required:
+                "Не указан список адресов E-Mail для оповещения об ошибке исполнения сообщения очереди для функции обработки (sErrNtfMail)",
+            validateErrNtfMail:
+                "Неверный формат списка адресов E-Mail для оповещения об ошибке исполнения сообщения очереди для функции обработки (sErrNtfMail), для указания нескольких адресов следует использовать запятую в качестве разделителя (без пробелов)"
         }
     }
 });

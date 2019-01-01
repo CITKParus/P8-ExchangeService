@@ -78,6 +78,89 @@ exports.getServiceFunctions = new Schema({
     }
 });
 
+//Схема валидации параметров функции получения контекста сервиса
+exports.getServiceContext = new Schema({
+    //Идентификатор сервиса
+    nServiceId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор сервиса (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сервиса (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции установки контектса сервиса
+exports.setServiceContext = new Schema({
+    //Идентификатор сервиса
+    nServiceId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор сервиса (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сервиса (${path})`
+        }
+    },
+    //Контекст сервиса
+    sCtx: {
+        type: String,
+        required: true,
+        message: {
+            type: path => `Контекст сервиса (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан контекст сервиса (${path})`
+        }
+    },
+    //Дата истечения контекста сервиса
+    dCtxExp: {
+        type: Date,
+        required: false,
+        message: {
+            type: path => `Дата истечения контекст сервиса (${path}) имеет некорректный тип данных (ожидалось - Date)`,
+            required: path => `Не указана дата истечения контекста сервиса (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции очистки контекста сервиса
+exports.clearServiceContext = new Schema({
+    //Идентификатор сервиса
+    nServiceId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор сервиса (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сервиса (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции проверки аутентифицированности сервиса
+exports.isServiceAuth = new Schema({
+    //Идентификатор сервиса
+    nServiceId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор сервиса (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сервиса (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции постановки в очередь задания на аутентификацию сервиса
+exports.putServiceAuthInQueue = new Schema({
+    //Идентификатор сервиса
+    nServiceId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор сервиса (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сервиса (${path})`
+        }
+    }
+});
+
 //Схема валидации параметров функции записи в журнал работы сервиса
 exports.putLog = new Schema({
     //Тип сообщения журнала работы сервиса

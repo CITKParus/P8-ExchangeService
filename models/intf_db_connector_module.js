@@ -64,6 +64,57 @@ exports.dbConnectorModule = new Schema({
             required: "Не реализована функция получения списка функций сервиса (getServiceFunctions)"
         }
     },
+    //Получение контекста сервиса
+    getServiceContext: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType:
+                "Функция получения контекста сервиса (getServiceContext) имеет неверный формат (ожидалось - AsyncFunction)",
+            required: "Не реализована функция получения контекста сервиса (getServiceContext)"
+        }
+    },
+    //Установка контекста сервиса
+    setServiceContext: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType:
+                "Функция установки контекста сервиса (setServiceContext) имеет неверный формат (ожидалось - AsyncFunction)",
+            required: "Не реализована функция установки контекста сервиса (setServiceContext)"
+        }
+    },
+    //Очистка контекста сервиса
+    clearServiceContext: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType:
+                "Функция очистки контекста сервиса (clearServiceContext) имеет неверный формат (ожидалось - AsyncFunction)",
+            required: "Не реализована функция очистки контекста сервиса (clearServiceContext)"
+        }
+    },
+    //Проверка атуентифицированности сервиса
+    isServiceAuth: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType:
+                "Функция проверки атуентифицированности сервиса (isServiceAuth) имеет неверный формат (ожидалось - AsyncFunction)",
+            required: "Не реализована функция проверки атуентифицированности сервиса (isServiceAuth)"
+        }
+    },
+    //Постановка в очередь задания на аутентификацию сервиса
+    putServiceAuthInQueue: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType:
+                "Функция постановки в очередь задания на аутентификацию сервиса (putServiceAuthInQueue) имеет неверный формат (ожидалось - AsyncFunction)",
+            required:
+                "Не реализована функция постановки в очередь задания на аутентификацию сервиса (putServiceAuthInQueue)"
+        }
+    },
     //Протоколирование работы сервиса
     log: {
         use: { validateAsyncFunctionType },
