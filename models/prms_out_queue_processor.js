@@ -24,21 +24,8 @@ exports.sendErrorResult = new Schema({
         type: String,
         required: true,
         message: {
-            type: path => `Идентификатор сервиса (${path}) имеет некорректный тип данных (ожидалось - String)`,
-            required: path => `Не указан идентификатор сервиса (${path})`
-        }
-    }
-});
-
-//Схема валидации параметров функции отправки успеха обработки
-exports.sendOKResult = new Schema({
-    //Контекст работы сервиса
-    context: {
-        type: Object,
-        required: true,
-        message: {
-            type: path => `Контекст работы сервиса (${path}) имеет некорректный тип данных (ожидалось - Object)`,
-            required: path => `Не указан контекст работы сервиса (${path})`
+            type: path => `Сообщение об ошибке (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указано сообщение об ошибке (${path})`
         }
     }
 });

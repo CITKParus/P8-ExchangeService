@@ -195,6 +195,9 @@ class OutQueue extends EventEmitter {
                 const self = this;
                 //Запоминаем текущее количество попыток обработки
                 const nQueueOldExecCnt = prms.queue.nExecCnt;
+                //Буфер для ошибок (для журнала работы и очереди обмена)
+                let sErrorLog = null;
+                let sError = null;
                 //Создаём новый обработчик сообщений
                 const proc = ChildProcess.fork("core/out_queue_processor", { silent: false });
                 //Перехват сообщений обработчика
@@ -211,40 +214,30 @@ class OutQueue extends EventEmitter {
                     if (!sCheckResult) {
                         //Анализируем результат обработки - если ошибка - фиксируем
                         if (result.sResult == objOutQueueProcessorSchema.STASK_RESULT_ERR) {
-                            //Фиксируем ошибку обработки - протокол работы сервиса
-                            await self.logger.error(`Ошибка обработки исходящего сообщения: ${result.sMsg}`, {
-                                nQueueId: prms.queue.nId
-                            });
-                            //Фиксируем ошибку обработки - статус сообщения
-                            await this.dbConn.setQueueState({
-                                nQueueId: prms.queue.nId,
-                                sExecMsg: result.sMsg,
-                                nIncExecCnt:
-                                    nQueueOldExecCnt == prms.queue.nExecCnt ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
-                                nExecState:
-                                    (nQueueOldExecCnt == prms.queue.nExecCnt
-                                        ? prms.queue.nExecCnt + 1
-                                        : prms.queue.nExecCnt) < prms.queue.nRetryAttempts
-                                        ? prms.queue.nExecState
-                                        : objQueueSchema.NQUEUE_EXEC_STATE_ERR
-                            });
+                            //Запоминаем ошибку обработчика
+                            sErrorLog = `Ошибка обработки исходящего сообщения: ${result.sMsg}`;
+                            sError = result.sMsg;
                         } else {
-                            //Ошибки нет, но если есть контекст для сервиса - сохраним его для дальнейшего использования
-                            if (!_.isUndefined(result.context)) {
-                                let tmpSrv = _.find(this.services, { nId: prms.queue.nServiceId });
-                                tmpSrv.context = _.cloneDeep(result.context);
+                            //Ошибки обработки нет, но может быть есть ошибка аутентификации
+                            if (result.sResult == objOutQueueProcessorSchema.STASK_RESULT_UNAUTH) {
+                                //!!!!!!!!!!!!!!
+                                //??????????????
+                                //!!!!!!!!!!!!!!
                             }
                         }
                     } else {
-                        //Пришел неожиданный ответ обработчика - запись в протокол работы сервиса
-                        await self.logger.error(
-                            `Неожиданный ответ обработчика для сообщения ${prms.queue.nId}: ${sCheckResult}`,
-                            { nQueueId: prms.queue.nId }
-                        );
-                        //Фиксируем ошибку обработки - статус сообщения
+                        //Пришел неожиданный ответ обработчика
+                        sErrorLog = `Неожиданный ответ обработчика для сообщения ${prms.queue.nId}: ${sCheckResult}`;
+                        sError = sCheckResult;
+                    }
+                    //Фиксируем ошибки, если есть
+                    if (sError) {
+                        //Запись в протокол работы сервиса
+                        await self.logger.error(sErrorLog, { nQueueId: prms.queue.nId });
+                        //Запись в статус сообщения
                         await this.dbConn.setQueueState({
                             nQueueId: prms.queue.nId,
-                            sExecMsg: `Неожиданный ответ обработчика для сообщения ${prms.queue.nId}: ${sCheckResult}`,
+                            sExecMsg: sError,
                             nIncExecCnt: nQueueOldExecCnt == prms.queue.nExecCnt ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
                             nExecState:
                                 (nQueueOldExecCnt == prms.queue.nExecCnt

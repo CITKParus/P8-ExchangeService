@@ -15,6 +15,7 @@ exports.SMODULES_PATH_MODELS = "@models"; //Модели данных и схе�
 //Типовые коды ошибок
 exports.SERR_COMMON = "ERR_COMMON"; //Общая ошибка
 exports.SERR_UNEXPECTED = "ERR_UNEXPECTED"; //Неожиданная ошибка
+exports.SERR_UNAUTH = "ERR_UNAUTH"; //Отсутствие аутентификации
 
 //Типовые коды ошибок подключения модулей
 exports.SERR_MODULES_NO_MODULE_SPECIFIED = "ERR_MODULES_NO_MODULE_SPECIFIED"; //Не указан подключаемый модуль

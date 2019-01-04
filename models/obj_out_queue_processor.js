@@ -19,6 +19,7 @@ const { ServiceFunction } = require("./obj_service_function"); //Схема ва
 //Состояния обработки сообщений очереди обмена
 const STASK_RESULT_OK = "OK"; //Обработано успешно
 const STASK_RESULT_ERR = "ERR"; //Обработано с ошибками
+const STASK_RESULT_UNAUTH = "UNAUTH"; //Не обработано из-за отсутсвия аутентификации
 
 //------------------
 //  Интерфейс модуля
@@ -27,6 +28,7 @@ const STASK_RESULT_ERR = "ERR"; //Обработано с ошибками
 //Константы
 exports.STASK_RESULT_OK = STASK_RESULT_OK;
 exports.STASK_RESULT_ERR = STASK_RESULT_ERR;
+exports.STASK_RESULT_UNAUTH = STASK_RESULT_UNAUTH;
 
 //Схема валидации задачи обработчику очереди исходящих сообщений
 exports.OutQueueProcessorTask = new Schema({
@@ -71,7 +73,7 @@ exports.OutQueueProcessorTaskResult = new Schema({
     //Состояние обработки сообщения очереди обмена
     sResult: {
         type: String,
-        enum: [STASK_RESULT_OK, STASK_RESULT_ERR],
+        enum: [STASK_RESULT_OK, STASK_RESULT_ERR, STASK_RESULT_UNAUTH],
         required: true,
         message: {
             type: path =>
@@ -88,15 +90,6 @@ exports.OutQueueProcessorTaskResult = new Schema({
             type: path =>
                 `Информация от обработчика сообщения очереди обмена (${path}) имеет некорректный тип данных (ожидалось - String)`,
             required: path => `Не указана информация от обработчика сообщения очереди обмена (${path})`
-        }
-    },
-    //Контекст работы сервиса
-    context: {
-        type: Object,
-        required: true,
-        message: {
-            type: path => `Контекст работы сервиса (${path}) имеет некорректный тип данных (ожидалось - Object)`,
-            required: path => `Не указан контекст работы сервиса (${path})`
         }
     }
 }).validator({
@@ -125,13 +118,14 @@ exports.OutQueueProcessorFnBefore = new Schema({
             required: path => `Не указано обработанное сообщение очереди (${path})`
         }
     },
-    //Контекст работы сервиса
-    context: {
-        type: Object,
+    //Флаг ошибки аутентификации на удаленном сервисе
+    bUnAuth: {
+        type: Boolean,
         required: false,
         message: {
-            type: path => `Контекст работы сервиса (${path}) имеет некорректный тип данных (ожидалось - Object)`,
-            required: path => `Не указан контекст работы сервиса (${path})`
+            type: path =>
+                `Флаг ошибки аутентификации на удаленном сервисе  (${path}) имеет некорректный тип данных (ожидалось - Boolean)`,
+            required: path => `Не указан флаг ошибки аутентификации на удаленном сервисе (${path})`
         }
     }
 });
@@ -148,13 +142,14 @@ exports.OutQueueProcessorFnAfter = new Schema({
             required: path => `Не указан результат обработки ответа удалённого сервиса (${path})`
         }
     },
-    //Контекст работы сервиса
-    context: {
-        type: Object,
+    //Флаг ошибки аутентификации на удаленном сервисе
+    bUnAuth: {
+        type: Boolean,
         required: false,
         message: {
-            type: path => `Контекст работы сервиса (${path}) имеет некорректный тип данных (ожидалось - Object)`,
-            required: path => `Не указан контекст работы сервиса (${path})`
+            type: path =>
+                `Флаг ошибки аутентификации на удаленном сервисе  (${path}) имеет некорректный тип данных (ожидалось - Boolean)`,
+            required: path => `Не указан флаг ошибки аутентификации на удаленном сервисе (${path})`
         }
     }
 });
