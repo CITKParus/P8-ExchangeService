@@ -4,8 +4,8 @@
 
   Полный формат формируемой посылки:
     reqBody = {
-        timestamp: doc.SDDOC_DATE,
-        external_id: doc.NRN,
+        timestamp: "",
+        external_id: 0,
         service: {
             callback_url: ""
         },
@@ -237,26 +237,62 @@ const getPropValueByCode = (props, sCode, sValType = "STR", sValField = "VALUE")
     return res;
 };
 
-//Подключение к сервису
-const connect = async prms => {
-    let authFn = _.find(prms.service.functions, { nFnType: NFN_TYPE_LOGIN });
-    if (!authFn) throw Error(`Для сервиса ${prms.service.sCode} не определена функция аутентификации`);
-    try {
-        let serverResp = JSON.parse(
-            await rqp({
-                method: authFn.sFnPrmsType,
-                url: buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: authFn.sFnURL }),
-                body: JSON.stringify({ login: prms.service.sSrvUser, pass: prms.service.sSrvPass }),
-                simple: false
-            })
-        );
-        if (serverResp.error === null) {
-            return serverResp.token;
-        } else {
-            throw Error(serverResp.error.text);
+//Конвертация строки в формате ДД.ММ.ГГГГ ЧЧ:МИ:СС в JS Date
+const strDDMMYYYYHHMISStoDate = sDate => {
+    let res = null;
+    if (sDate) {
+        try {
+            const [date, time] = sDate.split(" ");
+            const [day, month, year] = date.split(".");
+            const [hh, min, ss] = time.split(":");
+            res = new Date(year, month - 1, day, hh, min, ss);
+            if (isNaN(res.getTime())) {
+                res = null;
+            } else {
+                res.addHours = function(nHours) {
+                    this.setTime(this.getTime() + nHours * 60 * 60 * 1000);
+                    return this;
+                };
+            }
+        } catch (e) {
+            res = null;
         }
-    } catch (e) {
-        throw Error(`Ошибка аутентификации на сервере АТОЛ-Онлайн: ${e.message}`);
+    }
+    return res;
+};
+
+//Обработчик "До" подключения к сервису
+const beforeConnect = async prms => {
+    return {
+        options: {
+            headers: {
+                "Content-type": "application/json; charset=utf-8"
+            },
+            body: JSON.stringify({ login: prms.service.sSrvUser, pass: prms.service.sSrvPass }),
+            simple: false
+        }
+    };
+};
+
+//Обработчик "После" подключения к сервису
+const afterConnect = async prms => {
+    let resp = null;
+    if (prms.queue.blResp) {
+        try {
+            resp = JSON.parse(prms.queue.blResp.toString());
+        } catch (e) {
+            throw new Error(`Неожиданный ответ сервера АТОЛ-Онлайн. Ошибка интерпретации: ${e.message}`);
+        }
+    } else {
+        throw new Error(`Сервер АТОЛ-Онлайн не вернул ответ`);
+    }
+    if (resp.error === null) {
+        return {
+            sCtx: resp.token,
+            dCtxExp: strDDMMYYYYHHMISStoDate(resp.timestamp).addHours(24)
+        };
+    } else {
+        throw new Error(`Сервер АТОЛ-Онлайн вернул ошибку: ${resp.error.text}`);
     }
 };
 
@@ -267,13 +303,11 @@ const beforeRegBillSIR = async prms => {
         const sGroupCode = "v4-online-atol-ru_4179";
         //Токен доступа
         let sToken = null;
-        if (prms.service.context && prms.service.context.sToken) {
-            sToken = prms.service.context.sToken;
-        } else {
-            sToken = await connect(prms);
+        if (prms.service.sCtx) {
+            sToken = prms.service.sCtx;
         }
-
-        if (!sToken) throw Error("Не удалось получить токен доступа");
+        //Если не достали из контекста токен доступа - значит нет аутентификации на сервере
+        if (!sToken) return { bUnAuth: true };
         //Разберем XML-данные фискального документа
         const parseRes = await parseXML(prms.queue.blMsg.toString());
         //Сохраним короткие ссылки на документ и его свойства
@@ -285,12 +319,6 @@ const beforeRegBillSIR = async prms => {
         let reqBody = {
             timestamp: doc.SDDOC_DATE,
             external_id: doc.NRN,
-            /*
-            service: {
-                callback_url: ""
-            },
-            */
-
             receipt: {
                 client: {
                     email: "mim_@mail.ru", //getPropValueByCode(docProps, "1008"),
@@ -302,27 +330,6 @@ const beforeRegBillSIR = async prms => {
                     inn: getPropValueByCode(docProps, "1018"),
                     payment_address: "г. Казань" //getPropValueByCode(docProps, "1187")
                 },
-                /*
-                agent_info: {
-                    type: "",
-                    paying_agent: {
-                        operation: "",
-                        phones: [""]
-                    },
-                    receive_payments_operator: {
-                        phones: [""]
-                    },
-                    money_transfer_operator: {
-                        phones: [""],
-                        name: "",
-                        address: "",
-                        inn: ""
-                    }
-                },
-                supplier_info: {
-                    phones: [""]
-                },
-                */
                 items: [
                     {
                         name: getPropValueByCode(docProps, "1030"),
@@ -337,31 +344,7 @@ const beforeRegBillSIR = async prms => {
                         vat: {
                             type: "none", //getPropValueByCode(docProps, "1199")
                             sum: getPropValueByCode(docProps, "1200", "NUM")
-                        } /*,
-                        agent_info: {
-                            type: "",
-                            paying_agent: {
-                                operation: "",
-                                phones: [""]
-                            },
-                            receive_payments_operator: {
-                                phones: [""]
-                            },
-                            money_transfer_operator: {
-                                phones: [""],
-                                name: "",
-                                address: "",
-                                inn: ""
-                            }
-                        },
-                        supplier_info: {
-                            phones: [""],
-                            name: "",
-                            address: "",
-                            inn: ""
-                        },
-                        user_data: ""
-                        */
+                        }
                     }
                 ],
                 total: getPropValueByCode(docProps, "1020", "NUM")
@@ -448,7 +431,6 @@ const beforeRegBillSIR = async prms => {
         //Собираем общий результат работы
         let res = {
             options: {
-                method: prms.function.sFnPrmsType,
                 url: buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL })
                     .replace("<group_code>", sGroupCode)
                     .replace("<operation>", sOperation),
@@ -458,11 +440,8 @@ const beforeRegBillSIR = async prms => {
                 },
                 simple: false
             },
-            blMsg: new Buffer(JSON.stringify(reqBody)),
-            context: { sToken }
+            blMsg: new Buffer(JSON.stringify(reqBody))
         };
-        //Выводим что получилось
-        console.log(util.inspect(res, false, null));
         //Возврат резульатата
         return res;
     } catch (e) {
@@ -472,19 +451,26 @@ const beforeRegBillSIR = async prms => {
 
 //Обработчик "После" отправки запроса на регистрацию чека (приход, расход, возврат) серверу "АТОЛ-Онлайн"
 const afterRegBillSIR = async prms => {
-    let tmp = null;
-    try {
-        tmp = JSON.parse(prms.serverResp);
-    } catch (e) {
-        throw Error("Неожиданный ответ сервера АТОЛ-Онлайн!");
-    }
-    if (tmp.error !== null) {
-        throw Error(tmp.error.text);
+    let resp = null;
+    if (prms.queue.blResp) {
+        try {
+            resp = JSON.parse(prms.queue.blResp.toString());
+        } catch (e) {
+            throw new Error(`Неожиданный ответ сервера АТОЛ-Онлайн. Ошибка интерпретации: ${e.message}`);
+        }
     } else {
-        console.log(tmp);
+        throw new Error(`Сервер АТОЛ-Онлайн не вернул ответ`);
+    }
+    if (resp.error === null) {
         return {
-            blResp: new Buffer(tmp.uuid)
+            blResp: new Buffer(resp.uuid)
         };
+    } else {
+        if (resp.error.code === 10 || resp.error.code === 11) {
+            return { bUnAuth: true };
+        } else {
+            throw new Error(`Сервер АТОЛ-Онлайн вернул ошибку: ${resp.error.text}`);
+        }
     }
 };
 
@@ -492,5 +478,7 @@ const afterRegBillSIR = async prms => {
 // Интерфейс модуля
 //-----------------
 
+exports.beforeConnect = beforeConnect;
+exports.afterConnect = afterConnect;
 exports.beforeRegBillSIR = beforeRegBillSIR;
 exports.afterRegBillSIR = afterRegBillSIR;

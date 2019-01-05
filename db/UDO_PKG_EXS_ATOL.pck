@@ -4,7 +4,6 @@ create or replace package UDO_PKG_EXS_ATOL as
   procedure V4_FFD105_PROCESS_REG_BILL_SIR
   (
     NIDENT                  in number,  -- Идентификатор процесса
-    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
 
@@ -16,7 +15,6 @@ create or replace package body UDO_PKG_EXS_ATOL as
   procedure V4_FFD105_PROCESS_REG_BILL_SIR
   (
     NIDENT                  in number,        -- Идентификатор процесса
-    NSRV_TYPE               in number,        -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
   )
   is
@@ -44,6 +42,12 @@ create or replace package body UDO_PKG_EXS_ATOL as
     end if;
     /* Выставляем идентификатор АТОЛ в ФД */
     update UDO_FISCDOCS T set T.NUMB_FD = CTMP where T.RN = REXSQUEUE.LNK_DOCUMENT;
+    /* Всё прошло успешно */
+    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT);
+  exception
+    when others then
+      /* Вернём ошибку */
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end V4_FFD105_PROCESS_REG_BILL_SIR;
 
 end;
