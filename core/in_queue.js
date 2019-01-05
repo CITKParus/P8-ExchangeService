@@ -23,7 +23,9 @@ const {
     SERR_OBJECT_BAD_INTERFACE,
     SERR_WEB_SERVER,
     SERR_APP_SERVER_BEFORE,
-    SERR_APP_SERVER_AFTER
+    SERR_APP_SERVER_AFTER,
+    SERR_DB_SERVER,
+    SERR_UNAUTH
 } = require("./constants"); //Общесистемные константы
 
 //--------------------------
@@ -144,7 +146,7 @@ class InQueue extends EventEmitter {
                                 nQueueId: q.nId,
                                 nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
                             });
-                            //Фиксируем успех исполнения
+                            //Фиксируем результат исполнения
                             if (!_.isUndefined(resBefore.blMsg)) {
                                 blMsg = resBefore.blMsg;
                                 q = await this.dbConn.setQueueMsg({
@@ -159,6 +161,10 @@ class InQueue extends EventEmitter {
                                     blResp
                                 });
                             }
+                            //Если пришел флаг ошибочной аутентификации и он положительный - то это ошибка, дальше ничего не делаем
+                            if (!_.isUndefined(resBefore.bUnAuth))
+                                if (resBefore.bUnAuth === true)
+                                    throw new ServerError(SERR_UNAUTH, "Не аутентифицирован");
                         } else {
                             //Или расскажем об ошибке
                             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
@@ -173,7 +179,13 @@ class InQueue extends EventEmitter {
                         nExecState: objQueueSchema.NQUEUE_EXEC_STATE_DB
                     });
                     //Вызов обработчика БД
-                    q = await this.dbConn.execQueueDBPrc({ nQueueId: q.nId });
+                    let prcRes = await this.dbConn.execQueueDBPrc({ nQueueId: q.nId });
+                    //Если результат - ошибка пробрасываем её
+                    if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_ERR)
+                        throw new ServerError(SERR_DB_SERVER, prcRes.sMsg);
+                    //Если результат - ошибка аутентификации, то и её пробрасываем, но с правильным кодом
+                    if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_UNAUTH)
+                        throw new ServerError(SERR_UNAUTH, prcRes.sMsg || "Не аутентифицирован");
                     //Выставим статус сообщению очереди - исполнено обработчиком БД
                     q = await this.dbConn.setQueueState({
                         nQueueId: q.nId,
@@ -216,7 +228,7 @@ class InQueue extends EventEmitter {
                                 nQueueId: q.nId,
                                 nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
                             });
-                            //Фиксируем успех исполнения
+                            //Фиксируем результат исполнения
                             if (!_.isUndefined(resAfter.blResp)) {
                                 blResp = resAfter.blResp;
                                 q = await this.dbConn.setQueueResp({
@@ -224,6 +236,10 @@ class InQueue extends EventEmitter {
                                     blResp
                                 });
                             }
+                            //Если пришел флаг ошибочной аутентификации и он положительный - то это ошибка, дальше ничего не делаем
+                            if (!_.isUndefined(resAfter.bUnAuth))
+                                if (resAfter.bUnAuth === true)
+                                    throw new ServerError(SERR_UNAUTH, "Не аутентифицирован");
                         } else {
                             //Или расскажем об ошибке
                             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);

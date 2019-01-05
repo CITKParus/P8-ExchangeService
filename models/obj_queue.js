@@ -33,6 +33,11 @@ const SQUEUE_EXEC_STATE_DB_ERR = "DB_ERR"; //Ошибка обработки С�
 const SQUEUE_EXEC_STATE_OK = "OK"; //Обработано успешно (строковый код)
 const SQUEUE_EXEC_STATE_ERR = "ERR"; //Обработано с ошибками (строковый код)
 
+//Коды результатов исполнения обработчика сообщения
+const SPRC_RESP_RESULT_OK = "OK"; //Обработано успешно
+const SPRC_RESP_RESULT_ERR = "ERR"; //Ошибка обработки
+const SPRC_RESP_RESULT_UNAUTH = "UNAUTH"; //Неаутентифицирован
+
 //------------------
 //  Интерфейс модуля
 //------------------
@@ -56,6 +61,9 @@ exports.SQUEUE_EXEC_STATE_DB_OK = SQUEUE_EXEC_STATE_DB_OK;
 exports.SQUEUE_EXEC_STATE_DB_ERR = SQUEUE_EXEC_STATE_DB_ERR;
 exports.SQUEUE_EXEC_STATE_OK = SQUEUE_EXEC_STATE_OK;
 exports.SQUEUE_EXEC_STATE_ERR = SQUEUE_EXEC_STATE_ERR;
+exports.SPRC_RESP_RESULT_OK = SPRC_RESP_RESULT_OK;
+exports.SPRC_RESP_RESULT_ERR = SPRC_RESP_RESULT_ERR;
+exports.SPRC_RESP_RESULT_UNAUTH = SPRC_RESP_RESULT_UNAUTH;
 
 //Схема валидации сообщения очереди обмена
 exports.Queue = new Schema({
@@ -270,3 +278,31 @@ exports.QueueResp = new Schema({
         }
     }
 }).validator({ required: val => val === null || val });
+
+//Схема валидации результата обработки сообщения очереди
+exports.QueuePrcResult = new Schema({
+    //Состояние обработки сообщения очереди обмена
+    sResult: {
+        type: String,
+        enum: [SPRC_RESP_RESULT_OK, SPRC_RESP_RESULT_ERR, SPRC_RESP_RESULT_UNAUTH],
+        required: true,
+        message: {
+            type: path =>
+                `Состояние обработки сообщения очереди обмена (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            enum: path => `Значение состояния обработки сообщения очереди обмена (${path}) не поддерживается`,
+            required: path => `Не указано состояние обработки сообщения очереди обмена (${path})`
+        }
+    },
+    //Информация от обработчика сообщения очереди обмена
+    sMsg: {
+        type: String,
+        required: true,
+        message: {
+            type: path =>
+                `Информация от обработчика сообщения очереди обмена (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указана информация от обработчика сообщения очереди обмена (${path})`
+        }
+    }
+}).validator({
+    required: val => typeof val != "undefined"
+});

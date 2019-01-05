@@ -220,9 +220,8 @@ class OutQueue extends EventEmitter {
                         } else {
                             //Ошибки обработки нет, но может быть есть ошибка аутентификации
                             if (result.sResult == objOutQueueProcessorSchema.STASK_RESULT_UNAUTH) {
-                                //!!!!!!!!!!!!!!
-                                //??????????????
-                                //!!!!!!!!!!!!!!
+                                //Ставим задачу на аутентификацию сервиса
+                                await this.dbConn.putServiceAuthInQueue({ nServiceId: prms.queue.nServiceId });
                             }
                         }
                     } else {

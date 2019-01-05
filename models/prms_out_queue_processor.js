@@ -67,6 +67,14 @@ exports.dbProcess = new Schema({
         message: {
             required: path => `Не указано обрабатываемое сообщение очреди (${path})`
         }
+    },
+    //Функция сервиса-обработчика
+    function: {
+        schema: ServiceFunction,
+        required: true,
+        message: {
+            required: path => `Не указана функция сервиса для обработки сообщения очереди (${path})`
+        }
     }
 });
 

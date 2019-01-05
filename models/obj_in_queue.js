@@ -33,6 +33,16 @@ exports.InQueueProcessorFnBefore = new Schema({
             type: path => `Ответ системы (${path}) имеет некорректный тип данных (ожидалось - Buffer)`,
             required: path => `Не указан ответ системы (${path})`
         }
+    },
+    //Флаг ошибки аутентификации удаленного клиента
+    bUnAuth: {
+        type: Boolean,
+        required: false,
+        message: {
+            type: path =>
+                `Флаг ошибки аутентификации удаленного клиента  (${path}) имеет некорректный тип данных (ожидалось - Boolean)`,
+            required: path => `Не указан флаг ошибки аутентификации удаленного клиента (${path})`
+        }
     }
 });
 
@@ -45,6 +55,16 @@ exports.InQueueProcessorFnAfter = new Schema({
         message: {
             type: path => `Обработанный ответ системы (${path}) имеет некорректный тип данных (ожидалось - Buffer)`,
             required: path => `Не указан обработанный ответ системы (${path})`
+        }
+    },
+    //Флаг ошибки аутентификации удаленного клиента
+    bUnAuth: {
+        type: Boolean,
+        required: false,
+        message: {
+            type: path =>
+                `Флаг ошибки аутентификации удаленного клиента  (${path}) имеет некорректный тип данных (ожидалось - Boolean)`,
+            required: path => `Не указан флаг ошибки аутентификации удаленного клиента (${path})`
         }
     }
 });

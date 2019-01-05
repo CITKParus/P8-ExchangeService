@@ -23,6 +23,7 @@ const {
     SERR_OBJECT_BAD_INTERFACE,
     SERR_APP_SERVER_BEFORE,
     SERR_APP_SERVER_AFTER,
+    SERR_DB_SERVER,
     SERR_UNAUTH
 } = require("./constants"); //Глобальные константы
 const { NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
@@ -114,21 +115,23 @@ const appProcess = async prms => {
                 let qData = await dbConn.getQueueMsg({ nQueueId: prms.queue.nId });
                 //Считаем контекст сервиса
                 let serviceCtx = await dbConn.getServiceContext({ nServiceId: prms.service.nId });
+                //Флаг установленности контекста для функции начала сеанса
+                let bCtxIsSet = false;
                 //Кладём данные тела в объект сообщения и инициализируем поле для ответа
                 _.extend(prms.queue, { blMsg: qData.blMsg, blResp: null });
                 //Кладём данные контекста в сервис
                 _.extend(prms.service, serviceCtx);
                 //Собираем параметры для передачи серверу
-                let options = { method: prms.service.sFnPrmsType };
+                let options = { method: prms.function.sFnPrmsType };
                 //Определимся с URL и телом сообщения в зависимости от способа передачи параметров
-                if (prms.service.sFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
+                if (prms.function.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
                     options.url = buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL });
                     options.body = prms.queue.blMsg;
                 } else {
                     options.url = buildURL({
                         sSrvRoot: prms.service.sSrvRoot,
                         sFnURL: prms.function.sFnURL,
-                        sQuery: prms.queue.blMsg.toString()
+                        sQuery: prms.queue.blMsg === null ? "" : prms.queue.blMsg.toString()
                     });
                 }
                 //Выполняем обработчик "До" (если он есть)
@@ -150,26 +153,40 @@ const appProcess = async prms => {
                         );
                         //Если структура ответа в норме
                         if (!sCheckResult) {
-                            //Применим её
+                            //Применим ответ "До" - обработанное сообщение очереди
                             if (!_.isUndefined(resBefore.blMsg)) {
                                 prms.queue.blMsg = resBefore.blMsg;
                                 await dbConn.setQueueMsg({
                                     nQueueId: prms.queue.nId,
                                     blMsg: prms.queue.blMsg
                                 });
-                                if (prms.service.sFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
+                                if (prms.function.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
                                     options.body = prms.queue.blMsg;
                                 } else {
                                     options.url = buildURL({
                                         sSrvRoot: prms.service.sSrvRoot,
                                         sFnURL: prms.function.sFnURL,
-                                        sQuery: prms.queue.blMsg.toString()
+                                        sQuery: prms.queue.blMsg === null ? "" : prms.queue.blMsg.toString()
                                     });
                                 }
                             }
-                            if (!_.isUndefined(resBefore.options)) options = _.cloneDeep(resBefore.options);
+                            //Применим ответ "До" - параметры отправки сообщения удаленному серверу
+                            if (!_.isUndefined(resBefore.options)) _.extend(options, resBefore.options);
+                            //Применим ответ "До" - флаг отсуствия аутентификации
                             if (!_.isUndefined(resBefore.bUnAuth))
-                                throw new ServerError(SERR_UNAUTH, "Не аутентифицирован");
+                                if (resBefore.bUnAuth === true) {
+                                    throw new ServerError(SERR_UNAUTH, "Не аутентифицирован");
+                                }
+                            //Применим ответ "До" - контекст работы сервиса
+                            if (!_.isUndefined(resBefore.sCtx))
+                                if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGIN) {
+                                    await dbConn.setServiceContext({
+                                        nServiceId: prms.service.nId,
+                                        sCtx: resBefore.sCtx,
+                                        dCtxExp: resBefore.dCtxExp
+                                    });
+                                    bCtxIsSet = true;
+                                }
                         } else {
                             //Или расскажем об ошибке в структуре ответа
                             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
@@ -207,7 +224,7 @@ const appProcess = async prms => {
                         );
                         //Если структура ответа в норме
                         if (!sCheckResult) {
-                            //Применим её
+                            //Применим ответ "После" - обработанный ответ удаленного сервиса
                             if (!_.isUndefined(resAfter.blResp)) {
                                 prms.queue.blResp = resAfter.blResp;
                                 await dbConn.setQueueResp({
@@ -215,13 +232,37 @@ const appProcess = async prms => {
                                     blResp: prms.queue.blResp
                                 });
                             }
+                            //Применим ответ "После" - флаг утентификации сервиса
                             if (!_.isUndefined(resAfter.bUnAuth))
-                                throw new ServerError(SERR_UNAUTH, "Не аутентифицирован");
+                                if (resAfter.bUnAuth === true)
+                                    throw new ServerError(SERR_UNAUTH, "Не аутентифицирован");
+                            //Применим ответ "После" - контекст работы сервиса
+                            if (!_.isUndefined(resAfter.sCtx))
+                                if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGIN) {
+                                    await dbConn.setServiceContext({
+                                        nServiceId: prms.service.nId,
+                                        sCtx: resAfter.sCtx,
+                                        dCtxExp: resAfter.dCtxExp
+                                    });
+                                    bCtxIsSet = true;
+                                }
                         } else {
                             //Или расскажем об ошибке в структуре ответа
                             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
                         }
                     }
+                }
+                //Если это функция начала сеанса, и нет обработчика на стороне БД и контекст не был установлен до сих пор - то положим в него то, что нам ответил сервер
+                if (
+                    prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGIN &&
+                    !prms.function.sPrcResp &&
+                    !bCtxIsSet
+                ) {
+                    await dbConn.setServiceContext({ nServiceId: prms.service.nId, sCtx: serverResp });
+                }
+                //Если это функция окончания сеанса, и нет обработчика на стороне БД - то сбросим контекст здесь
+                if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGOUT && !prms.function.sPrcResp) {
+                    await dbConn.clearServiceContext({ nServiceId: prms.service.nId });
                 }
                 //Фиксируем успешное исполнение сервером приложений - в статусе сообщения
                 res = await dbConn.setQueueState({
@@ -287,8 +328,17 @@ const dbProcess = async prms => {
                 }, ${prms.queue.sExecState}, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
                 { nQueueId: prms.queue.nId }
             );
-            //Вызов обработчика БД
-            res = await dbConn.execQueueDBPrc({ nQueueId: prms.queue.nId });
+            //Если обработчик со стороны БД указан
+            if (prms.function.sPrcResp) {
+                //Вызываем его
+                let prcRes = await dbConn.execQueueDBPrc({ nQueueId: prms.queue.nId });
+                //Если результат - ошибка пробрасываем её
+                if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_ERR)
+                    throw new ServerError(SERR_DB_SERVER, prcRes.sMsg);
+                //Если результат - ошибка аутентификации, то и её пробрасываем, но с правильным кодом
+                if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_UNAUTH)
+                    throw new ServerError(SERR_UNAUTH, prcRes.sMsg || "Не аутентифицирован");
+            }
             //Фиксируем успешное исполнение (полное - дальше обработки нет) - в статусе сообщения
             res = await dbConn.setQueueState({
                 nQueueId: prms.queue.nId,
@@ -351,8 +401,6 @@ const processTask = async prms => {
             await dbConn.connect();
             //Считываем запись очереди
             q = await dbConn.getQueue({ nQueueId: prms.task.nQueueId });
-            //Выставим флаг - нет ошибок аутентификации на удаленном сервере
-            let bUnAuthFlag = false;
             //Далее работаем от статуса считанной записи
             switch (q.nExecState) {
                 //Статусы "Поставлено в очередь" или "Ошибка обработки сервером приложений"
@@ -361,60 +409,21 @@ const processTask = async prms => {
                     //Если ещё не обрабатывали или есть ещё попытки отработки
                     if (q.nExecCnt == 0 || q.nExecCnt < q.nRetryAttempts) {
                         //Запускаем обработку сервером приложений
-                        try {
-                            let res = await appProcess({
-                                queue: q,
-                                service: prms.task.service,
-                                function: prms.task.function
-                            });
-                            //Если результат обработки - ошибка аутентификации
-                            if (res === objOutQueueProcessorSchema.STASK_RESULT_UNAUTH) {
-                                //Выставим флаг, который будет указывать на ошибку аутентификации
-                                bUnAuthFlag = true;
-                            } else {
-                                //Нет такой ошибки, посмотрим что прилетело сообщение в успешном статусе и тогда запустим обработку сервером БД
-                                if (res.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_APP_OK) {
-                                    try {
-                                        await dbProcess({ queue: res });
-                                    } catch (e) {
-                                        //Фиксируем ошибку обработки сервером БД - в статусе сообщения
-                                        await dbConn.setQueueState({
-                                            nQueueId: res.nId,
-                                            sExecMsg: makeErrorText(e),
-                                            nIncExecCnt: NINC_EXEC_CNT_YES,
-                                            nExecState:
-                                                res.nExecCnt + 1 < res.nRetryAttempts
-                                                    ? objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
-                                                    : objQueueSchema.NQUEUE_EXEC_STATE_ERR
-                                        });
-                                        //Фиксируем ошибку обработки сервером БД - в протоколе работы сервиса
-                                        await logger.error(
-                                            `Ошибка обработки исходящего сообщения ${
-                                                res.nId
-                                            } сервером БД: ${makeErrorText(e)}`,
-                                            { nQueueId: res.nId }
-                                        );
-                                    }
-                                }
+                        let res = await appProcess({
+                            queue: q,
+                            service: prms.task.service,
+                            function: prms.task.function
+                        });
+                        //Если результат обработки ошибка - пробрасываем её дальше
+                        if (res instanceof ServerError) {
+                            throw res;
+                        } else {
+                            //Нет ошибки, посмотрим что прилетело сообщение в успешном статусе и тогда запустим обработку сервером БД
+                            if (res.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_APP_OK) {
+                                res = await dbProcess({ queue: res, function: prms.task.function });
+                                //Если результат обработки ошибка - пробрасываем её дальше
+                                if (res instanceof ServerError) throw res;
                             }
-                        } catch (e) {
-                            //Фиксируем ошибку обработки сервером приложений - в статусе сообщения
-                            newQueue = await dbConn.setQueueState({
-                                nQueueId: q.nId,
-                                sExecMsg: makeErrorText(e),
-                                nIncExecCnt: NINC_EXEC_CNT_YES,
-                                nExecState:
-                                    q.nExecCnt + 1 < q.nRetryAttempts
-                                        ? objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR
-                                        : objQueueSchema.NQUEUE_EXEC_STATE_ERR
-                            });
-                            //Фиксируем ошибку обработки сервером приложений - в протоколе работы сервиса
-                            await logger.error(
-                                `Ошибка обработки исходящего сообщения ${q.nId} сервером приложений: ${makeErrorText(
-                                    e
-                                )}`,
-                                { nQueueId: q.nId }
-                            );
                         }
                     } else {
                         //Попыток нет - финализируем обработку
@@ -433,25 +442,9 @@ const processTask = async prms => {
                     //Если ещё есть попытки отработки
                     if (q.nExecCnt == 0 || q.nExecCnt < q.nRetryAttempts) {
                         //Снова запускаем обработку сервером БД
-                        try {
-                            await dbProcess({ queue: q });
-                        } catch (e) {
-                            //Фиксируем ошибку обработки сервером БД - в статусе сообщения
-                            await dbConn.setQueueState({
-                                nQueueId: q.nId,
-                                sExecMsg: makeErrorText(e),
-                                nIncExecCnt: NINC_EXEC_CNT_YES,
-                                nExecState:
-                                    q.nExecCnt + 1 < q.nRetryAttempts
-                                        ? objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
-                                        : objQueueSchema.NQUEUE_EXEC_STATE_ERR
-                            });
-                            //Фиксируем ошибку обработки сервером БД - в протоколе работы сервиса
-                            await logger.error(
-                                `Ошибка обработки исходящего сообщения ${q.nId} сервером БД: ${makeErrorText(e)}`,
-                                { nQueueId: q.nId }
-                            );
-                        }
+                        let res = await dbProcess({ queue: q, function: prms.task.function });
+                        //Если результат обработки ошибка - пробрасываем её дальше
+                        if (res instanceof ServerError) throw res;
                     } else {
                         //Попыток нет - финализируем обработку
                         await dbConn.setQueueState({
@@ -493,14 +486,14 @@ const processTask = async prms => {
             }
             //Отключаемся от БД
             if (dbConn) await dbConn.disconnect();
-            //Отправляем успех или ошибку аутентификации
-            if (bUnAuthFlag) sendUnAuthResult();
-            else sendOKResult();
+            //Отправляем успех
+            sendOKResult();
         } catch (e) {
             //Отключаемся от БД
             if (dbConn) await dbConn.disconnect();
             //Отправляем ошибку
-            sendErrorResult({ sMessage: makeErrorText(e) });
+            if (e instanceof ServerError && e.sCode == SERR_UNAUTH) sendUnAuthResult();
+            else sendErrorResult({ sMessage: makeErrorText(e) });
         }
     } else {
         sendErrorResult({ sMessage: sCheckResult });

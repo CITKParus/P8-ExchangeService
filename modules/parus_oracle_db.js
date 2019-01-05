@@ -341,14 +341,14 @@ const setQueueResp = async prms => {
 const execQueuePrc = async prms => {
     try {
         let res = await prms.connection.execute(
-            "BEGIN PKG_EXS.QUEUE_PRC(NEXSQUEUE => :NEXSQUEUE, RCQUEUE => :RCQUEUE); END;",
+            "BEGIN PKG_EXS.QUEUE_PRC(NEXSQUEUE => :NEXSQUEUE, RCRESULT => :RCRESULT); END;",
             {
                 NEXSQUEUE: prms.nQueueId,
-                RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+                RCRESULT: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
             { outFormat: oracledb.OBJECT, autoCommit: true }
         );
-        let rows = await readCursorData(res.outBinds.RCQUEUE);
+        let rows = await readCursorData(res.outBinds.RCRESULT);
         return rows[0];
     } catch (e) {
         throw new Error(e.message);

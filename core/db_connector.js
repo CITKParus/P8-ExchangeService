@@ -139,7 +139,6 @@ class DBConnector extends EventEmitter {
                 let srvs = await this.connector.getServices({ connection: this.connection });
                 srvs.forEach(s => {
                     s.functions = [];
-                    s.context = {};
                 });
                 //Валидируем его
                 let sCheckResult = validateObject({ services: srvs }, objServicesSchema.Services, "Список сервисов");
@@ -760,14 +759,19 @@ class DBConnector extends EventEmitter {
             if (!sCheckResult) {
                 //Исполняем действие в БД
                 try {
-                    let res = await this.connector.execQueuePrc({
-                        nQueueId: prms.nQueueId,
-                        connection: this.connection
-                    });
+                    //Подготовим параметры для передачи в БД
+                    let execQueuePrcData = _.cloneDeep(prms);
+                    execQueuePrcData.connection = this.connection;
+                    //И выполним обработчик со стороны БД
+                    let res = await this.connector.execQueuePrc(execQueuePrcData);
                     //Валидируем полученный ответ
-                    sCheckResult = validateObject(res, objQueueSchema.Queue, "Изменённое сообщение очереди обмена");
+                    sCheckResult = validateObject(
+                        res,
+                        objQueueSchema.QueuePrcResult,
+                        "Результат обработки очереди обмена"
+                    );
                     if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
-                    //Вернём измененную запись
+                    //Вернём результат обработки
                     return res;
                 } catch (e) {
                     if (e instanceof ServerError) throw e;

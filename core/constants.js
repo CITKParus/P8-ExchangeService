@@ -33,6 +33,7 @@ exports.SERR_MAIL_FAILED = "ERR_MAIL_FAILED"; //Ошибка отправки п
 //Типовые коды ошибок WEB-сервера
 exports.SERR_WEB_SERVER = "ERR_WEB_SERVER"; //Ошибка WEB-сервера
 
-//Типовые коди ошибок пользовательских обработчиков сервера приложений
+//Типовые коди ошибок пользовательских обработчиков сервера приложений и сервера БД
 exports.SERR_APP_SERVER_BEFORE = "ERR_APP_SERVER_BEFORE"; //Ошибка предобработчика
 exports.SERR_APP_SERVER_AFTER = "ERR_APP_SERVER_AFTER"; //Ошибка постобработчика
+exports.SERR_DB_SERVER = "SERR_DB_SERVER"; //Ошибка обработчика сервера БД

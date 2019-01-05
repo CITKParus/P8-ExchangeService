@@ -127,6 +127,24 @@ exports.OutQueueProcessorFnBefore = new Schema({
                 `Флаг ошибки аутентификации на удаленном сервисе  (${path}) имеет некорректный тип данных (ожидалось - Boolean)`,
             required: path => `Не указан флаг ошибки аутентификации на удаленном сервисе (${path})`
         }
+    },
+    //Контекст сервиса
+    sCtx: {
+        type: String,
+        required: false,
+        message: {
+            type: path => `Контектс сервиса (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан контекст сервиса (${path})`
+        }
+    },
+    //Дата истечения контекста
+    dCtxExp: {
+        type: Date,
+        required: false,
+        message: {
+            type: path => `Дата истечения контекста (${path}) имеет некорректный тип данных (ожидалось - Date)`,
+            required: path => `Не указана дата истечения контекста (${path})`
+        }
     }
 });
 
@@ -150,6 +168,24 @@ exports.OutQueueProcessorFnAfter = new Schema({
             type: path =>
                 `Флаг ошибки аутентификации на удаленном сервисе  (${path}) имеет некорректный тип данных (ожидалось - Boolean)`,
             required: path => `Не указан флаг ошибки аутентификации на удаленном сервисе (${path})`
+        }
+    },
+    //Контекст сервиса
+    sCtx: {
+        type: String,
+        required: false,
+        message: {
+            type: path => `Контектс сервиса (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан контекст сервиса (${path})`
+        }
+    },
+    //Дата истечения контекста
+    dCtxExp: {
+        type: Date,
+        required: false,
+        message: {
+            type: path => `Дата истечения контекста (${path}) имеет некорректный тип данных (ожидалось - Date)`,
+            required: path => `Не указана дата истечения контекста (${path})`
         }
     }
 });

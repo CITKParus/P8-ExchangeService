@@ -9,8 +9,11 @@ create or replace package PKG_EXS as
   SCONT_PRC                 constant PKG_STD.TSTRING := 'PRC';     -- Наименование контейнера для параметров процесса
 
   /* Константы - поля контейнеров */
-  SCONT_FLD_SERR            constant PKG_STD.TSTRING := 'SERR';  -- Наименование поля контейнера для ошибки
-  SCONT_FLD_BRESP           constant PKG_STD.TSTRING := 'BRESP'; -- Наименование поля контейнера для результата обработки
+  SCONT_FLD_SRESULT         constant PKG_STD.TSTRING := 'SRESULT';  -- Наименование поля контейнера для кода результата обработки
+  SCONT_FLD_SMSG            constant PKG_STD.TSTRING := 'SMSG';     -- Наименование поля контейнера для сообщения обработки
+  SCONT_FLD_BRESP           constant PKG_STD.TSTRING := 'BRESP';    -- Наименование поля контейнера для результата обработки
+  SCONT_FLD_DCTX_EXP        constant PKG_STD.TSTRING := 'DCTX_EXP'; -- Наименование поля контейнера для даты истечения контектса сервиса
+  SCONT_FLD_SCTX            constant PKG_STD.TSTRING := 'SCTX';     -- Наименование поля контейнера для для контекста сервиса
 
   /* Константы - типы сервисов */
   NSRV_TYPE_SEND            constant EXSSERVICE.SRV_TYPE%type := 0; -- Отправка сообщений
@@ -108,8 +111,13 @@ create or replace package PKG_EXS as
   SAUTH_ONLY_YES            constant varchar2(40) := 'AUTH_ONLY_YES';  -- Требуется аутентификация (строковый код)
   SAUTH_ONLY_NO             constant varchar2(40) := 'AUTH_ONLY_NO';   -- Аутентификация не требуется (строковый код)
   
+  /* Константы - коды результатов исполнения обработчика сообщения */
+  SPRC_RESP_RESULT_OK       constant varchar2(40) := 'OK';     -- Обработано успешно
+  SPRC_RESP_RESULT_ERR      constant varchar2(40) := 'ERR';    -- Ошибка обработки
+  SPRC_RESP_RESULT_UNAUTH   constant varchar2(40) := 'UNAUTH'; -- Неаутентифицирован    
+  
   /* Константы - ожидаемый интерфейс процедуры обработки сообщения очереди на стороне БД */
-  SPRC_RESP_ARGS            constant varchar2(80) := 'NIDENT,IN,NUMBER;NSRV_TYPE,IN,NUMBER;NEXSQUEUE,IN,NUMBER;'; -- Список параметров процедуры обработки
+  SPRC_RESP_ARGS            constant varchar2(80) := 'NIDENT,IN,NUMBER;NEXSQUEUE,IN,NUMBER;'; -- Список параметров процедуры обработки
 
   /* Проверка активности сервера приложений */
   function UTL_APPSRV_IS_ACTIVE
@@ -223,6 +231,28 @@ create or replace package PKG_EXS as
     SARG                    in varchar2 -- Наименование параметра
   ) return                  blob;       -- Значение параметра
 
+  /* Установка результата исполнения обработчика */
+  procedure PRC_RESP_RESULT_SET
+  (
+    NIDENT                  in number,                          -- Идентификатор процесса
+    SRESULT                 in varchar2 := SPRC_RESP_RESULT_OK, -- Код результата (см. константы SPRC_RESP_RESULT_*)
+    BRESP                   in blob := null,                    -- Результат обработки
+    SMSG                    in varchar2 := null,                -- Сообщение обработчика
+    SCTX                    in varchar2 := null,                -- Контекст
+    DCTX_EXP                in date     := null                 -- Дата истечения контекста
+  );
+
+  /* Считывание результата исполнения обработчика */
+  procedure PRC_RESP_RESULT_GET
+  (
+    NIDENT                  in number,    -- Идентификатор процесса
+    SRESULT                 out varchar2, -- Код результата (см. константы SPRC_RESP_RESULT_*)
+    BRESP                   out blob,     -- Результат обработки
+    SMSG                    out varchar2, -- Сообщение обработчика
+    SCTX                    out varchar2, -- Контекст
+    DCTX_EXP                out date      -- Дата истечения контекста
+  );
+  
   /* Базовое добавление в буфер отбора документов */
   procedure RNLIST_BASE_INSERT
   (
@@ -269,9 +299,9 @@ create or replace package PKG_EXS as
   /* Установка контекста сервиса */
   procedure SERVICE_CTX_SET
   (
-    NEXSSERVICE             in number,   -- Рег. номер записи сервиса
-    SCTX                    in varchar2, -- Контекст
-    DCTX_EXP                in date      -- Дата истечения контекста
+    NEXSSERVICE             in number,      -- Рег. номер записи сервиса
+    SCTX                    in varchar2,    -- Контекст
+    DCTX_EXP                in date := null -- Дата истечения контекста
   );
 
   /* Очистка контекста сервиса */
@@ -422,6 +452,13 @@ create or replace package PKG_EXS as
   /* Установка результата обработки записи очереди */
   procedure QUEUE_RESP_SET
   (
+    NEXSQUEUE               in number,  -- Рег. номер записи очереди
+    BRESP                   in blob     -- Результат обработки
+  );
+
+  /* Установка результата обработки записи очереди (возвращает измененную позицию очереди) */
+  procedure QUEUE_RESP_SET
+  (
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
     BRESP                   in blob,          -- Результат обработки
     RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
@@ -435,6 +472,13 @@ create or replace package PKG_EXS as
   ); 
   
   /* Установка сообщения записи очереди */
+  procedure QUEUE_MSG_SET
+  (
+    NEXSQUEUE               in number,  -- Рег. номер записи очереди
+    BMSG                    in blob     -- Результат обработки
+  );
+  
+  /* Установка сообщения записи очереди (возвращает измененную позицию очереди) */
   procedure QUEUE_MSG_SET
   (
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
@@ -500,7 +544,7 @@ create or replace package PKG_EXS as
   procedure QUEUE_PRC
   (
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
-    RCQUEUE                 out sys_refcursor -- Курсор с обработанной позицией очереди
+    RCRESULT                out sys_refcursor -- Курсор с результатами обработки
   );
 
 end;
@@ -720,6 +764,10 @@ create or replace package body PKG_EXS as
           NARGS_LIST_CUR_CORRECT := 0;
         end if;
       end loop;
+      /* Проверим совпадение и по количеству */
+      if (RARGS_LIST.COUNT <> RARGS_LIST_CUR.COUNT) then
+        NARGS_LIST_CUR_CORRECT := 0;
+      end if;
       /* Установка результата */
       NRESULT := NARGS_LIST_CUR_CORRECT;
       /* Установим сообщение об ожидаемом интерфейсе */
@@ -1006,24 +1054,88 @@ create or replace package body PKG_EXS as
     SCONTAINER := UTL_CONTAINER_MAKE_NAME(NIDENT => NIDENT);
     /* Считаем значение идентификатора буфера из контейнера */
     NFILE_IDENT := PKG_CONTVARGLB.GETN(SCONTAINER => SCONTAINER, SNAME => SARG);
-    /* Заберем результаты обработки из файлового буфера */
-    begin
-      select T.BDATA into BRESP from FILE_BUFFER T where T.IDENT = NFILE_IDENT;
-    exception
-      when NO_DATA_FOUND then
-        P_EXCEPTION(0,
-                    'Результаты обработки не найдены в буфере (IDENT: %s).',
-                    TO_CHAR(NFILE_IDENT));
-      when TOO_MANY_ROWS then
-        P_EXCEPTION(0,
-                    'Результаты обработки не определены однозначно (IDENT: %s).',
-                    TO_CHAR(NFILE_IDENT));
-    end;
-    /* Зачистим файловый буфер */
-    P_FILE_BUFFER_CLEAR(NIDENT => NFILE_IDENT);
+    /* Если идентификатор буфера был в контейнере */
+    if (NFILE_IDENT is not null) then
+      /* Заберем результаты обработки из файлового буфера */
+      begin
+        select T.BDATA into BRESP from FILE_BUFFER T where T.IDENT = NFILE_IDENT;
+      exception
+        when NO_DATA_FOUND then
+          P_EXCEPTION(0,
+                      'Результаты обработки не найдены в буфере (IDENT: %s).',
+                      TO_CHAR(NFILE_IDENT));
+        when TOO_MANY_ROWS then
+          P_EXCEPTION(0,
+                      'Результаты обработки не определены однозначно (IDENT: %s).',
+                      TO_CHAR(NFILE_IDENT));
+      end;
+      /* Зачистим файловый буфер */
+      P_FILE_BUFFER_CLEAR(NIDENT => NFILE_IDENT);
+    else
+      /* Идентификатор буфера в контейнере отсутствовал - данных нет */
+      BRESP := null;
+    end if;
     /* Вернём значение */
     return BRESP;
   end PRC_RESP_ARG_BLOB_GET;
+  
+  /* Установка результата исполнения обработчика */
+  procedure PRC_RESP_RESULT_SET
+  (
+    NIDENT                  in number,                          -- Идентификатор процесса
+    SRESULT                 in varchar2 := SPRC_RESP_RESULT_OK, -- Код результата (см. константы SPRC_RESP_RESULT_*)
+    BRESP                   in blob := null,                    -- Данные ответа
+    SMSG                    in varchar2 := null,                -- Сообщение обработчика
+    SCTX                    in varchar2 := null,                -- Контекст
+    DCTX_EXP                in date     := null                 -- Дата истечения контекста
+  )
+  is
+  begin
+    /* Проверим параметры */
+    if (SRESULT is not null) then
+      if (SRESULT not in (SPRC_RESP_RESULT_OK, SPRC_RESP_RESULT_ERR, SPRC_RESP_RESULT_UNAUTH)) then
+        P_EXCEPTION(0,
+                    'Код результата исполнения обработчика "%s" не поддерживается',
+                    SRESULT);
+      end if;
+    else
+      P_EXCEPTION(0, 'Не указан код результата исполнения обработчика');
+    end if;
+    /* Сохраняем код результата */
+    PRC_RESP_ARG_STR_SET(NIDENT => NIDENT, SARG => SCONT_FLD_SRESULT, SVALUE => SRESULT);
+    /* Сохраняем данные ответа */
+    PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT, SARG => SCONT_FLD_BRESP, BVALUE => BRESP);
+    /* Сохраняем сообщение обработчика */
+    PRC_RESP_ARG_STR_SET(NIDENT => NIDENT, SARG => SCONT_FLD_SMSG, SVALUE => SMSG);
+    /* Сохраняем контекст */
+    PRC_RESP_ARG_STR_SET(NIDENT => NIDENT, SARG => SCONT_FLD_SCTX, SVALUE => SCTX);
+    /* Сохраняем дату истечения контекста */
+    PRC_RESP_ARG_DATE_SET(NIDENT => NIDENT, SARG => SCONT_FLD_DCTX_EXP, DVALUE => DCTX_EXP);
+  end PRC_RESP_RESULT_SET;
+  
+  /* Считывание результата исполнения обработчика */
+  procedure PRC_RESP_RESULT_GET
+  (
+    NIDENT                  in number,    -- Идентификатор процесса
+    SRESULT                 out varchar2, -- Код результата (см. константы SPRC_RESP_RESULT_*)
+    BRESP                   out blob,     -- Данные ответа
+    SMSG                    out varchar2, -- Сообщение обработчика
+    SCTX                    out varchar2, -- Контекст
+    DCTX_EXP                out date      -- Дата истечения контекста
+  )
+  is
+  begin
+    /* Считаем код результата */
+    SRESULT := PRC_RESP_ARG_STR_GET(NIDENT => NIDENT, SARG => SCONT_FLD_SRESULT);
+    /* Считаем данные ответа */
+    BRESP := PRC_RESP_ARG_BLOB_GET(NIDENT => NIDENT, SARG => SCONT_FLD_BRESP);
+    /* Считаем сообщение обработчика */
+    SMSG := PRC_RESP_ARG_STR_GET(NIDENT => NIDENT, SARG => SCONT_FLD_SMSG);
+    /* Считаем контекст */
+    SCTX := PRC_RESP_ARG_STR_GET(NIDENT => NIDENT, SARG => SCONT_FLD_SCTX);
+    /* Считаем дату истечения контекста */
+    DCTX_EXP := PRC_RESP_ARG_DATE_GET(NIDENT => NIDENT, SARG => SCONT_FLD_DCTX_EXP);
+  end PRC_RESP_RESULT_GET;
 
   /* Базовое добавление в буфер отбора документов */
   procedure RNLIST_BASE_INSERT
@@ -1149,7 +1261,7 @@ create or replace package body PKG_EXS as
   (
     NEXSSERVICE             in number,          -- Рег. номер записи сервиса
     SCTX                    in varchar2,        -- Контекст
-    DCTX_EXP                in date             -- Дата истечения контекста
+    DCTX_EXP                in date := null     -- Дата истечения контекста
   )
   is
     REXSSERVICE             EXSSERVICE%rowtype; -- Запись сервиса
@@ -1386,7 +1498,7 @@ create or replace package body PKG_EXS as
                     SRETRY_SCHEDULE_MONTH) "sRetrySchedule",
              T.EXSMSGTYPE "nMsgId",
              M.CODE "sMsgCode",
-             DECODE(M.PRC_RESP, null, null, UTL_STORED_MAKE_LINK(SPROCEDURE => M.PRC_RESP, SPACKAGE => M.PKG_RESP)) "sPrcResp",
+             DECODE(M.PRC_RESP, null, null, UTL_STORED_MAKE_LINK(M.PRC_RESP, M.PKG_RESP)) "sPrcResp",
              M.APPSRV_BEFORE "sAppSrvBefore",
              M.APPSRV_AFTER "sAppSrvAfter",
              T.AUTH_ONLY "nAuthOnly",
@@ -1833,8 +1945,23 @@ create or replace package body PKG_EXS as
     open RCQUEUE_RESP for
       select REXSQUEUE.RESP "blResp" from DUAL;
   end QUEUE_RESP_GET;
-  
+
   /* Установка результата обработки записи очереди */
+  procedure QUEUE_RESP_SET
+  (
+    NEXSQUEUE               in number,  -- Рег. номер записи очереди
+    BRESP                   in blob     -- Результат обработки
+  )
+  is
+  begin
+    /* Выставим результат */
+    update EXSQUEUE T set T.RESP = BRESP where T.RN = NEXSQUEUE;
+    if (sql%rowcount = 0) then
+      PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NEXSQUEUE, SUNIT_TABLE => 'EXSQUEUE');
+    end if;
+  end QUEUE_RESP_SET;
+  
+  /* Установка результата обработки записи очереди (возвращает измененную позицию очереди) */
   procedure QUEUE_RESP_SET
   (
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
@@ -1844,10 +1971,7 @@ create or replace package body PKG_EXS as
   is
   begin
     /* Выставим результат */
-    update EXSQUEUE T set T.RESP = BRESP where T.RN = NEXSQUEUE;
-    if (sql%rowcount = 0) then
-      PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NEXSQUEUE, SUNIT_TABLE => 'EXSQUEUE');
-    end if;
+    QUEUE_RESP_SET(NEXSQUEUE => NEXSQUEUE, BRESP => BRESP);
     /* Вернем измененную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_RESP_SET;
@@ -1867,8 +1991,23 @@ create or replace package body PKG_EXS as
     open RCQUEUE_MSG for
       select REXSQUEUE.MSG "blMsg" from DUAL;
   end QUEUE_MSG_GET;
-
+  
   /* Установка сообщения записи очереди */
+  procedure QUEUE_MSG_SET
+  (
+    NEXSQUEUE               in number,  -- Рег. номер записи очереди
+    BMSG                    in blob     -- Результат обработки
+  )
+  is
+  begin
+    /* Выставим сообщение */
+    update EXSQUEUE T set T.MSG = BMSG where T.RN = NEXSQUEUE;
+    if (sql%rowcount = 0) then
+      PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NEXSQUEUE, SUNIT_TABLE => 'EXSQUEUE');
+    end if;    
+  end QUEUE_MSG_SET;
+
+  /* Установка сообщения записи очереди (возвращает измененную позицию очереди) */
   procedure QUEUE_MSG_SET
   (
     NEXSQUEUE               in number,        -- Рег. номер записи очереди
@@ -1878,10 +2017,7 @@ create or replace package body PKG_EXS as
   is
   begin
     /* Выставим сообщение */
-    update EXSQUEUE T set T.MSG = BMSG where T.RN = NEXSQUEUE;
-    if (sql%rowcount = 0) then
-      PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NEXSQUEUE, SUNIT_TABLE => 'EXSQUEUE');
-    end if;
+    QUEUE_MSG_SET(NEXSQUEUE => NEXSQUEUE, BMSG => BMSG);
     /* Вернем измененную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_MSG_SET;
@@ -2036,15 +2172,19 @@ create or replace package body PKG_EXS as
   procedure QUEUE_PRC
   (
     NEXSQUEUE               in number,                 -- Рег. номер записи очереди
-    RCQUEUE                 out sys_refcursor          -- Курсор с обработанной позицией очереди
+    RCRESULT                out sys_refcursor          -- Курсор с результатами обработки
   )
   is
     REXSQUEUE               EXSQUEUE%rowtype;          -- Запись позиции очереди
     REXSSERVICE             EXSSERVICE%rowtype;        -- Запись сервиса обработки
     REXSSERVICEFN           EXSSERVICEFN%rowtype;      -- Запись функции обработки
-    REXSMSGTYPE             EXSMSGTYPE%rowtype;        -- Запись типового сообщения обмена
-    SERR                    EXSQUEUE.EXEC_MSG%type;    -- Сообщение об ошибке обработчика
+    REXSMSGTYPE             EXSMSGTYPE%rowtype;        -- Запись типового сообщения обмена    
     NIDENT                  PKG_STD.TREF;              -- Идентификатор процесса обработки
+    SRESULT                 PKG_STD.TSTRING;           -- Буфер для результата: код результата
+    BRESP                   blob;                      -- Буфер для результата: данные ответа
+    SMSG                    PKG_STD.TSTRING;           -- Буфер для результата: сообщение обработчика
+    SCTX                    PKG_STD.TSTRING;           -- Буфер для результата: контекст
+    DCTX_EXP                PKG_STD.TLDATE;            -- Буфер для результата: дата истечения контекста
     PRMS                    PKG_CONTPRMLOC.TCONTAINER; -- Контейнер для параметров процедуры обработки
   begin
     /* Считаем запись очереди */
@@ -2057,49 +2197,95 @@ create or replace package body PKG_EXS as
     REXSMSGTYPE := GET_EXSMSGTYPE_ID(NFLAG_SMART => 0, NRN => REXSSERVICEFN.EXSMSGTYPE);
     /* Запустим обработчик, если он есть */
     if (REXSMSGTYPE.PRC_RESP is not null) then
-      /* Проверяем интерфейс обработчика */
-      UTL_STORED_CHECK(NFLAG_SMART => 0,
-                       SPKG        => REXSMSGTYPE.PKG_RESP,
-                       SPRC        => REXSMSGTYPE.PRC_RESP,
-                       SARGS       => SPRC_RESP_ARGS,
-                       NRESULT     => NIDENT);
-      /* Формируем идентификатор процесса */
-      NIDENT := GEN_IDENT();
-      /* Установим значения фиксированных входных параметров */
-      PKG_CONTPRMLOC.APPENDN(RCONTAINER => PRMS,
-                             SNAME      => 'NIDENT',
-                             NVALUE     => NIDENT,
-                             NIN_OUT    => PKG_STD.IPARAM_TYPE_IN);
-      PKG_CONTPRMLOC.APPENDN(RCONTAINER => PRMS,
-                             SNAME      => 'NSRV_TYPE',
-                             NVALUE     => REXSSERVICE.SRV_TYPE,
-                             NIN_OUT    => PKG_STD.IPARAM_TYPE_IN);
-      PKG_CONTPRMLOC.APPENDN(RCONTAINER => PRMS,
-                             SNAME      => 'NEXSQUEUE',
-                             NVALUE     => REXSQUEUE.RN,
-                             NIN_OUT    => PKG_STD.IPARAM_TYPE_IN);
-      /* Исполняем процедуру */
-      PKG_SQL_CALL.EXECUTE_STORED(SSTORED_NAME     => UTL_STORED_MAKE_LINK(SPACKAGE   => REXSMSGTYPE.PKG_RESP,
-                                                                           SPROCEDURE => REXSMSGTYPE.PRC_RESP),
-                                  RPARAM_CONTAINER => PRMS);
-      /* Забираем параметр с ошибками обработчика */
-      SERR := PRC_RESP_ARG_STR_GET(NIDENT => NIDENT, SARG => SCONT_FLD_SERR);
-      /* Если были ошибки - скажем об этом */
-      if (SERR is not null) then
-        P_EXCEPTION(0, SERR);
-      else
-        /* Зафиксируем результат обработки (только для входящих и только если нет ошибок обработки) */
-        if (REXSSERVICE.SRV_TYPE = NSRV_TYPE_RECIVE) then
-          QUEUE_RESP_SET(NEXSQUEUE => REXSQUEUE.RN,
-                         BRESP     => PRC_RESP_ARG_BLOB_GET(NIDENT => NIDENT, SARG => SCONT_FLD_BRESP),
-                         RCQUEUE   => RCQUEUE);
+      begin
+        /* Проверяем интерфейс обработчика */
+        UTL_STORED_CHECK(NFLAG_SMART => 0,
+                         SPKG        => REXSMSGTYPE.PKG_RESP,
+                         SPRC        => REXSMSGTYPE.PRC_RESP,
+                         SARGS       => SPRC_RESP_ARGS,
+                         NRESULT     => NIDENT);
+        /* Формируем идентификатор процесса */
+        NIDENT := GEN_IDENT();
+        /* Установим значения фиксированных входных параметров */
+        PKG_CONTPRMLOC.APPENDN(RCONTAINER => PRMS,
+                               SNAME      => 'NIDENT',
+                               NVALUE     => NIDENT,
+                               NIN_OUT    => PKG_STD.IPARAM_TYPE_IN);
+        PKG_CONTPRMLOC.APPENDN(RCONTAINER => PRMS,
+                               SNAME      => 'NEXSQUEUE',
+                               NVALUE     => REXSQUEUE.RN,
+                               NIN_OUT    => PKG_STD.IPARAM_TYPE_IN);
+        /* Исполняем процедуру */
+        PKG_SQL_CALL.EXECUTE_STORED(SSTORED_NAME     => UTL_STORED_MAKE_LINK(SPACKAGE   => REXSMSGTYPE.PKG_RESP,
+                                                                             SPROCEDURE => REXSMSGTYPE.PRC_RESP),
+                                    RPARAM_CONTAINER => PRMS);
+        /* Очистим контейнер параметров */
+        PKG_CONTPRMLOC.PURGE(RCONTAINER => PRMS); 
+        /* Забираем результаты */
+        PRC_RESP_RESULT_GET(NIDENT   => NIDENT,
+                            SRESULT  => SRESULT,
+                            BRESP    => BRESP,
+                            SMSG     => SMSG,
+                            SCTX     => SCTX,
+                            DCTX_EXP => DCTX_EXP);
+        /* Если код результата установлен */
+        if (SRESULT is not null) then
+          /* И если результат успешен - применим его */
+          if (SRESULT = SPRC_RESP_RESULT_OK) then
+            /* Зафиксируем результат обработки (для входящих - всегда, для исходящих - только если не пустой) */
+            if ((REXSSERVICE.SRV_TYPE = NSRV_TYPE_RECIVE) or
+               ((REXSSERVICE.SRV_TYPE = NSRV_TYPE_SEND) and (BRESP is not null) and (DBMS_LOB.GETLENGTH(BRESP) > 0))) then
+              QUEUE_RESP_SET(NEXSQUEUE => REXSQUEUE.RN, BRESP => BRESP);
+            end if;
+            /* Если это была функция начала сеанса */
+            if (REXSSERVICEFN.FN_TYPE = NFN_TYPE_LOGIN) then
+              /* Если обработчик вернул контекст */
+              if (SCTX is not null) then
+                /* Пропишем его сервису, вне зависимости от того, что там было до этого */
+                SERVICE_CTX_SET(NEXSSERVICE => REXSSERVICE.RN, SCTX => SCTX, DCTX_EXP => DCTX_EXP);
+              else
+                /* Обработчик не вернул контекста, проверим, есть ли он сейчас у сервиса */
+                REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => REXSSERVICEFN.PRN);
+                if (REXSSERVICE.CTX is null) then
+                  /* Обработчик не вернул контекст и сейчас он не установлен для сервиса, это проблема - больше обработок не будет значит мы не залогинились */
+                  P_EXCEPTION(0,
+                              'Функция начала сеанса "%s" не установила контекст работы для сервиса "%s"',
+                              REXSSERVICEFN.CODE,
+                              REXSSERVICE.CODE);
+                end if;
+              end if;
+            end if;
+            /* Если это была функция завершения сеанса */
+            if (REXSSERVICEFN.FN_TYPE = NFN_TYPE_LOGOUT) then
+              /* Удалим контекст сервиса */
+              SERVICE_CTX_CLEAR(NEXSSERVICE => REXSSERVICE.RN);
+            end if;
+          else
+            /* Во всех остальных случаях - откатываем транзакцию, т.к. есть какие-то ошибки обработки */
+            rollback;
+          end if;
+        else
+          /* Результат не установлен - это ошибка */
+          P_EXCEPTION(0,
+                      'Процедура обработчик "%s" не вернула результат работы',
+                      UTL_STORED_MAKE_LINK(SPACKAGE => REXSMSGTYPE.PKG_RESP, SPROCEDURE => REXSMSGTYPE.PRC_RESP));
         end if;
-      end if;
-      /* Очистим контейнер параметров */
-      PKG_CONTPRMLOC.PURGE(RCONTAINER => PRMS);
+      exception
+        when others then
+          rollback;
+          SRESULT := SPRC_RESP_RESULT_ERR;
+          SMSG    := sqlerrm;
+      end;
+    else
+      /* Обработчика нет и нет проблем */
+      SRESULT := SPRC_RESP_RESULT_OK;
+      SMSG    := null;
     end if;
-    /* Возвращаем обработанную позицию очереди */
-    QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => REXSQUEUE.RN, RCQUEUE => RCQUEUE);
+    /* Возвращаем результат в виде курсора */
+    open RCRESULT for
+      select SRESULT "sResult",
+             SMSG    "sMsg"
+        from DUAL;
   end QUEUE_PRC;
 
 end;
