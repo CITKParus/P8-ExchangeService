@@ -38,6 +38,10 @@ const SPRC_RESP_RESULT_OK = "OK"; //Обработано успешно
 const SPRC_RESP_RESULT_ERR = "ERR"; //Ошибка обработки
 const SPRC_RESP_RESULT_UNAUTH = "UNAUTH"; //Неаутентифицирован
 
+//Флаг сброса данных сообщения
+const NQUEUE_RESET_DATA_NO = 0; //Не сбрасывать
+const NQUEUE_RESET_DATA_YES = 1; //Сбросить
+
 //------------------
 //  Интерфейс модуля
 //------------------
@@ -64,6 +68,8 @@ exports.SQUEUE_EXEC_STATE_ERR = SQUEUE_EXEC_STATE_ERR;
 exports.SPRC_RESP_RESULT_OK = SPRC_RESP_RESULT_OK;
 exports.SPRC_RESP_RESULT_ERR = SPRC_RESP_RESULT_ERR;
 exports.SPRC_RESP_RESULT_UNAUTH = SPRC_RESP_RESULT_UNAUTH;
+exports.NQUEUE_RESET_DATA_NO = NQUEUE_RESET_DATA_NO;
+exports.NQUEUE_RESET_DATA_YES = NQUEUE_RESET_DATA_YES;
 
 //Схема валидации сообщения очереди обмена
 exports.Queue = new Schema({

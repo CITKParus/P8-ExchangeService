@@ -114,7 +114,11 @@ create or replace package PKG_EXS as
   /* Константы - коды результатов исполнения обработчика сообщения */
   SPRC_RESP_RESULT_OK       constant varchar2(40) := 'OK';     -- Обработано успешно
   SPRC_RESP_RESULT_ERR      constant varchar2(40) := 'ERR';    -- Ошибка обработки
-  SPRC_RESP_RESULT_UNAUTH   constant varchar2(40) := 'UNAUTH'; -- Неаутентифицирован    
+  SPRC_RESP_RESULT_UNAUTH   constant varchar2(40) := 'UNAUTH'; -- Неаутентифицирован
+  
+  /* Константы - признак сброса данных сообщения очереди */
+  NQUEUE_RESET_DATA_NO      constant number(1) := 0; -- Не сбрасывать
+  NQUEUE_RESET_DATA_YES     constant number(1) := 1; -- Сбрасывать
   
   /* Константы - ожидаемый интерфейс процедуры обработки сообщения очереди на стороне БД */
   SPRC_RESP_ARGS            constant varchar2(80) := 'NIDENT,IN,NUMBER;NEXSQUEUE,IN,NUMBER;'; -- Список параметров процедуры обработки
@@ -439,6 +443,7 @@ create or replace package PKG_EXS as
     NEXEC_STATE             in number,        -- Устанавливаемое состояние (см. констнаты NQUEUE_EXEC_STATE_*, null - не менять)
     SEXEC_MSG               in varchar2,      -- Сообщение обработчика
     NINC_EXEC_CNT           in number,        -- Флаг инкремента счётчика исполнений (см. констнаты NINC_EXEC_CNT_*, null - не менять)
+    NRESET_DATA             in number,        -- Флаг сброса данных сообщения (см. констатнты NQUEUE_RESET_DATA_NO*, null - не сбрасывать)    
     RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
   );
 
@@ -1881,6 +1886,7 @@ create or replace package body PKG_EXS as
     NEXEC_STATE             in number,        -- Устанавливаемое состояние (см. констнаты NQUEUE_EXEC_STATE_*, null - не менять)
     SEXEC_MSG               in varchar2,      -- Сообщение обработчика
     NINC_EXEC_CNT           in number,        -- Флаг инкремента счётчика исполнений (см. констнаты NINC_EXEC_CNT_*, null - не менять)
+    NRESET_DATA             in number,        -- Флаг сброса данных сообщения (см. констатнты NQUEUE_RESET_DATA_NO*, null - не сбрасывать)
     RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
   )
   is
@@ -1921,7 +1927,9 @@ create or replace package body PKG_EXS as
        set T.EXEC_DATE  = sysdate,
            T.EXEC_STATE = NVL(NEXEC_STATE, T.EXEC_STATE),
            T.EXEC_CNT   = REXSQUEUE.EXEC_CNT,
-           T.EXEC_MSG   = SEXEC_MSG
+           T.EXEC_MSG   = SEXEC_MSG,
+           T.MSG = DECODE(NVL(NRESET_DATA, NQUEUE_RESET_DATA_NO), NQUEUE_RESET_DATA_NO, T.MSG, T.MSG_ORIGINAL),
+           T.RESP = DECODE(NVL(NRESET_DATA, NQUEUE_RESET_DATA_NO), NQUEUE_RESET_DATA_NO, T.RESP, null)           
      where T.RN = NEXSQUEUE;
     if (sql%rowcount = 0) then
       PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NEXSQUEUE, SUNIT_TABLE => 'EXSQUEUE');
@@ -2220,7 +2228,7 @@ create or replace package body PKG_EXS as
                                                                              SPROCEDURE => REXSMSGTYPE.PRC_RESP),
                                     RPARAM_CONTAINER => PRMS);
         /* Очистим контейнер параметров */
-        PKG_CONTPRMLOC.PURGE(RCONTAINER => PRMS); 
+        PKG_CONTPRMLOC.PURGE(RCONTAINER => PRMS);
         /* Забираем результаты */
         PRC_RESP_RESULT_GET(NIDENT   => NIDENT,
                             SRESULT  => SRESULT,
@@ -2284,7 +2292,13 @@ create or replace package body PKG_EXS as
     /* Возвращаем результат в виде курсора */
     open RCRESULT for
       select SRESULT "sResult",
-             SMSG    "sMsg"
+             DECODE(SRESULT,
+                    SPRC_RESP_RESULT_OK,
+                    null,
+                    SPRC_RESP_RESULT_ERR,
+                    NVL(SMSG, 'Неопределённая ошибка'),
+                    SPRC_RESP_RESULT_UNAUTH,
+                    NVL(SMSG, 'Нет аутентификации')) "sMsg"
         from DUAL;
   end QUEUE_PRC;
 

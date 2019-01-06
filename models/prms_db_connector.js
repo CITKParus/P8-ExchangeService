@@ -19,7 +19,9 @@ const {
     NQUEUE_EXEC_STATE_DB_OK,
     NQUEUE_EXEC_STATE_DB_ERR,
     NQUEUE_EXEC_STATE_OK,
-    NQUEUE_EXEC_STATE_ERR
+    NQUEUE_EXEC_STATE_ERR,
+    NQUEUE_RESET_DATA_NO,
+    NQUEUE_RESET_DATA_YES
 } = require("./obj_queue"); //Схемы валидации сообщения очереди обмена
 
 //----------
@@ -367,6 +369,17 @@ exports.setQueueState = new Schema({
                 "Флаг инкремента количества исполнений (nIncExecCnt) имеет некорректный тип данных (ожидалось - Number)",
             enum: "Значение флага инкремента количества исполнений (nIncExecCnt) не поддерживается",
             required: "Не указан флаг икремента количества исполнений (nIncExecCnt)"
+        }
+    },
+    //Флаг сброса данных сообщения
+    nResetData: {
+        type: Number,
+        enum: [NQUEUE_RESET_DATA_NO, NQUEUE_RESET_DATA_YES],
+        required: false,
+        message: {
+            type: "Флаг сброса данных сообщения (nResetData) имеет некорректный тип данных (ожидалось - Number)",
+            enum: "Значение флага сброса данных сообщения (nResetData) не поддерживается",
+            required: "Не указан флаг сброса данных сообщения (nResetData)"
         }
     }
 });
