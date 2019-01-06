@@ -73,7 +73,7 @@ const start = async () => {
         await appSrv.run();
     } catch (e) {
         //Если есть ошибки с которыми сервер не справился - ловим их, показываем...
-        appSrv.logger.error(makeErrorText(e));
+        await appSrv.logger.error(makeErrorText(e));
         //...и пытаемся остановить сервер нормально
         try {
             await appSrv.stop();

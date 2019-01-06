@@ -12,7 +12,7 @@ const rqp = require("request-promise"); //Работа с HTTP/HTTPS запро�
 const EventEmitter = require("events"); //Обработчик пользовательских событий
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const { SERR_SERVICE_UNAVAILABLE, SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
-const { makeErrorText, validateObject, sendMail } = require("./utils"); //Вспомогательные функции
+const { makeErrorText, validateObject } = require("./utils"); //Вспомогательные функции
 const prmsServiceAvailableControllerSchema = require("../models/prms_service_available_controller"); //Схемы валидации параметров функций класса
 const objServiceSchema = require("../models/obj_service"); //Схемы валидации сервисов
 
@@ -40,7 +40,7 @@ class ServiceAvailableController extends EventEmitter {
     constructor(prms) {
         //Создадим экземпляр родительского класса
         super();
-        //Проверяем структуру переданного объекта для подключения
+        //Проверяем структуру переданного набора параметров для конструктора
         let sCheckResult = validateObject(
             prms,
             prmsServiceAvailableControllerSchema.ServiceAvailableController,
@@ -58,17 +58,19 @@ class ServiceAvailableController extends EventEmitter {
             this.bInDetectingLoop = false;
             //Идентификатор таймера проверки доступности сервисов
             this.nDetectingLoopTimeOut = null;
-            //Запомним параметры отправки E-Mail
-            this.mail = prms.mail;
+            //Запомним уведомитель
+            this.notifier = prms.notifier;
             //Запомним логгер
             this.logger = prms.logger;
+            //Установим таймаут проведки адреса сервиса (мс)
+            this.nCheckTimeout = 10000;
             //Привяжем методы к указателю на себя для использования в обработчиках событий
             this.serviceDetectingLoop = this.serviceDetectingLoop.bind(this);
         } else {
             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
         }
     }
-    //Уведомление об запуске контроллера
+    //Уведомление о запуске контроллера
     notifyStarted() {
         //Оповестим подписчиков о запуске
         this.emit(SEVT_SERVICE_AVAILABLE_CONTROLLER_STARTED);
@@ -86,15 +88,15 @@ class ServiceAvailableController extends EventEmitter {
                 await this.serviceDetectingLoop();
             }, NDETECTING_LOOP_INTERVAL);
         } else {
-            //Если мы не работаем и просили оповстить об останове (видимо была команда на останов) - сделаем это
+            //Если мы не работаем и просили оповестить об останове (видимо была команда на останов) - сделаем это
             if (this.bNotifyStopped) this.notifyStopped();
         }
     }
-    //Опрос очереди исходящих сообщений
+    //Опрос доступности сервисов
     async serviceDetectingLoop() {
         //Если есть сервисы для опроса
         if (this.services && Array.isArray(this.services) && this.services.length > 0) {
-            //Выставим флаг - цикл опроса кативен
+            //Выставим флаг - цикл опроса активен
             this.bInDetectingLoop = true;
             try {
                 //Обходим список сервисов для проверки
@@ -106,7 +108,7 @@ class ServiceAvailableController extends EventEmitter {
                     ) {
                         try {
                             //Отправляем проверочный запрос
-                            await rqp({ url: this.services[i].sSrvRoot });
+                            await rqp({ url: this.services[i].sSrvRoot, timeout: this.nCheckTimeout });
                             //Запрос прошел - фиксируем дату доступности и сбрасываем дату недоступности
                             this.services[i].dAvailable = new Date();
                             this.services[i].dUnAvailable = null;
@@ -116,20 +118,31 @@ class ServiceAvailableController extends EventEmitter {
                             //Сформируем текст ошибки в зависимости от того, что случилось
                             let sError = "Неожиданная ошибка удалённого сервиса";
                             if (e.error) {
-                                sError = `Ошибка передачи данных: ${e.error.code}`;
+                                let sSubError = e.error.code || e.error;
+                                if (e.error.code === "ESOCKETTIMEDOUT")
+                                    sSubError = `сервис не ответил на запрос в течение ${this.nCheckTimeout} мс`;
+                                sError = `Ошибка передачи данных: ${sSubError}`;
                             }
                             if (e.response) {
-                                sError = `Ошибка работы удалённого сервиса: ${e.response.statusCode} - ${
-                                    e.response.statusMessage
-                                }`;
+                                //Нам нужны только ошибки сервера
+                                if (String(e.response.statusCode).startsWith("5")) {
+                                    sError = `Ошибка работы удалённого сервиса: ${e.response.statusCode} - ${
+                                        e.response.statusMessage
+                                    }`;
+                                } else {
+                                    //Остальное - клиентские ошибки, но сервер-то вроде отвечает, поэтому - пропускаем
+                                    this.services[i].dUnAvailable = null;
+                                }
                             }
-                            //Фиксируем ошибку проверки в протоколе
-                            await this.logger.warn(
-                                `При проверке доступности сервиса ${this.services[i].sCode}: ${makeErrorText(
-                                    new ServerError(SERR_SERVICE_UNAVAILABLE, sError)
-                                )} (адрес - ${this.services[i].sSrvRoot})`,
-                                { nServiceId: this.services[i].nId }
-                            );
+                            //Фиксируем ошибку проверки в протоколе (только если она действительно была)
+                            if (this.services[i].dUnAvailable) {
+                                await this.logger.warn(
+                                    `При проверке доступности сервиса ${this.services[i].sCode}: ${makeErrorText(
+                                        new ServerError(SERR_SERVICE_UNAVAILABLE, sError)
+                                    )} (адрес - ${this.services[i].sSrvRoot})`,
+                                    { nServiceId: this.services[i].nId }
+                                );
+                            }
                         }
                         //Если есть даты - будем проверять
                         if (this.services[i].dUnAvailable && this.services[i].dAvailable) {
@@ -151,8 +164,7 @@ class ServiceAvailableController extends EventEmitter {
                                 //И в почту, если есть список адресов
                                 if (this.services[i].sUnavlblNtfMail) {
                                     try {
-                                        await sendMail({
-                                            mail: this.mail,
+                                        this.notifier.addMessage({
                                             sTo: this.services[i].sUnavlblNtfMail,
                                             sSubject,
                                             sMessage
@@ -204,7 +216,7 @@ class ServiceAvailableController extends EventEmitter {
                 s.dUnAvailable = null;
                 s.dAvailable = new Date();
             });
-            //Начинаем слушать очередь исходящих
+            //Начинаем проверять список сервисов
             setTimeout(this.serviceDetectingLoop, NDETECTING_LOOP_DELAY);
             //И оповещаем всех что запустились
             this.notifyStarted();

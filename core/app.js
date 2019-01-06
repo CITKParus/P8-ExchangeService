@@ -12,6 +12,7 @@ const db = require("./db_connector"); //Взаимодействие с БД
 const oq = require("./out_queue"); //Прослушивание очереди исходящих сообщений
 const iq = require("./in_queue"); //Прослушивание очереди входящих сообщений
 const sac = require("./service_available_controller"); //Контроль доступности удалённых сервисов
+const ntf = require("./notifier"); //Отправка уведомлений
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const { makeErrorText, validateObject, getIPs } = require("./utils"); //Вспомогательные функции
 const { SERR_COMMON, SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
@@ -35,6 +36,8 @@ class ParusAppServer {
         this.inQ = null;
         //Контроллер доступности удалённых сервисов
         this.srvAvlCtrl = null;
+        //Модуль отправки уведомлений
+        this.notifier = null;
         //Флаг остановки сервера
         this.bStopping = false;
         //Список обслуживаемых сервисов
@@ -46,6 +49,8 @@ class ParusAppServer {
         this.onOutQStopped = this.onOutQStopped.bind(this);
         this.onInQStarted = this.onInQStarted.bind(this);
         this.onInQStopped = this.onInQStopped.bind(this);
+        this.onNotifierStarted = this.onNotifierStarted.bind(this);
+        this.onNotifierStopped = this.onNotifierStopped.bind(this);
         this.onServiceACStarted = this.onServiceACStarted.bind(this);
         this.onServiceACStopped = this.onServiceACStopped.bind(this);
     }
@@ -111,6 +116,29 @@ class ParusAppServer {
         await this.logger.info(
             `Обработчик очереди входящих сообщений запущен (порт - ${nPort}, доступные IP - ${getIPs().join("; ")})`
         );
+        //Запускаем модуль отправки уведомлений
+        await this.logger.info("Запуск модуля отправки уведомлений...");
+        try {
+            this.notifier.startNotifier();
+        } catch (e) {
+            await this.logger.error(`Ошибка запуска модуля отправки уведомлений: ${makeErrorText(e)}`);
+            await this.stop();
+            return;
+        }
+    }
+    //При останове обработчика входящих сообщений
+    async onInQStopped() {
+        //Сообщим, что остановили обработчик
+        await this.logger.warn("Обработчик очереди входящих сообщений остановлен");
+        //Останавливаем модуль отправки уведомлений
+        await this.logger.warn("Останов модуля отправки уведомлений...");
+        if (this.notifier) this.notifier.stopNotifier();
+        else await this.onNotifierStopped();
+    }
+    //При запуске модуля отправки уведомлений
+    async onNotifierStarted() {
+        //Сообщим, что запустили модуль
+        await this.logger.info(`Модуль отправки уведомлений запущен`);
         //Запускаем контроллер доступности удалённых сервисов
         await this.logger.info("Запуск контроллера доступности удалённых сервисов...");
         try {
@@ -121,10 +149,10 @@ class ParusAppServer {
             return;
         }
     }
-    //При останове обработчика входящих сообщений
-    async onInQStopped() {
-        //Сообщим, что остановили обработчик
-        await this.logger.warn("Обработчик очереди входящих сообщений остановлен");
+    //При останове модуля отправки уведомлений
+    async onNotifierStopped() {
+        //Сообщим, что остановили модуль
+        await this.logger.warn("Модуль отправки уведомлений остановлен");
         //Останавливаем контроллер доступности удалённных сервисов
         await this.logger.warn("Останов контроллера доступности удалённых сервисов...");
         if (this.srvAvlCtrl) this.srvAvlCtrl.stopController();
@@ -172,8 +200,10 @@ class ParusAppServer {
             this.outQ = new oq.OutQueue({ outGoing: prms.config.outGoing, dbConn: this.dbConn, logger: this.logger });
             //Создаём обработчик очереди входящих
             this.inQ = new iq.InQueue({ inComing: prms.config.inComing, dbConn: this.dbConn, logger: this.logger });
-            //Создаём контроллер доступности удалённых сервислв
-            this.srvAvlCtrl = new sac.ServiceAvailableController({ logger: this.logger, mail: prms.config.mail });
+            //Создаём модуль рассылки уведомлений
+            this.notifier = new ntf.Notifier({ logger: this.logger, mail: prms.config.mail });
+            //Создаём контроллер доступности удалённых сервисов
+            this.srvAvlCtrl = new sac.ServiceAvailableController({ logger: this.logger, notifier: this.notifier });
             //Скажем что инициализировали
             await this.logger.info("Сервер приложений инициализирован");
         } else {
@@ -197,6 +227,9 @@ class ParusAppServer {
         //Включим прослушивание событий обработчика входящих сообщений
         this.inQ.on(iq.SEVT_IN_QUEUE_STARTED, this.onInQStarted);
         this.inQ.on(iq.SEVT_IN_QUEUE_STOPPED, this.onInQStopped);
+        //Включим прослушивание событий модуля рассылки уведомлений
+        this.notifier.on(ntf.SEVT_NOTIFIER_STARTED, this.onNotifierStarted);
+        this.notifier.on(ntf.SEVT_NOTIFIER_STOPPED, this.onNotifierStopped);
         //Включим прослушивание событий контроллера доступности удалённых сервисов
         this.srvAvlCtrl.on(sac.SEVT_SERVICE_AVAILABLE_CONTROLLER_STARTED, this.onServiceACStarted);
         this.srvAvlCtrl.on(sac.SEVT_SERVICE_AVAILABLE_CONTROLLER_STOPPED, this.onServiceACStopped);
@@ -209,7 +242,7 @@ class ParusAppServer {
         if (!this.bStopping) {
             //Установим флаг - остановка в процессе
             this.bStopping = true;
-            //Сообщаем, что начала останов сервера
+            //Сообщаем, что начался останов сервера
             await this.logger.warn("Останов сервера приложений...");
             //Останов обслуживания очереди исходящих
             await this.logger.warn("Останов обработчика очереди исходящих сообщений...");

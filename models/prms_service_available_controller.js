@@ -9,7 +9,7 @@
 
 const Schema = require("validate"); //Схемы валидации
 const { defServices } = require("./obj_services"); //Схема валидации списка сервисов
-const { mail } = require("./obj_config"); //Схемы валидации конфигурации сервера приложений
+const { Notifier } = require("../core/notifier"); //Класс рассылки уведомлений
 const { Logger } = require("../core/logger"); //Класс для протоколирования работы
 
 //------------------
@@ -18,12 +18,14 @@ const { Logger } = require("../core/logger"); //Класс для протоко
 
 //Схема валидации параметров конструктора
 exports.ServiceAvailableController = new Schema({
-    //Параметры отправки E-Mail уведомлений
-    mail: {
-        schema: mail,
+    //Объект для рассылки уведомлений
+    notifier: {
+        type: Notifier,
         required: true,
         message: {
-            required: path => `Не указаны параметры отправки E-Mail уведомлений (${path})`
+            type: path =>
+                `Объект для рассылки уведомлений (${path}) имеет некорректный тип данных (ожидалось - Notifier)`,
+            required: path => `Не указан объект для рассылки уведомлений (${path})`
         }
     },
     //Объект для протоколирования работы
