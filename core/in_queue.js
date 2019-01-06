@@ -164,7 +164,7 @@ class InQueue extends EventEmitter {
                             //Если пришел флаг ошибочной аутентификации и он положительный - то это ошибка, дальше ничего не делаем
                             if (!_.isUndefined(resBefore.bUnAuth))
                                 if (resBefore.bUnAuth === true)
-                                    throw new ServerError(SERR_UNAUTH, "Не аутентифицирован");
+                                    throw new ServerError(SERR_UNAUTH, "Нет аутентификации");
                         } else {
                             //Или расскажем об ошибке
                             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
@@ -185,7 +185,7 @@ class InQueue extends EventEmitter {
                         throw new ServerError(SERR_DB_SERVER, prcRes.sMsg);
                     //Если результат - ошибка аутентификации, то и её пробрасываем, но с правильным кодом
                     if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_UNAUTH)
-                        throw new ServerError(SERR_UNAUTH, prcRes.sMsg || "Не аутентифицирован");
+                        throw new ServerError(SERR_UNAUTH, prcRes.sMsg || "Нет аутентификации");
                     //Выставим статус сообщению очереди - исполнено обработчиком БД
                     q = await this.dbConn.setQueueState({
                         nQueueId: q.nId,
@@ -238,8 +238,7 @@ class InQueue extends EventEmitter {
                             }
                             //Если пришел флаг ошибочной аутентификации и он положительный - то это ошибка, дальше ничего не делаем
                             if (!_.isUndefined(resAfter.bUnAuth))
-                                if (resAfter.bUnAuth === true)
-                                    throw new ServerError(SERR_UNAUTH, "Не аутентифицирован");
+                                if (resAfter.bUnAuth === true) throw new ServerError(SERR_UNAUTH, "Нет аутентификации");
                         } else {
                             //Или расскажем об ошибке
                             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
