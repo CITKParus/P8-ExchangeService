@@ -89,6 +89,8 @@ const appProcess = async prms => {
     );
     //Если структура объекта в норме
     if (!sCheckResult) {
+        //Запоминаем текущий статус сообщения
+        let nOldExecState = prms.queue.nExecState;
         //Обрабатываем
         try {
             //Считываем статус аутентификации сервиса
@@ -175,7 +177,7 @@ const appProcess = async prms => {
                             //Применим ответ "До" - флаг отсуствия аутентификации
                             if (!_.isUndefined(resBefore.bUnAuth))
                                 if (resBefore.bUnAuth === true) {
-                                    throw new ServerError(SERR_UNAUTH, "Не аутентифицирован");
+                                    throw new ServerError(SERR_UNAUTH, "Нет аутентификации");
                                 }
                             //Применим ответ "До" - контекст работы сервиса
                             if (!_.isUndefined(resBefore.sCtx))
@@ -234,8 +236,7 @@ const appProcess = async prms => {
                             }
                             //Применим ответ "После" - флаг утентификации сервиса
                             if (!_.isUndefined(resAfter.bUnAuth))
-                                if (resAfter.bUnAuth === true)
-                                    throw new ServerError(SERR_UNAUTH, "Не аутентифицирован");
+                                if (resAfter.bUnAuth === true) throw new ServerError(SERR_UNAUTH, "Нет аутентификации");
                             //Применим ответ "После" - контекст работы сервиса
                             if (!_.isUndefined(resAfter.sCtx))
                                 if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGIN) {
@@ -274,20 +275,35 @@ const appProcess = async prms => {
                     nQueueId: prms.queue.nId
                 });
             } else {
-                //Нет атуентификации (мы ещё не меняли статус сообщения и это не считается за попытку исполнения, это будет просто сигнал, что надо аутентифицироваться а потом задача снова попадёт в очередь)
-                res = new ServerError(SERR_UNAUTH, "Не аутентифицирован");
+                //Нет атуентификации
+                throw new ServerError(SERR_UNAUTH, "Нет аутентификации");
             }
         } catch (e) {
-            //Фиксируем ошибку обработки сервером приложений - в статусе сообщения
-            res = await dbConn.setQueueState({
-                nQueueId: prms.queue.nId,
-                sExecMsg: makeErrorText(e),
-                nIncExecCnt: NINC_EXEC_CNT_YES,
-                nExecState:
-                    prms.queue.nExecCnt + 1 < prms.queue.nRetryAttempts
-                        ? objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR
-                        : objQueueSchema.NQUEUE_EXEC_STATE_ERR
-            });
+            //Если была ошибка аутентификации - возвращаем старый статус не меняя количества попыток
+            if (e instanceof ServerError && e.sCode == SERR_UNAUTH) {
+                await dbConn.setQueueState({
+                    nQueueId: prms.queue.nId,
+                    sExecMsg: makeErrorText(e),
+                    nExecState: nOldExecState,
+                    nResetData: objQueueSchema.NQUEUE_RESET_DATA_YES
+                });
+                res = e;
+            } else {
+                //Фиксируем ошибку обработки сервером приложений - в статусе сообщения
+                res = await dbConn.setQueueState({
+                    nQueueId: prms.queue.nId,
+                    sExecMsg: makeErrorText(e),
+                    nResetData:
+                        prms.queue.nExecCnt + 1 < prms.queue.nRetryAttempts
+                            ? objQueueSchema.NQUEUE_RESET_DATA_YES
+                            : objQueueSchema.NQUEUE_RESET_DATA_NO,
+                    nIncExecCnt: NINC_EXEC_CNT_YES,
+                    nExecState:
+                        prms.queue.nExecCnt + 1 < prms.queue.nRetryAttempts
+                            ? objQueueSchema.NQUEUE_EXEC_STATE_APP_ERR
+                            : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                });
+            }
             //Фиксируем ошибку обработки сервером приложений - в протоколе работы сервиса
             await logger.error(
                 `Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером приложений: ${makeErrorText(e)}`,
@@ -337,7 +353,7 @@ const dbProcess = async prms => {
                     throw new ServerError(SERR_DB_SERVER, prcRes.sMsg);
                 //Если результат - ошибка аутентификации, то и её пробрасываем, но с правильным кодом
                 if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_UNAUTH)
-                    throw new ServerError(SERR_UNAUTH, prcRes.sMsg || "Не аутентифицирован");
+                    throw new ServerError(SERR_UNAUTH, prcRes.sMsg || "Нет аутентификации");
             }
             //Фиксируем успешное исполнение (полное - дальше обработки нет) - в статусе сообщения
             res = await dbConn.setQueueState({
@@ -350,16 +366,27 @@ const dbProcess = async prms => {
                 nQueueId: prms.queue.nId
             });
         } catch (e) {
-            //Фиксируем ошибку обработки сервером БД - в статусе сообщения
-            await dbConn.setQueueState({
-                nQueueId: prms.queue.nId,
-                sExecMsg: makeErrorText(e),
-                nIncExecCnt: NINC_EXEC_CNT_YES,
-                nExecState:
-                    prms.queue.nExecCnt + 1 < prms.queue.nRetryAttempts
-                        ? objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
-                        : objQueueSchema.NQUEUE_EXEC_STATE_ERR
-            });
+            //Если была ошибка аутентификации - возвращаем на повторную обработку сервером приложений
+            if (e instanceof ServerError && e.sCode == SERR_UNAUTH) {
+                await dbConn.setQueueState({
+                    nQueueId: prms.queue.nId,
+                    sExecMsg: makeErrorText(e),
+                    nExecState: objQueueSchema.NQUEUE_EXEC_STATE_INQUEUE,
+                    nResetData: objQueueSchema.NQUEUE_RESET_DATA_YES
+                });
+                res = e;
+            } else {
+                //Фиксируем ошибку обработки сервером БД - в статусе сообщения
+                res = await dbConn.setQueueState({
+                    nQueueId: prms.queue.nId,
+                    sExecMsg: makeErrorText(e),
+                    nIncExecCnt: NINC_EXEC_CNT_YES,
+                    nExecState:
+                        prms.queue.nExecCnt + 1 < prms.queue.nRetryAttempts
+                            ? objQueueSchema.NQUEUE_EXEC_STATE_DB_ERR
+                            : objQueueSchema.NQUEUE_EXEC_STATE_ERR
+                });
+            }
             //Фиксируем ошибку обработки сервером БД - в протоколе работы сервиса
             await logger.error(
                 `Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером БД: ${makeErrorText(e)}`,
