@@ -309,7 +309,12 @@ const beforeRegBillSIR = async prms => {
         //Если не достали из контекста токен доступа - значит нет аутентификации на сервере
         if (!sToken) return { bUnAuth: true };
         //Разберем XML-данные фискального документа
-        const parseRes = await parseXML(prms.queue.blMsg.toString());
+        let parseRes = null;
+        try {
+            parseRes = await parseXML(prms.queue.blMsg.toString());
+        } catch (e) {
+            throw new Error("Ошибка рабора XML");
+        }
         //Сохраним короткие ссылки на документ и его свойства
         const doc = parseRes.FISCDOC;
         const docProps = parseRes.FISCDOC.FISCDOC_PROPS.FISCDOC_PROP;
