@@ -292,6 +292,13 @@ create or replace package PKG_EXS as
     RCSERVICE               out sys_refcursor -- Курсор со списком сервисов
   );
 
+  /* Получение информации о просроченных сообщениях очереди для сервиса */
+  procedure SERVICE_QUEUE_EXPIRED_GET
+  (
+    NEXSSERVICE             in number,        -- Рег. номер записи сервиса
+    RCSERVICE_QUEUE_EXPIRED out sys_refcursor -- Курсор со сведениями о просроченных сообщениях сервиса
+  );
+
   /* Получение контекста сервиса */
   procedure SERVICE_CTX_GET
   (
@@ -435,7 +442,7 @@ create or replace package PKG_EXS as
     NPORTION_SIZE           in number,        -- Количество выбираемых сообщений
     RCQUEUES                out sys_refcursor -- Курсор со списком позиций очереди
   );
-
+  
   /* Установка состояние записи очереди */
   procedure QUEUE_EXEC_STATE_SET
   (
@@ -1237,6 +1244,66 @@ create or replace package body PKG_EXS as
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
   end SERVICE_GET;
 
+/* Получение информации о просроченных сообщениях очереди для сервиса */
+  procedure SERVICE_QUEUE_EXPIRED_GET
+  (
+    NEXSSERVICE             in number,                        -- Рег. номер записи сервиса
+    RCSERVICE_QUEUE_EXPIRED out sys_refcursor                 -- Курсор со сведениями о просроченных сообщениях сервиса
+  )
+  is
+    /* Локальные константы */
+    NMAX_SINFO_LIST_LEN     constant PKG_STD.TNUMBER := 4000; -- Максимальная длинна списка с информацией о просроченных сообщениях
+    SDELIM                  constant varchar2(10) := chr(10); -- Разделитель списка с информацией о просроченных сообщениях
+    /* Локальные переменные */
+    REXSSERVICE             EXSSERVICE%rowtype;               -- Запись сервиса
+    NCNT                    PKG_STD.TNUMBER := 0;             -- Количество просроченных сообщений
+    SINFO_LIST              PKG_STD.TSTRING;                  -- Список с информацией о просроченных сообщениях
+    SPREF                   PKG_STD.TSTRING;                  -- Возвращаемый префикс списка с информацией о просроченных сообщениях
+    SPREF_FULL              PKG_STD.TSTRING;                  -- Префикс полного списка с информацией о просроченных сообщениях
+    SPREF_SOME              PKG_STD.TSTRING;                  -- Префикс неполного (если не вся информация вошла) списка с информацией о просроченных сообщениях
+  begin
+    /* Считаем запись сервиса */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => NEXSSERVICE);
+    /* Инициализируем префексы */
+    SPREF_FULL := 'Список просроченных сообщений обмена для сервиса "' || REXSSERVICE.CODE || '":' || CHR(10);
+    SPREF_SOME := 'Наиболее поздние сообщения обмена из числа просроченных для сервиса "' || REXSSERVICE.CODE || '":' ||
+                  CHR(10);
+    SPREF      := SPREF_FULL;
+    /* Обходим все сообщения в любом статусе, кроме финальных, для которых установлен лимит нахождения в очереди и он превышен */
+    for C in (select 'Р/н: ' || TO_CHAR(Q.RN) || ', ф-я: ' || FN.CODE || ', от ' ||
+                     TO_CHAR(Q.IN_DATE, 'dd.mm.yyyy hh24:mi:ss') SINFO
+                from EXSSERVICEFN FN,
+                     EXSMSGTYPE   MT,
+                     EXSQUEUE     Q
+               where FN.PRN = REXSSERVICE.RN
+                 and FN.EXSMSGTYPE = MT.RN
+                 and FN.RN = Q.EXSSERVICEFN
+                 and MT.MAX_IDLE > 0
+                 and Q.EXEC_STATE not in (NQUEUE_EXEC_STATE_OK, NQUEUE_EXEC_STATE_ERR)
+                 and ROUND(24 * 60 * (sysdate - Q.IN_DATE)) > MT.MAX_IDLE
+               order by Q.IN_DATE)
+    loop
+      /* Инкремент количества */
+      NCNT := NCNT + 1;
+      /* Собираем информацию в список */
+      if ((NVL(LENGTH(SINFO_LIST), 0) + LENGTH(C.SINFO) + LENGTH(SDELIM) +
+         GREATEST(NVL(LENGTH(SPREF_FULL), 0), NVL(LENGTH(SPREF_SOME), 0))) <= NMAX_SINFO_LIST_LEN) then
+        if (SINFO_LIST is null) then
+          SINFO_LIST := C.SINFO;
+        else
+          SINFO_LIST := SINFO_LIST || SDELIM || C.SINFO;
+        end if;
+      else
+        SPREF := SPREF_SOME;
+      end if;
+    end loop;
+    /* Возвращаем ответ в виде курсора */
+    open RCSERVICE_QUEUE_EXPIRED for
+      select NCNT "nCnt",
+             DECODE(NCNT, 0, null, SPREF || SINFO_LIST) "sInfoList"
+        from DUAL;
+  end SERVICE_QUEUE_EXPIRED_GET;
+
   /* Получение контекста сервиса */
   procedure SERVICE_CTX_GET
   (
@@ -1877,7 +1944,7 @@ create or replace package body PKG_EXS as
     QUEUE_GET(NIDENT => NIDENT, RCQUEUE => RCQUEUES);
     /* Чистим буфер */
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
-  end QUEUE_SRV_TYPE_SEND_GET;
+  end QUEUE_SRV_TYPE_SEND_GET; 
   
   /* Установка состояние записи очереди */
   procedure QUEUE_EXEC_STATE_SET
