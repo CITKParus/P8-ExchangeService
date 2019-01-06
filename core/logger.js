@@ -43,6 +43,9 @@ class Logger {
     }
     //Протоколирование
     async log(prms) {
+        //Фиксируем время
+        const dNow = new Date();
+        const sNow = dNow.toLocaleString();
         //Проверяем структуру переданного объекта для подключения
         let sCheckResult = validateObject(prms, prmsLoggerSchema.log, "Параметры функции протоколирования");
         //Если структура объекта в норме
@@ -70,7 +73,7 @@ class Logger {
                     break;
             }
             //Выдаём сообщение
-            console.log(sColorPattern, sPrefix + ": ", prms.sMsg);
+            console.log(sColorPattern, `${sNow} ${sPrefix}: `, prms.sMsg);
             //Протоколируем в БД, если это необходимо
             if (this.bLogDB) {
                 try {
@@ -79,11 +82,11 @@ class Logger {
                         await this.dbConnector.putLog(prms);
                     }
                 } catch (e) {
-                    console.log("\x1b[31m%s\x1b[0m%s", "ОШИБКА ПРОТОКОЛИРОВАНИЯ: ", e.sMessage);
+                    console.log("\x1b[31m%s\x1b[0m%s", `${sNow} ОШИБКА ПРОТОКОЛИРОВАНИЯ: `, e.sMessage);
                 }
             }
         } else {
-            console.log("\x1b[31m%s\x1b[0m%s", "ОШИБКА ПРОТОКОЛИРОВАНИЯ: ", sCheckResult);
+            console.log("\x1b[31m%s\x1b[0m%s", `${sNow} ОШИБКА ПРОТОКОЛИРОВАНИЯ: `, sCheckResult);
             console.log(prms);
         }
     }
