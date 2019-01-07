@@ -63,7 +63,7 @@ class Notifier extends EventEmitter {
         }
     }
     //Добавление уведомления в очередь отправки
-    addMessage(prms) {
+    async addMessage(prms) {
         //Проверяем структуру переданного объекта для старта
         let sCheckResult = validateObject(
             prms,
@@ -76,7 +76,11 @@ class Notifier extends EventEmitter {
             tmp.bSent = false;
             this.messages.push(tmp);
         } else {
-            throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            await this.logger.error(
+                `Ошибка добавления уведомления в очередь: ${makeErrorText(
+                    new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult)
+                )}`
+            );
         }
     }
     //Уведомление о запуске модуля
