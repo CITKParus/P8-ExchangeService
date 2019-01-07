@@ -16,6 +16,7 @@ const { makeErrorText, validateObject } = require("./utils"); //Вспомога
 const { NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 const objOutQueueProcessorSchema = require("../models/obj_out_queue_processor"); //Схемы валидации сообщений обмена с обработчиком сообщения очереди
 const objQueueSchema = require("../models/obj_queue"); //Схемы валидации сообщения очереди
+const objServiceFnSchema = require("../models/obj_service_function"); //Схемы валидации функции сервиса
 const prmsOutQueueSchema = require("../models/prms_out_queue"); //Схемы валидации параметров функций класса
 
 //--------------------------
@@ -60,6 +61,8 @@ class OutQueue extends EventEmitter {
             this.dbConn = prms.dbConn;
             //Запомним логгер
             this.logger = prms.logger;
+            //Запомним уведомитель
+            this.notifier = prms.notifier;
             //Список обрабатываемых в текущий момент сообщений очереди
             this.inProgress = [];
             //Привяжем методы к указателю на себя для использования в обработчиках событий
@@ -134,7 +137,7 @@ class OutQueue extends EventEmitter {
     }
     //Старт обработчика
     startQueueProcessor(prms) {
-        //Проверяем структуру переданного объекта
+        //Проверяем структуру переданного объекта для старта обработчика
         let sCheckResult = validateObject(
             prms,
             prmsOutQueueSchema.startQueueProcessor,
@@ -161,7 +164,7 @@ class OutQueue extends EventEmitter {
     }
     //Останов обработчика
     stopQueueProcessor(prms) {
-        //Проверяем структуру переданного объекта для старта
+        //Проверяем структуру переданного объекта для останова обработчика
         let sCheckResult = validateObject(
             prms,
             prmsOutQueueSchema.stopQueueProcessor,
@@ -177,6 +180,41 @@ class OutQueue extends EventEmitter {
             this.nWorkersLeft++;
         } else {
             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+        }
+    }
+    //Оповещение об ошибке исполнения сообщения
+    async notifyMessageProcessError(prms) {
+        try {
+            //Проверяем структуру переданного объекта для отправки оповещения
+            let sCheckResult = validateObject(
+                prms,
+                prmsOutQueueSchema.notifyMessageProcessError,
+                "Параметры функции оповещения об ошибке исполнения сообщения"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                //Найдем сервис и функцию, исполнявшие данное сообщение
+                let service = _.find(this.services, { nId: prms.queue.nServiceId });
+                let func = _.find(_.find(this.services, { nId: prms.queue.nServiceId }).functions, {
+                    nId: prms.queue.nServiceFnId
+                });
+                //Если нашли и для функции-обработчика указан признак необходимости оповещения об ошибках
+                if (service && func && func.nErrNtfSign == objServiceFnSchema.NERR_NTF_SIGN_YES)
+                    //Отправим уведомление об ошибке отработки в почту
+                    await this.notifier.addMessage({
+                        sTo: func.sErrNtfMail,
+                        sSubject: `Ошибка обработки исходящего сообщения ${
+                            prms.queue.nId
+                        } сервером приложений для функции "${func.sCode}" сервиса "${service.sCode}"`,
+                        sMessage: prms.queue.sExecMsg
+                    });
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } catch (e) {
+            await this.logger.error(
+                `При отправке уведомления об ошибке обработки исходящего сообщения: ${makeErrorText(e)}`
+            );
         }
     }
     //Запуск обработки очередного сообщения
@@ -234,7 +272,7 @@ class OutQueue extends EventEmitter {
                         //Запись в протокол работы сервиса
                         await self.logger.error(sErrorLog, { nQueueId: prms.queue.nId });
                         //Запись в статус сообщения
-                        await this.dbConn.setQueueState({
+                        prms.queue = await this.dbConn.setQueueState({
                             nQueueId: prms.queue.nId,
                             sExecMsg: sError,
                             nIncExecCnt: nQueueOldExecCnt == prms.queue.nExecCnt ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
@@ -246,6 +284,9 @@ class OutQueue extends EventEmitter {
                                     : objQueueSchema.NQUEUE_EXEC_STATE_ERR
                         });
                     }
+                    //Если исполнение завершилось полностью и с ошибкой - расскажем об этом
+                    if (prms.queue.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_ERR)
+                        await this.notifyMessageProcessError(prms);
                     //Останавливаем обработчик и инкрементируем флаг их доступного количества
                     try {
                         this.stopQueueProcessor({ nQueueId: prms.queue.nId, proc });
@@ -266,7 +307,7 @@ class OutQueue extends EventEmitter {
                         nQueueId: prms.queue.nId
                     });
                     //Фиксируем ошибку обработки - статус сообщения
-                    await this.dbConn.setQueueState({
+                    prms.queue = await this.dbConn.setQueueState({
                         nQueueId: prms.queue.nId,
                         sExecMsg: makeErrorText(e),
                         nIncExecCnt: nQueueOldExecCnt == prms.queue.nExecCnt ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
@@ -276,6 +317,9 @@ class OutQueue extends EventEmitter {
                                 ? prms.queue.nExecState
                                 : objQueueSchema.NQUEUE_EXEC_STATE_ERR
                     });
+                    //Если исполнение завершилось полностью и с ошибкой - расскажем об этом
+                    if (prms.queue.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_ERR)
+                        await this.notifyMessageProcessError(prms);
                     //Останавливаем обработчик и инкрементируем флаг их доступного количества
                     try {
                         this.stopQueueProcessor({ nQueueId: prms.queue.nId, proc });
@@ -323,7 +367,7 @@ class OutQueue extends EventEmitter {
                                 this.processMessage({ queue: outMsgs[i] });
                             } catch (e) {
                                 //Фиксируем ошибку обработки сервером приложений - статус сообщения
-                                await this.dbConn.setQueueState({
+                                let queue = await this.dbConn.setQueueState({
                                     nQueueId: outMsgs[i].nId,
                                     sExecMsg: makeErrorText(e),
                                     nIncExecCnt: NINC_EXEC_CNT_YES,
@@ -334,6 +378,9 @@ class OutQueue extends EventEmitter {
                                 });
                                 //Фиксируем ошибку обработки сервером приложений - запись в протокол работы сервера приложений
                                 await this.logger.error(makeErrorText(e), { nQueueId: outMsgs[i].nId });
+                                //Если исполнение завершилось полностью и с ошибкой - расскажем об этом
+                                if (queue.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_ERR)
+                                    await this.notifyMessageProcessError({ queue });
                             }
                         }
                     }

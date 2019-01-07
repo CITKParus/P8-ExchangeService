@@ -13,6 +13,7 @@ const { defServices } = require("./obj_services"); //Схема валидаци
 const { Queue } = require("./obj_queue"); //Схема валидации сообщения очереди
 const { DBConnector } = require("../core/db_connector"); //Класс взаимодействия в БД
 const { Logger } = require("../core/logger"); //Класс для протоколирования работы
+const { Notifier } = require("../core/notifier"); //Класс рассылки уведомлений
 
 //-------------
 //  Тело модуля
@@ -54,6 +55,16 @@ exports.OutQueue = new Schema({
             type: path =>
                 `Объект для протоколирования работы (${path}) имеет некорректный тип данных (ожидалось - Logger)`,
             required: path => `Не указаны объект для протоколирования работы (${path})`
+        }
+    },
+    //Объект для рассылки уведомлений
+    notifier: {
+        type: Notifier,
+        required: true,
+        message: {
+            type: path =>
+                `Объект для рассылки уведомлений (${path}) имеет некорректный тип данных (ожидалось - Notifier)`,
+            required: path => `Не указан объект для рассылки уведомлений (${path})`
         }
     }
 });
@@ -138,6 +149,18 @@ exports.stopQueueProcessor = new Schema({
             validateChildProcess: path =>
                 `Процесс обработчика (${path}) имеет некорректный тип данных (ожидалось - ChildProcess)`,
             required: path => `Не указан процесс обработчика (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции оповещения об ошибке исполнения сообщения обмена
+exports.notifyMessageProcessError = new Schema({
+    //Обрабатываемое исходящее сообщение
+    queue: {
+        schema: Queue,
+        required: true,
+        message: {
+            required: path => `Не указано обрабатываемое исходящее сообщение (${path})`
         }
     }
 });

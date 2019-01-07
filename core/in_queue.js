@@ -60,6 +60,8 @@ class InQueue extends EventEmitter {
             this.dbConn = prms.dbConn;
             //Запомним логгер
             this.logger = prms.logger;
+            //Запомним уведомитель
+            this.notifier = prms.notifier;
             //WEB-приложение
             this.webApp = express();
             //WEB-сервер
@@ -256,25 +258,43 @@ class InQueue extends EventEmitter {
                 //Фиксируем успех обработки - в протоколе работы сервиса
                 await this.logger.info(`Входящее сообщение ${q.nId} успешно отработано`, { nQueueId: q.nId });
             } catch (e) {
+                //Тема и текст уведомления об ошибке
+                let sSubject = `Ошибка обработки входящего сообщения сервером приложений для функции "${
+                    prms.function.sCode
+                }" сервиса "${prms.service.sCode}"`;
+                let sMessage = makeErrorText(e);
                 //Если сообщение очереди успели создать
                 if (q) {
                     //Фиксируем ошибку обработки сервером приложений - в статусе сообщения
                     q = await this.dbConn.setQueueState({
                         nQueueId: q.nId,
-                        sExecMsg: makeErrorText(e),
+                        sExecMsg: sMessage,
                         nIncExecCnt: NINC_EXEC_CNT_YES,
                         nExecState: objQueueSchema.NQUEUE_EXEC_STATE_ERR
                     });
                     //Фиксируем ошибку обработки сервером приложений - в протоколе работы сервиса
                     await this.logger.error(
-                        `Ошибка обработки входящего сообщения ${q.nId} сервером приложений: ${makeErrorText(e)}`,
+                        `Ошибка обработки входящего сообщения ${q.nId} сервером приложений: ${sMessage}`,
                         { nQueueId: q.nId }
                     );
+                    //Добавим чуть больше информации в тему сообщения
+                    sSubject = `Ошибка обработки входящего сообщения ${q.nId} сервером приложений для функции "${
+                        prms.function.sCode
+                    }" сервиса "${prms.service.sCode}"`;
                 } else {
                     //Ограничимся общей ошибкой
-                    await this.logger.error(makeErrorText(e), {
+                    await this.logger.error(sMessage, {
                         nServiceId: prms.service.nId,
                         nServiceFnId: prms.function.nId
+                    });
+                }
+                //Если для функции-обработчика указан признак необходимости оповещения об ошибках
+                if (prms.function.nErrNtfSign == objServiceFnSchema.NERR_NTF_SIGN_YES) {
+                    //Отправим уведомление об ошибке отработки в почту
+                    await this.notifier.addMessage({
+                        sTo: prms.function.sErrNtfMail,
+                        sSubject,
+                        sMessage
                     });
                 }
                 //Отправим ошибку клиенту

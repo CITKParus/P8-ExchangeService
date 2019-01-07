@@ -196,14 +196,28 @@ class ParusAppServer {
         if (!sCheckResult) {
             //Создаём подключение к БД
             this.dbConn = new db.DBConnector({ connectSettings: prms.config.dbConnect });
-            //Создаём обработчик очереди исходящих
-            this.outQ = new oq.OutQueue({ outGoing: prms.config.outGoing, dbConn: this.dbConn, logger: this.logger });
-            //Создаём обработчик очереди входящих
-            this.inQ = new iq.InQueue({ inComing: prms.config.inComing, dbConn: this.dbConn, logger: this.logger });
             //Создаём модуль рассылки уведомлений
             this.notifier = new ntf.Notifier({ logger: this.logger, mail: prms.config.mail });
+            //Создаём обработчик очереди исходящих
+            this.outQ = new oq.OutQueue({
+                outGoing: prms.config.outGoing,
+                dbConn: this.dbConn,
+                logger: this.logger,
+                notifier: this.notifier
+            });
+            //Создаём обработчик очереди входящих
+            this.inQ = new iq.InQueue({
+                inComing: prms.config.inComing,
+                dbConn: this.dbConn,
+                logger: this.logger,
+                notifier: this.notifier
+            });
             //Создаём контроллер доступности удалённых сервисов
-            this.srvAvlCtrl = new sac.ServiceAvailableController({ logger: this.logger, notifier: this.notifier });
+            this.srvAvlCtrl = new sac.ServiceAvailableController({
+                logger: this.logger,
+                notifier: this.notifier,
+                dbConn: this.dbConn
+            });
             //Скажем что инициализировали
             await this.logger.info("Сервер приложений инициализирован");
         } else {

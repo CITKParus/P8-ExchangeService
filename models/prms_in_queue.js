@@ -15,6 +15,7 @@ const { DBConnector } = require("../core/db_connector"); //Класс взаим
 const { Logger } = require("../core/logger"); //Класс для протоколирования работы
 const { Service } = require("./obj_service"); //Схема валидации сервиса
 const { ServiceFunction } = require("./obj_service_function"); //Схема валидации функции сервиса
+const { Notifier } = require("../core/notifier"); //Класс рассылки уведомлений
 
 //------------------
 //  Интерфейс модуля
@@ -48,6 +49,16 @@ exports.InQueue = new Schema({
             type: path =>
                 `Объект для протоколирования работы (${path}) имеет некорректный тип данных (ожидалось - Logger)`,
             required: path => `Не указаны объект для протоколирования работы (${path})`
+        }
+    },
+    //Объект для рассылки уведомлений
+    notifier: {
+        type: Notifier,
+        required: true,
+        message: {
+            type: path =>
+                `Объект для рассылки уведомлений (${path}) имеет некорректный тип данных (ожидалось - Notifier)`,
+            required: path => `Не указан объект для рассылки уведомлений (${path})`
         }
     }
 });
