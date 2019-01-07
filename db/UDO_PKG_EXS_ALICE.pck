@@ -4,7 +4,6 @@ create or replace package UDO_PKG_EXS_ALICE as
   procedure FIND_AGENT
   (
     NIDENT                  in number,  -- Идентификатор процесса
-    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
 
@@ -12,7 +11,6 @@ create or replace package UDO_PKG_EXS_ALICE as
   procedure FIND_CONTRACT
   (
     NIDENT                  in number,  -- Идентификатор процесса
-    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );  
 
@@ -20,7 +18,6 @@ create or replace package UDO_PKG_EXS_ALICE as
   procedure FIND_CONSUMERORD
   (
     NIDENT                  in number,  -- Идентификатор процесса
-    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );  
 
@@ -28,7 +25,6 @@ create or replace package UDO_PKG_EXS_ALICE as
   procedure FIND_CONTACT
   (
     NIDENT                  in number,        -- Идентификатор процесса
-    NSRV_TYPE               in number,        -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
 
@@ -213,7 +209,6 @@ create or replace package body UDO_PKG_EXS_ALICE as
   procedure FIND_AGENT
   (
     NIDENT                  in number,        -- Идентификатор процесса
-    NSRV_TYPE               in number,        -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
   )
   is
@@ -292,16 +287,19 @@ create or replace package body UDO_PKG_EXS_ALICE as
       CRESP := 'Не понятно какого контрагента Вы хотите найти, извините...';
     end if;
     /* Возвращаем ответ */
-    PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
-                                  SARG   => PKG_EXS.SCONT_FLD_BRESP,
-                                  BVALUE => CLOB2BLOB(LCDATA => CRESP, SCHARSET => 'UTF8'));
+    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT  => NIDENT,
+                                SRESULT => PKG_EXS.SPRC_RESP_RESULT_OK,
+                                BRESP   => CLOB2BLOB(LCDATA => CRESP, SCHARSET => 'UTF8'));
+  exception
+    when others then
+      /* Вернём ошибку */
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end FIND_AGENT;
 
   /* Обработка запроса на поиск договора */
   procedure FIND_CONTRACT
   (
     NIDENT                  in number,        -- Идентификатор процесса
-    NSRV_TYPE               in number,        -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
   )
   is
@@ -393,22 +391,24 @@ create or replace package body UDO_PKG_EXS_ALICE as
       CRESP := 'Не понятно какой договор Вы хотите найти, извините...';
     end if;
     /* Возвращаем ответ */
-    PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
-                                  SARG   => PKG_EXS.SCONT_FLD_BRESP,
-                                  BVALUE => CLOB2BLOB(LCDATA => CRESP, SCHARSET => 'UTF8'));
+    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT  => NIDENT,
+                                SRESULT => PKG_EXS.SPRC_RESP_RESULT_OK,
+                                BRESP   => CLOB2BLOB(LCDATA => CRESP, SCHARSET => 'UTF8'));
+  exception
+    when others then
+      /* Вернём ошибку */
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end FIND_CONTRACT;
   
   /* Обработка запроса на поиск заказа потребителя */
   procedure FIND_CONSUMERORD
   (
     NIDENT                  in number,        -- Идентификатор процесса
-    NSRV_TYPE               in number,        -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
   )
   is
     HELPER_PATTERNS         THELPER_PATTERNS; -- Коллекция шаблонов вспомогательных слов поиска
     REXSQUEUE               EXSQUEUE%rowtype; -- Запись позиции очереди
-    NSTATE_PROP             PKG_STD.TREF;     -- Рег. номер ДС для хранения состояния заказа
     CTMP                    clob;             -- Буфер для конвертации
     CRESP                   clob;             -- Данные для ответа
     RCTMP                   sys_refcursor;    -- Буфер для измененной позиции очереди
@@ -476,16 +476,19 @@ create or replace package body UDO_PKG_EXS_ALICE as
       CRESP := 'Не понятно какой заказ Вы хотите найти, извините...';
     end if;
     /* Возвращаем ответ */
-    PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
-                                  SARG   => PKG_EXS.SCONT_FLD_BRESP,
-                                  BVALUE => CLOB2BLOB(LCDATA => CRESP, SCHARSET => 'UTF8'));
+    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT  => NIDENT,
+                                SRESULT => PKG_EXS.SPRC_RESP_RESULT_OK,
+                                BRESP   => CLOB2BLOB(LCDATA => CRESP, SCHARSET => 'UTF8'));
+  exception
+    when others then
+      /* Вернём ошибку */
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end FIND_CONSUMERORD;
   
   /* Обработка запроса на поиск контактной информации */
   procedure FIND_CONTACT
   (
     NIDENT                  in number,        -- Идентификатор процесса
-    NSRV_TYPE               in number,        -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
   )
   is
@@ -561,9 +564,13 @@ create or replace package body UDO_PKG_EXS_ALICE as
       CRESP := 'Не понятно какую контактную информацию Вы хотите найти, извините...';
     end if;
     /* Возвращаем ответ */
-    PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
-                                  SARG   => PKG_EXS.SCONT_FLD_BRESP,
-                                  BVALUE => CLOB2BLOB(LCDATA => CRESP, SCHARSET => 'UTF8'));
+    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT  => NIDENT,
+                                SRESULT => PKG_EXS.SPRC_RESP_RESULT_OK,
+                                BRESP   => CLOB2BLOB(LCDATA => CRESP, SCHARSET => 'UTF8'));
+  exception
+    when others then
+      /* Вернём ошибку */
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end FIND_CONTACT;
   
 end;

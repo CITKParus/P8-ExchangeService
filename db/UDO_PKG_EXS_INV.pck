@@ -4,7 +4,6 @@ create or replace package UDO_PKG_EXS_INV as
   procedure CHECKAUTH
   (
     NIDENT                  in number,  -- Идентификатор процесса
-    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
 
@@ -12,7 +11,6 @@ create or replace package UDO_PKG_EXS_INV as
   procedure GETUSERS
   (
     NIDENT                  in number,  -- Идентификатор процесса
-    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
 
@@ -155,7 +153,6 @@ create or replace package body UDO_PKG_EXS_INV as
   procedure CHECKAUTH
   (
     NIDENT                  in number,               -- Идентификатор процесса
-    NSRV_TYPE               in number,               -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number                -- Регистрационный номер обрабатываемой позиции очереди обмена
   ) 
   is
@@ -204,19 +201,22 @@ create or replace package body UDO_PKG_EXS_INV as
       XRESULT            := UTL_CREATENODE(XDOC => XDOC, STAG => SRESULT, SNS => STSD, SVAL => 'true');
       XNODE              := DBMS_XMLDOM.APPENDCHILD(N => XCHECKAUTHRESPONSE, NEWCHILD => XRESULT);
       /* Оборачиваем его в конверт */
-      CRESPONSE          := UTL_CREATERESPONSE(XDOC => XDOC, XCONTENT => XCHECKAUTHRESPONSE);
+      CRESPONSE := UTL_CREATERESPONSE(XDOC => XDOC, XCONTENT => XCHECKAUTHRESPONSE);
     end if;
     /* Возвращаем ответ */
-    PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
-                                  SARG   => PKG_EXS.SCONT_FLD_BRESP,
-                                  BVALUE => CLOB2BLOB(LCDATA => CRESPONSE));
+    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT  => NIDENT,
+                                SRESULT => PKG_EXS.SPRC_RESP_RESULT_OK,
+                                BRESP   => CLOB2BLOB(LCDATA => CRESPONSE, SCHARSET => 'UTF8'));
+  exception
+    when others then
+      /* Вернём ошибку */
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end CHECKAUTH;
 
   /* Электронная инвентаризация - считывание пользователей */
   procedure GETUSERS
   (
     NIDENT                  in number,               -- Идентификатор процесса
-    NSRV_TYPE               in number,               -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number                -- Регистрационный номер обрабатываемой позиции очереди обмена
   ) 
   is
@@ -282,11 +282,15 @@ create or replace package body UDO_PKG_EXS_INV as
       end loop;
       /* Оборачиваем ответ в конверт */
       CRESPONSE := UTL_CREATERESPONSE(XDOC => XDOC, XCONTENT => XGETUSERSRESPONSE);
-    end if;
+    end if;   
     /* Возвращаем ответ */
-    PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
-                                  SARG   => PKG_EXS.SCONT_FLD_BRESP,
-                                  BVALUE => CLOB2BLOB(LCDATA => CRESPONSE, SCHARSET => 'UTF8'));
+    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT  => NIDENT,
+                                SRESULT => PKG_EXS.SPRC_RESP_RESULT_OK,
+                                BRESP   => CLOB2BLOB(LCDATA => CRESPONSE, SCHARSET => 'UTF8'));
+  exception
+    when others then
+      /* Вернём ошибку */
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end GETUSERS;
 
 end;

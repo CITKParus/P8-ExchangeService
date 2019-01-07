@@ -4,7 +4,6 @@ create or replace package UDO_PKG_EXS_TEST as
   procedure UTL_LOGIN
   (
     NIDENT                  in number,  -- Идентификатор процесса
-    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
 
@@ -19,7 +18,6 @@ create or replace package UDO_PKG_EXS_TEST as
   procedure AGENT_PROCESS_INFO
   (
     NIDENT                  in number,  -- Идентификатор процесса
-    NSRV_TYPE               in number,  -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
   
@@ -30,8 +28,7 @@ create or replace package body UDO_PKG_EXS_TEST as
   /* Обработка запроса на создание сессии */
   procedure UTL_LOGIN
   (
-    NIDENT                  in number,        -- Идентификатор процесса
-    NSRV_TYPE               in number,        -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
+    NIDENT                  in number,        -- Идентификатор процесса    
     NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
   )
   is
@@ -73,16 +70,16 @@ create or replace package body UDO_PKG_EXS_TEST as
                             SAPPLICATION    => 'Other',
                             SCOMPANY        => SCOMPANY);
       /* Выставляем результат обработки */
-      PKG_EXS.PRC_RESP_ARG_BLOB_SET(NIDENT => NIDENT,
-                                    SARG   => PKG_EXS.SCONT_FLD_BRESP,
-                                    BVALUE => CLOB2BLOB(LCDATA => SCONNECT, SCHARSET => 'UTF8'));
-    
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT  => NIDENT,
+                                  SRESULT => PKG_EXS.SPRC_RESP_RESULT_OK,
+                                  BRESP   => CLOB2BLOB(LCDATA => SCONNECT, SCHARSET => 'UTF8'));
     else
-      P_EXCEPTION(0, 'Не указано имя пользователя, пароль или организация.');
+      P_EXCEPTION(0,
+                  'Не указано имя пользователя, пароль или организация.');
     end if;
   exception
     when others then
-      PKG_EXS.PRC_RESP_ARG_STR_SET(NIDENT => NIDENT, SARG => PKG_EXS.SCONT_FLD_SERR, SVALUE => sqlerrm);
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end UTL_LOGIN;
   
   /* Запросить контрагента на удалённом сервере */
@@ -106,7 +103,6 @@ create or replace package body UDO_PKG_EXS_TEST as
   procedure AGENT_PROCESS_INFO
   (
     NIDENT                  in number,            -- Идентификатор процесса
-    NSRV_TYPE               in number,            -- Тип сервиса (см. константы PKG_EXS.NSRV_TYPE*)
     NEXSQUEUE               in number             -- Регистрационный номер обрабатываемой позиции очереди обмена
   )
   is
@@ -173,9 +169,11 @@ create or replace package body UDO_PKG_EXS_TEST as
                           SAGNABBR => SUBSTR(NIDENT || SAGNABBR, 1, 20),
                           SAGNNAME => SAGNNAME || ' ' || NIDENT,
                           NRN      => NAGENT);
+    /* Фиксируем испех исполнения */
+    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_OK);
   exception
     when others then
-      PKG_EXS.PRC_RESP_ARG_STR_SET(NIDENT => NIDENT, SARG => PKG_EXS.SCONT_FLD_SERR, SVALUE => sqlerrm);
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end AGENT_PROCESS_INFO;
 
 end;
