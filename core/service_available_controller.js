@@ -30,6 +30,9 @@ const NDETECTING_LOOP_DELAY = 3000;
 //Интервал проверки доступности сервисов (мс)
 const NDETECTING_LOOP_INTERVAL = 60000;
 
+//Таймаут проверки доступности адреса сервиса (мс)
+const NNETWORK_CHECK_TIMEOUT = 10000;
+
 //------------
 // Тело модуля
 //------------
@@ -62,8 +65,8 @@ class ServiceAvailableController extends EventEmitter {
             this.notifier = prms.notifier;
             //Запомним логгер
             this.logger = prms.logger;
-            //Установим таймаут проведки адреса сервиса (мс)
-            this.nCheckTimeout = 10000;
+            //Запомним подключение к БД
+            this.dbConn = prms.dbConn;
             //Привяжем методы к указателю на себя для использования в обработчиках событий
             this.serviceDetectingLoop = this.serviceDetectingLoop.bind(this);
         } else {
@@ -108,7 +111,7 @@ class ServiceAvailableController extends EventEmitter {
                     ) {
                         try {
                             //Отправляем проверочный запрос
-                            await rqp({ url: this.services[i].sSrvRoot, timeout: this.nCheckTimeout });
+                            await rqp({ url: this.services[i].sSrvRoot, timeout: NNETWORK_CHECK_TIMEOUT });
                             //Запрос прошел - фиксируем дату доступности и сбрасываем дату недоступности
                             this.services[i].dAvailable = new Date();
                             this.services[i].dUnAvailable = null;
@@ -120,7 +123,7 @@ class ServiceAvailableController extends EventEmitter {
                             if (e.error) {
                                 let sSubError = e.error.code || e.error;
                                 if (e.error.code === "ESOCKETTIMEDOUT")
-                                    sSubError = `сервис не ответил на запрос в течение ${this.nCheckTimeout} мс`;
+                                    sSubError = `сервис не ответил на запрос в течение ${NNETWORK_CHECK_TIMEOUT} мс`;
                                 sError = `Ошибка передачи данных: ${sSubError}`;
                             }
                             if (e.response) {
@@ -151,8 +154,6 @@ class ServiceAvailableController extends EventEmitter {
                             let nDiffMins = Math.round(((nDiffMs % 86400000) % 3600000) / 60000);
                             //Если простой больше указанного в настройках - будем оповещать по почте
                             if (nDiffMins >= this.services[i].nUnavlblNtfTime) {
-                                //Подготовим тему для уведомления
-                                let sSubject = `Удалённый сервис ${this.services[i].sCode} неотвечает на запросы`;
                                 //Подготовим сообщение для уведомления
                                 let sMessage = `Сервис недоступен более ${
                                     this.services[i].nUnavlblNtfTime
@@ -161,21 +162,39 @@ class ServiceAvailableController extends EventEmitter {
                                 }`;
                                 //Положим уведомление в протокол работы сервера приложений
                                 await this.logger.error(sMessage, { nServiceId: this.services[i].nId });
-                                //И в почту, если есть список адресов
-                                if (this.services[i].sUnavlblNtfMail) {
-                                    try {
-                                        this.notifier.addMessage({
-                                            sTo: this.services[i].sUnavlblNtfMail,
-                                            sSubject,
-                                            sMessage
-                                        });
-                                    } catch (e) {
-                                        await this.logger.error(makeErrorText(e), {
-                                            nServiceId: this.services[i].nId
-                                        });
-                                    }
-                                }
+                                //И в очередь уведомлений
+                                await this.notifier.addMessage({
+                                    sTo: this.services[i].sUnavlblNtfMail,
+                                    sSubject: `Удалённый сервис ${this.services[i].sCode} неотвечает на запросы`,
+                                    sMessage
+                                });
                             }
+                        }
+                    }
+                    //Если сервис надо проверять на доступность то проверим так же - есть ли у него неотработанные сообщения обмена
+                    if (this.services[i].nUnavlblNtfSign == objServiceSchema.NUNAVLBL_NTF_SIGN_YES) {
+                        try {
+                            let res = await this.dbConn.getServiceExpiredQueueInfo({
+                                nServiceId: this.services[i].nId
+                            });
+                            //Если у сервиса есть просроченные сообщения - будет отправлять информацию об этом
+                            if (res.nCnt > 0) {
+                                //Отправляем уведомление
+                                await this.notifier.addMessage({
+                                    sTo: this.services[i].sUnavlblNtfMail,
+                                    sSubject: `Для сервиса ${
+                                        this.services[i].sCode
+                                    } зафиксированы просроченные сообщения обмена (${res.nCnt} ед.)`,
+                                    sMessage: res.sInfoList
+                                });
+                            }
+                        } catch (e) {
+                            await this.logger.error(
+                                `При проверке просроченных сообщений сервиса ${this.services[i].sCode}: ${makeErrorText(
+                                    e
+                                )}`,
+                                { nServiceId: this.services[i].nId }
+                            );
                         }
                     }
                 }
