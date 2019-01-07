@@ -293,10 +293,10 @@ create or replace package PKG_EXS as
   );
 
   /* Получение информации о просроченных сообщениях очереди для сервиса */
-  procedure SERVICE_QUEUE_EXPIRED_GET
+  procedure SERVICE_QUEUE_EXPIRED_INFO_GET
   (
-    NEXSSERVICE             in number,        -- Рег. номер записи сервиса
-    RCSERVICE_QUEUE_EXPIRED out sys_refcursor -- Курсор со сведениями о просроченных сообщениях сервиса
+    NEXSSERVICE                  in number,        -- Рег. номер записи сервиса
+    RCSERVICE_QUEUE_EXPIRED_INFO out sys_refcursor -- Курсор со сведениями о просроченных сообщениях сервиса
   );
 
   /* Получение контекста сервиса */
@@ -1244,11 +1244,11 @@ create or replace package body PKG_EXS as
     RNLIST_BASE_CLEAR(NIDENT => NIDENT);
   end SERVICE_GET;
 
-/* Получение информации о просроченных сообщениях очереди для сервиса */
-  procedure SERVICE_QUEUE_EXPIRED_GET
+  /* Получение информации о просроченных сообщениях очереди для сервиса */
+  procedure SERVICE_QUEUE_EXPIRED_INFO_GET
   (
-    NEXSSERVICE             in number,                        -- Рег. номер записи сервиса
-    RCSERVICE_QUEUE_EXPIRED out sys_refcursor                 -- Курсор со сведениями о просроченных сообщениях сервиса
+    NEXSSERVICE                  in number,                   -- Рег. номер записи сервиса
+    RCSERVICE_QUEUE_EXPIRED_INFO out sys_refcursor            -- Курсор со сведениями о просроченных сообщениях сервиса
   )
   is
     /* Локальные константы */
@@ -1298,11 +1298,12 @@ create or replace package body PKG_EXS as
       end if;
     end loop;
     /* Возвращаем ответ в виде курсора */
-    open RCSERVICE_QUEUE_EXPIRED for
-      select NCNT "nCnt",
+    open RCSERVICE_QUEUE_EXPIRED_INFO for
+      select REXSSERVICE.RN "nId",
+             NCNT "nCnt",
              DECODE(NCNT, 0, null, SPREF || SINFO_LIST) "sInfoList"
         from DUAL;
-  end SERVICE_QUEUE_EXPIRED_GET;
+  end SERVICE_QUEUE_EXPIRED_INFO_GET;
 
   /* Получение контекста сервиса */
   procedure SERVICE_CTX_GET

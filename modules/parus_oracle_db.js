@@ -152,6 +152,24 @@ const putServiceAuthInQueue = async prms => {
     }
 };
 
+//Получение информации о просроченных сообщениях обмена сервиса
+const getServiceExpiredQueueInfo = async prms => {
+    try {
+        let res = await prms.connection.execute(
+            "BEGIN PKG_EXS.SERVICE_QUEUE_EXPIRED_INFO_GET(NEXSSERVICE => :NEXSSERVICE, RCSERVICE_QUEUE_EXPIRED_INFO => :RCSERVICE_QUEUE_EXPIRED_INFO); END;",
+            {
+                NEXSSERVICE: prms.nServiceId,
+                RCSERVICE_QUEUE_EXPIRED_INFO: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+            },
+            { outFormat: oracledb.OBJECT }
+        );
+        let rows = await readCursorData(res.outBinds.RCSERVICE_QUEUE_EXPIRED_INFO);
+        return rows[0];
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
 //Запись в протокол работы
 const log = async prms => {
     try {
@@ -369,6 +387,7 @@ exports.setServiceContext = setServiceContext;
 exports.clearServiceContext = clearServiceContext;
 exports.isServiceAuth = isServiceAuth;
 exports.putServiceAuthInQueue = putServiceAuthInQueue;
+exports.getServiceExpiredQueueInfo = getServiceExpiredQueueInfo;
 exports.log = log;
 exports.getQueue = getQueue;
 exports.putQueue = putQueue;

@@ -368,6 +368,43 @@ class DBConnector extends EventEmitter {
             throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
         }
     }
+    //Получить информацию о просроченных сообщениях обмена сервиса
+    async getServiceExpiredQueueInfo(prms) {
+        //Работаем только при наличии подключения
+        if (this.bConnected) {
+            //Проверяем структуру переданного объекта с параметрами получения информации о просроченных сообщения обмена
+            let sCheckResult = validateObject(
+                prms,
+                prmsDBConnectorSchema.getServiceExpiredQueueInfo,
+                "Параметры функции получения информации о просроченных сообщениях обмена сервиса"
+            );
+            //Если структура объекта в норме
+            if (!sCheckResult) {
+                try {
+                    //Подготовим параметры для передачи в БД
+                    let getServiceExpiredQueueInfoData = _.cloneDeep(prms);
+                    getServiceExpiredQueueInfoData.connection = this.connection;
+                    //И выполним получение информации о просроченных сообщениях
+                    let res = await this.connector.getServiceExpiredQueueInfo(getServiceExpiredQueueInfoData);
+                    //Валидируем полученный ответ
+                    sCheckResult = validateObject(
+                        res,
+                        objServiceSchema.ServiceExpiredQueueInfo,
+                        "Сведения о просроченных сообщениях обмена сервиса"
+                    );
+                    if (sCheckResult) throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                    //Успешно - отдаём полученные сведения о просроченных сообщениях
+                    return res;
+                } catch (e) {
+                    throw new ServerError(SERR_DB_EXECUTE, e.message);
+                }
+            } else {
+                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+            }
+        } else {
+            throw new ServerError(SERR_DB_EXECUTE, "Нет подключения к БД");
+        }
+    }
     //Запись в журнал работы
     async putLog(prms) {
         //Работаем только при наличии подключения

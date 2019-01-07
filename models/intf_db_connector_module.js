@@ -115,6 +115,17 @@ exports.dbConnectorModule = new Schema({
                 "Не реализована функция постановки в очередь задания на аутентификацию сервиса (putServiceAuthInQueue)"
         }
     },
+    //Получение информации о просроченных сообщениях обмена сервиса
+    getServiceExpiredQueueInfo: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType:
+                "Функция получения информации о просроченных сообщениях обмена сервиса (getServiceExpiredQueueInfo) имеет неверный формат (ожидалось - AsyncFunction)",
+            required:
+                "Не реализована функция получения информации о просроченных сообщениях обмена сервиса (getServiceExpiredQueueInfo)"
+        }
+    },
     //Протоколирование работы сервиса
     log: {
         use: { validateAsyncFunctionType },

@@ -163,6 +163,19 @@ exports.putServiceAuthInQueue = new Schema({
     }
 });
 
+//Схема валидации параметров функции получения информации о просроченных сообщениях обмена сервиса
+exports.getServiceExpiredQueueInfo = new Schema({
+    //Идентификатор сервиса
+    nServiceId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор сервиса (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор сервиса (${path})`
+        }
+    }
+});
+
 //Схема валидации параметров функции записи в журнал работы сервиса
 exports.putLog = new Schema({
     //Тип сообщения журнала работы сервиса

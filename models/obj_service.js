@@ -256,3 +256,35 @@ exports.ServiceCtx = new Schema({
         }
     }
 });
+
+//Схема валидации сведений о просроченных сообщениях обмена сервиса
+exports.ServiceExpiredQueueInfo = new Schema({
+    //Идентификатор сервиса
+    nId: {
+        type: Number,
+        required: true,
+        message: {
+            type: "Идентификатор сервиса (nId) имеет некорректный тип данных (ожидалось - Number)",
+            required: "Не указан идентификатор сервиса (nId)"
+        }
+    },
+    //Количество просроченных сообщений обмена
+    nCnt: {
+        type: Number,
+        required: true,
+        message: {
+            type: "Количество просроченных сообщений обмена (nCnt) имеет некорректный тип данных (ожидалось - Number)",
+            required: "Не указано количество просроченных сообщений обмена (nCnt)"
+        }
+    },
+    //Информация о просроченных сообщениях обмена
+    sInfoList: {
+        type: String,
+        required: true,
+        message: {
+            type:
+                "Информация о просроченных сообщениях обмена (sInfoList) имеет некорректный тип данных (ожидалось - String)",
+            required: "Не указана информация о просроченных сообщениях обмена (sInfoList)"
+        }
+    }
+}).validator({ required: val => val === null || val === 0 || val });
