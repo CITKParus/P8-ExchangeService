@@ -327,7 +327,7 @@ create or replace package PKG_EXS as
     NEXSSERVICE             in number   -- Рег. номер записи сервиса
   ) return                  number;     -- Флаг аутентификации (см. константы NIS_AUTH_*)
 
-  /* Поиск функции аутентификации для сервиса обмена */
+  /* Поиск функции аутентификации (начала сеанса) для сервиса обмена */
   procedure SERVICE_AUTH_FN_FIND
   (
     NFLAG_SMART             in number,               -- Признак выдачи сообщения об ошибке
@@ -335,8 +335,22 @@ create or replace package PKG_EXS as
     REXSSERVICEFN           out EXSSERVICEFN%rowtype -- Запись функции аутентификации
   );
   
-  /* Помещение задания на аутентификацию сервиса в очередь обмена */
+  /* Поиск функции отмены аутентификации (завершения сеанса) для сервиса обмена */
+  procedure SERVICE_UNAUTH_FN_FIND
+  (
+    NFLAG_SMART             in number,               -- Признак выдачи сообщения об ошибке
+    NEXSSERVICE             in number,               -- Рег. номер записи сервиса
+    REXSSERVICEFN           out EXSSERVICEFN%rowtype -- Запись функции аутентификации
+  );
+  
+  /* Помещение задания на аутентификацию (начало сеанса) сервиса в очередь обмена */
   procedure SERVICE_AUTH_PUT_INQUEUE
+  (
+    NEXSSERVICE             in number   -- Рег. номер сервиса обмена
+  );
+  
+  /* Помещение задания на отмену аутентификации (завершение сеанса) сервиса в очередь обмена */
+  procedure SERVICE_UNAUTH_PUT_INQUEUE
   (
     NEXSSERVICE             in number   -- Рег. номер сервиса обмена
   );
@@ -508,7 +522,7 @@ create or replace package PKG_EXS as
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
     SOPTIONS                in varchar2 := null, -- Параметры сообщения    
-    NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
+    NNEW_EXSQUEUE           out number           -- Рег. номер добавленной позиции очереди
   );
   
   /* Помещение сообщения обмена в очередь (возвращает курсор с добавленной записью) */
@@ -535,7 +549,7 @@ create or replace package PKG_EXS as
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
     SOPTIONS                in varchar2 := null, -- Параметры сообщения    
-    NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
+    NNEW_EXSQUEUE           out number           -- Рег. номер добавленной позиции очереди
   );
 
   /* Помещение сообщения обмена в очередь (по коду сервиса и функции обрабоки, возвращает курсор с добавленной записью) */
@@ -708,7 +722,7 @@ create or replace package body PKG_EXS as
       RARGS_LIST(RARGS_LIST.LAST).DATA_TYPE := STORED_ARG.DB_DATA_TYPE;
       if (RARGS_LIST(RARGS_LIST.LAST).DATA_TYPE in ('PL/SQL RECORD')) then
         P_EXCEPTION(NFLAG_SMART,
-                    'Невозможно проверить интерфейс пользовательской процедуры: поддерживаются только простые типы данных аргументов!');
+                    'Невозможно проверить интерфейс пользовательской процедуры: поддерживаются только простые типы данных аргументов.');
         return;
       end if;
       /* Установка признака - не проверено */
@@ -741,7 +755,7 @@ create or replace package body PKG_EXS as
         if (SARG_TYPE_NAME is not null) then
           /* Если пользовательский тип данных */
           P_EXCEPTION(NFLAG_SMART,
-                      'Невозможно проверить интерфейс пользовательской процедуры: поддерживаются только простые типы данных!');
+                      'Невозможно проверить интерфейс пользовательской процедуры: поддерживаются только простые типы данных.');
           return;
         else
           /* Если стандартный тип данных */
@@ -1107,11 +1121,11 @@ create or replace package body PKG_EXS as
     if (SRESULT is not null) then
       if (SRESULT not in (SPRC_RESP_RESULT_OK, SPRC_RESP_RESULT_ERR, SPRC_RESP_RESULT_UNAUTH)) then
         P_EXCEPTION(0,
-                    'Код результата исполнения обработчика "%s" не поддерживается',
+                    'Код результата исполнения обработчика "%s" не поддерживается.',
                     SRESULT);
       end if;
     else
-      P_EXCEPTION(0, 'Не указан код результата исполнения обработчика');
+      P_EXCEPTION(0, 'Не указан код результата исполнения обработчика.');
     end if;
     /* Сохраняем код результата */
     PRC_RESP_ARG_STR_SET(NIDENT => NIDENT, SARG => SCONT_FLD_SRESULT, SVALUE => SRESULT);
@@ -1402,7 +1416,7 @@ create or replace package body PKG_EXS as
     return NRES;
   end SERVICE_IS_AUTH;
   
-  /* Поиск функции аутентификации для сервиса обмена */
+  /* Поиск функции аутентификации (начала сеанса) для сервиса обмена */
   procedure SERVICE_AUTH_FN_FIND
   (
     NFLAG_SMART             in number,               -- Признак выдачи сообщения об ошибке
@@ -1436,41 +1450,117 @@ create or replace package body PKG_EXS as
     end if;
   end SERVICE_AUTH_FN_FIND;
   
-  /* Помещение задания на аутентификацию сервиса в очередь обмена */
+  /* Поиск функции отмены аутентификации (завершения сеанса) для сервиса обмена */
+  procedure SERVICE_UNAUTH_FN_FIND
+  (
+    NFLAG_SMART             in number,               -- Признак выдачи сообщения об ошибке
+    NEXSSERVICE             in number,               -- Рег. номер записи сервиса
+    REXSSERVICEFN           out EXSSERVICEFN%rowtype -- Запись функции аутентификации
+  )
+  is
+    REXSSERVICE             EXSSERVICE%rowtype;      -- Запись сервиса
+  begin
+    /* Считаем запись сервиса */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => NFLAG_SMART, NRN => NEXSSERVICE);
+    /* Если сервис считался */
+    if (REXSSERVICE.RN is not null) then
+      /* Ищем функцию */
+      begin
+        select T.*
+          into REXSSERVICEFN
+          from EXSSERVICEFN T
+         where T.PRN = REXSSERVICE.RN
+           and T.FN_TYPE = NFN_TYPE_LOGOUT;
+      exception
+        when TOO_MANY_ROWS then
+          P_EXCEPTION(NFLAG_SMART,
+                      'Для сервиса обмена "%s" функция отмены аутентификации определена неоднозначно.',
+                      REXSSERVICE.CODE);
+        when NO_DATA_FOUND then
+          P_EXCEPTION(NFLAG_SMART,
+                      'Для сервиса обмена "%s" не определена функция отмены аутентификации.',
+                      REXSSERVICE.CODE);
+      end;
+    end if;
+  end SERVICE_UNAUTH_FN_FIND;  
+  
+  /* Помещение задания на аутентификацию (начало сеанса) сервиса в очередь обмена */
   procedure SERVICE_AUTH_PUT_INQUEUE
   (
     NEXSSERVICE             in number             -- Рег. номер сервиса обмена
   )
   is
     pragma autonomous_transaction;
+    REXSSERVICE             EXSSERVICE%rowtype;   -- Запись сервиса
     REXSSERVICEFN_AUTH      EXSSERVICEFN%rowtype; -- Запись функции аутентификации  
     NAUTH_EXSQUEUE          PKG_STD.TREF;         -- Рег. номер позиции очереди для атуентификации
   begin
-    /* Ищем функцию её осуществляющую аутентификацию */
-    SERVICE_AUTH_FN_FIND(NFLAG_SMART => 0, NEXSSERVICE => NEXSSERVICE, REXSSERVICEFN => REXSSERVICEFN_AUTH);
-    /* Проверяем, что в очереди ещё пока нет запросов на аутентификацию */
-    if (not SERVICEFN_CHECK_INCMPL_INQUEUE(NEXSSERVICEFN => REXSSERVICEFN_AUTH.RN)) then
-      /* Зачищаем текущий контекст сервиса */
-      SERVICE_CTX_CLEAR(NEXSSERVICE => REXSSERVICEFN_AUTH.PRN);
-      /* Регистрируем в очереди задание на аутентификацию */
-      P_EXSQUEUE_BASE_INSERT(DIN_DATE      => sysdate,
-                             SIN_AUTHID    => UTILIZER(),
-                             NEXSSERVICEFN => REXSSERVICEFN_AUTH.RN,
-                             DEXEC_DATE    => null,
-                             NEXEC_CNT     => 0,
-                             NEXEC_STATE   => NQUEUE_EXEC_STATE_INQUEUE,
-                             SEXEC_MSG     => null,
-                             BMSG          => null,
-                             BRESP         => null,
-                             NEXSQUEUE     => null,
-                             NLNK_COMPANY  => null,
-                             NLNK_DOCUMENT => null,
-                             SLNK_UNITCODE => null,
-                             SOPTIONS      => null,
-                             NRN           => NAUTH_EXSQUEUE);
+    /* Считаем запись сервиса */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => NEXSSERVICE);
+    /* Работаем только для сервисов отправки сообщений */
+    if (REXSSERVICE.SRV_TYPE = NSRV_TYPE_SEND) then
+      /* Проверим, что сервис ещё не аутентифицирован */
+      if (SERVICE_IS_AUTH(NEXSSERVICE => REXSSERVICE.RN) = PKG_EXS.NIS_AUTH_NO) then
+        /* Ищем функцию осуществляющую аутентификацию */
+        SERVICE_AUTH_FN_FIND(NFLAG_SMART => 0, NEXSSERVICE => REXSSERVICE.RN, REXSSERVICEFN => REXSSERVICEFN_AUTH);
+        /* Проверяем, что в очереди ещё пока нет запросов на аутентификацию */
+        if (not SERVICEFN_CHECK_INCMPL_INQUEUE(NEXSSERVICEFN => REXSSERVICEFN_AUTH.RN)) then
+          /* Зачищаем текущий контекст сервиса */
+          SERVICE_CTX_CLEAR(NEXSSERVICE => REXSSERVICEFN_AUTH.PRN);
+          /* Регистрируем в очереди задание на аутентификацию */
+          QUEUE_PUT(NEXSSERVICEFN => REXSSERVICEFN_AUTH.RN, BMSG => null, NNEW_EXSQUEUE => NAUTH_EXSQUEUE);
+        end if;
+        commit;
+      else
+        P_EXCEPTION(0,
+                    'Сервис уже аутентифицирован - сначала необходимо завершить текущий сеанс.');
+      end if;
+    else
+      P_EXCEPTION(0,
+                  'Только удалённый клиент может начинать сеанс для сервиса типа "Приём сообщений".');
     end if;
-    commit;
   end SERVICE_AUTH_PUT_INQUEUE;
+  
+  /* Помещение задания на отмену аутентификации (завершение сеанса) сервиса в очередь обмена */
+  procedure SERVICE_UNAUTH_PUT_INQUEUE
+  (
+    NEXSSERVICE             in number             -- Рег. номер сервиса обмена
+  )
+  is
+    pragma autonomous_transaction;
+    REXSSERVICE             EXSSERVICE%rowtype;   -- Запись сервиса
+    REXSSERVICEFN_UNAUTH    EXSSERVICEFN%rowtype; -- Запись функции отмены аутентификации  
+    NUNAUTH_EXSQUEUE        PKG_STD.TREF;         -- Рег. номер позиции очереди для отмены атуентификации
+  begin
+    /* Считаем запись сервиса */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => NEXSSERVICE);
+    /* Работаем только для сервисов отправки сообщений */
+    if (REXSSERVICE.SRV_TYPE = NSRV_TYPE_SEND) then
+      /* Проверим, что сервис аутентифицирован */
+      if (SERVICE_IS_AUTH(NEXSSERVICE => REXSSERVICE.RN) = PKG_EXS.NIS_AUTH_YES) then
+        /* Ищем функцию осуществляющую отмену аутентификации */
+        SERVICE_UNAUTH_FN_FIND(NFLAG_SMART => 1, NEXSSERVICE => REXSSERVICE.RN, REXSSERVICEFN => REXSSERVICEFN_UNAUTH);
+        /* Если функция найдена */
+        if (REXSSERVICEFN_UNAUTH.RN is not null) then
+          /* Проверяем, что в очереди ещё пока нет запросов на отмену аутентификации */
+          if (not SERVICEFN_CHECK_INCMPL_INQUEUE(NEXSSERVICEFN => REXSSERVICEFN_UNAUTH.RN)) then
+            /* Регистрируем в очереди задание на отмену аутентификации */
+            QUEUE_PUT(NEXSSERVICEFN => REXSSERVICEFN_UNAUTH.RN, BMSG => null, NNEW_EXSQUEUE => NUNAUTH_EXSQUEUE);
+          end if;
+        else
+          /* Функции отмены аутентификации нет - просто зачищаем текущий контекст сервиса */
+          SERVICE_CTX_CLEAR(NEXSSERVICE => REXSSERVICE.RN);
+        end if;
+        commit;
+      else
+        P_EXCEPTION(0,
+                    'Сервис не аутентифицирован - сначала необходимо начать сеанс.');
+      end if;
+    else
+      P_EXCEPTION(0,
+                  'Только удалённый клиент может завершать сеанс для сервиса типа "Приём сообщений".');
+    end if;
+  end SERVICE_UNAUTH_PUT_INQUEUE;
   
   /* Получение списка сервисов */
   procedure SERVICES_GET
@@ -1681,7 +1771,7 @@ create or replace package body PKG_EXS as
   exception
     when others then
       P_EXCEPTION(0,
-                  'Ошибка определения наличия в очереди заданий для функции (RN: %s) сервиса обмена: %s',
+                  'Ошибка определения наличия в очереди заданий для функции (RN: %s) сервиса обмена: %s.',
                   TO_CHAR(NEXSSERVICEFN),
                   sqlerrm);
   end SERVICEFN_CHECK_INCMPL_INQUEUE;
@@ -1963,7 +2053,7 @@ create or replace package body PKG_EXS as
     /* Проверям параметры */
     if (NEXSQUEUE is null) then
       P_EXCEPTION(0,
-                  'Не указан идентификатор позиции очереди для изменения состояния');
+                  'Не указан идентификатор позиции очереди для изменения состояния.');
     end if;
     if ((NEXEC_STATE is not null) and
        (NEXEC_STATE not in (NQUEUE_EXEC_STATE_INQUEUE,
@@ -1976,12 +2066,12 @@ create or replace package body PKG_EXS as
                              NQUEUE_EXEC_STATE_OK,
                              NQUEUE_EXEC_STATE_ERR))) then
       P_EXCEPTION(0,
-                  'Код состояния "%s" позиции очереди не поддерживается',
+                  'Код состояния "%s" позиции очереди не поддерживается.',
                   TO_CHAR(NEXEC_STATE));
     end if;
     if (NVL(NINC_EXEC_CNT, NINC_EXEC_CNT_NO) not in (NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO)) then
       P_EXCEPTION(0,
-                  'Флаг икремента счетчика исполнений "%s" позиции очереди не поддерживается',
+                  'Флаг икремента счетчика исполнений "%s" позиции очереди не поддерживается.',
                   TO_CHAR(NINC_EXEC_CNT));
     end if;
     /* Считаем запись очереди */
@@ -2108,7 +2198,7 @@ create or replace package body PKG_EXS as
     NLNK_DOCUMENT           in number := null,    -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null,  -- Код связанного раздела
     SOPTIONS                in varchar2 := null,  -- Параметры сообщения
-    NNEW_EXSQUEUE           out number            -- Курсор с добавленной позицией очереди
+    NNEW_EXSQUEUE           out number            -- Рег. номер добавленной позиции очереди
   )
   is
     REXSSERVICE             EXSSERVICE%rowtype;   -- Запись сервиса обработки
@@ -2187,17 +2277,17 @@ create or replace package body PKG_EXS as
     NLNK_DOCUMENT           in number := null,   -- Рег. номер связанной записи документа
     SLNK_UNITCODE           in varchar2 := null, -- Код связанного раздела
     SOPTIONS                in varchar2 := null, -- Параметры сообщения    
-    NNEW_EXSQUEUE           out number           -- Курсор с добавленной позицией очереди
+    NNEW_EXSQUEUE           out number           -- Рег. номер добавленной позиции очереди
   )
   is
     NEXSSERVICEFN           PKG_STD.TREF;        -- Рег. номер функции сервиса обработки
   begin
     /* Проверяем параметры */
     if (SEXSSERVICE is null) then
-      P_EXCEPTION(0, 'Не указан код сервиса обмена');
+      P_EXCEPTION(0, 'Не указан код сервиса обмена.');
     end if;
     if (SEXSSERVICEFN is null) then
-      P_EXCEPTION(0, 'Не указан код функции сервиса обмена');
+      P_EXCEPTION(0, 'Не указан код функции сервиса обмена.');
     end if;
     /* Разыменуем функцию сервиса */
     NEXSSERVICEFN := SERVICEFN_FIND_BY_SRVCODE(NFLAG_SMART   => 0,
@@ -2325,7 +2415,7 @@ create or replace package body PKG_EXS as
                 if (REXSSERVICE.CTX is null) then
                   /* Обработчик не вернул контекст и сейчас он не установлен для сервиса, это проблема - больше обработок не будет значит мы не залогинились */
                   P_EXCEPTION(0,
-                              'Функция начала сеанса "%s" не установила контекст работы для сервиса "%s"',
+                              'Функция начала сеанса "%s" не установила контекст работы для сервиса "%s".',
                               REXSSERVICEFN.CODE,
                               REXSSERVICE.CODE);
                 end if;
@@ -2343,7 +2433,7 @@ create or replace package body PKG_EXS as
         else
           /* Результат не установлен - это ошибка */
           P_EXCEPTION(0,
-                      'Процедура обработчик "%s" не вернула результат работы',
+                      'Процедура обработчик "%s" не вернула результат работы.',
                       UTL_STORED_MAKE_LINK(SPACKAGE => REXSMSGTYPE.PKG_RESP, SPROCEDURE => REXSMSGTYPE.PRC_RESP));
         end if;
       exception
