@@ -165,6 +165,19 @@ const paymensOperation = {
     }
 };
 
+//Словарь - ставка НДС позиции чека
+const receiptItemVat = {
+    sName: "Ставка НДС позиции чека",
+    vals: {
+        "1": "vat20",
+        "2": "vat10",
+        "3": "vat120",
+        "4": "vat110",
+        "5": "vat0",
+        "6": "none"
+    }
+};
+
 //------------
 // Тело модуля
 //------------
@@ -327,14 +340,14 @@ const beforeRegBillSIR = async prms => {
             external_id: doc.NRN,
             receipt: {
                 client: {
-                    email: "mim_@mail.ru", //getPropValueByCode(docProps, "1008"),
+                    email: getPropValueByCode(docProps, "1008"),
                     phone: ""
                 },
                 company: {
-                    email: "mim_@mail.ru", //getPropValueByCode(docProps, "1117"),
-                    sno: "osn", //getPropValueByCode(docProps, "1055"),
+                    email: getPropValueByCode(docProps, "1117"),
+                    sno: getPropValueByCode(docProps, "1055"),
                     inn: getPropValueByCode(docProps, "1018"),
-                    payment_address: "г. Казань" //getPropValueByCode(docProps, "1187")
+                    payment_address: getPropValueByCode(docProps, "1187")
                 },
                 items: [
                     {
@@ -343,12 +356,10 @@ const beforeRegBillSIR = async prms => {
                         quantity: getPropValueByCode(docProps, "1023", "NUM"),
                         sum: getPropValueByCode(docProps, "1043", "NUM"),
                         measurement_unit: getPropValueByCode(docProps, "1197"),
-                        //payment_method: "full_prepayment",
-                        //payment_object: "service",
                         payment_method: mapDictionary(paymentMethod, getPropValueByCode(docProps, "1214")),
                         payment_object: mapDictionary(paymentObject, getPropValueByCode(docProps, "1212")),
                         vat: {
-                            type: "none", //getPropValueByCode(docProps, "1199")
+                            type: mapDictionary(receiptItemVat, getPropValueByCode(docProps, "1199")),
                             sum: getPropValueByCode(docProps, "1200", "NUM")
                         }
                     }
@@ -411,10 +422,10 @@ const beforeRegBillSIR = async prms => {
                 sum: getPropValueByCode(docProps, "1103", "NUM")
             });
         }
-        //Сумма НДС чека по ставке 18%;
+        //Сумма НДС чека по ставке 20%;
         if (getPropValueByCode(docProps, "1102", "NUM") !== null) {
             vats.push({
-                type: "vat18",
+                type: "vat20",
                 sum: getPropValueByCode(docProps, "1102", "NUM")
             });
         }
@@ -425,10 +436,10 @@ const beforeRegBillSIR = async prms => {
                 sum: getPropValueByCode(docProps, "1107", "NUM")
             });
         }
-        //Сумма НДС чека по расч. ставке 18/118
+        //Сумма НДС чека по расч. ставке 20/120
         if (getPropValueByCode(docProps, "1106", "NUM") !== null) {
             vats.push({
-                type: "vat118",
+                type: "vat120",
                 sum: getPropValueByCode(docProps, "1106", "NUM")
             });
         }
