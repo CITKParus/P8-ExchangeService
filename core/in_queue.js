@@ -13,7 +13,7 @@ const express = require("express"); //WEB-сервер Express
 const bodyParser = require("body-parser"); //Модуль для Express (разбор тела входящего запроса)
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const { makeErrorText, validateObject, buildURL, getAppSrvFunction } = require("./utils"); //Вспомогательные функции
-const { NINC_EXEC_CNT_YES } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
+const { NINC_EXEC_CNT_YES, NIS_ORIGINAL_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 const objInQueueSchema = require("../models/obj_in_queue"); //Схема валидации сообщений обмена с бработчиком очереди входящих сообщений
 const objServiceSchema = require("../models/obj_service"); //Схемы валидации сервиса
 const objServiceFnSchema = require("../models/obj_service_function"); //Схемы валидации функции сервиса
@@ -160,7 +160,8 @@ class InQueue extends EventEmitter {
                                 blResp = resBefore.blResp;
                                 q = await this.dbConn.setQueueResp({
                                     nQueueId: q.nId,
-                                    blResp
+                                    blResp,
+                                    nIsOriginal: NIS_ORIGINAL_NO
                                 });
                             }
                             //Если пришел флаг ошибочной аутентификации и он положительный - то это ошибка, дальше ничего не делаем
@@ -235,7 +236,8 @@ class InQueue extends EventEmitter {
                                 blResp = resAfter.blResp;
                                 q = await this.dbConn.setQueueResp({
                                     nQueueId: q.nId,
-                                    blResp
+                                    blResp,
+                                    nIsOriginal: NIS_ORIGINAL_NO
                                 });
                             }
                             //Если пришел флаг ошибочной аутентификации и он положительный - то это ошибка, дальше ничего не делаем

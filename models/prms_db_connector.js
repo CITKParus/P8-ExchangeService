@@ -32,6 +32,10 @@ const {
 NINC_EXEC_CNT_NO = 0; //Не инкрементировать
 NINC_EXEC_CNT_YES = 1; //Инкрементировать
 
+//Признак оригинала данных
+NIS_ORIGINAL_NO = 0; //Оригинал
+NIS_ORIGINAL_YES = 1; //Не оригинал
+
 //------------
 // Тело модуля
 //------------
@@ -54,6 +58,8 @@ const validateBuffer = val => {
 //Константы
 exports.NINC_EXEC_CNT_NO = NINC_EXEC_CNT_NO;
 exports.NINC_EXEC_CNT_YES = NINC_EXEC_CNT_YES;
+exports.NIS_ORIGINAL_NO = NIS_ORIGINAL_NO;
+exports.NIS_ORIGINAL_YES = NIS_ORIGINAL_YES;
 
 //Схема валидации параметров конструктора
 exports.DBConnector = new Schema({
@@ -404,8 +410,8 @@ exports.getQueueMsg = new Schema({
         type: Number,
         required: true,
         message: {
-            type: path => `Идентификатор позиции очереди ((${path}) имеет некорректный тип данных (ожидалось - Number)`,
-            required: path => `Не указан идентификатор позиции очереди ((${path})`
+            type: path => `Идентификатор позиции очереди (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди (${path})`
         }
     }
 });
@@ -417,8 +423,8 @@ exports.setQueueMsg = new Schema({
         type: Number,
         required: true,
         message: {
-            type: path => `Идентификатор позиции очереди ((${path}) имеет некорректный тип данных (ожидалось - Number)`,
-            required: path => `Не указан идентификатор позиции очереди ((${path})`
+            type: path => `Идентификатор позиции очереди (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди (${path})`
         }
     },
     //Данные сообщения очереди обмена
@@ -440,8 +446,8 @@ exports.getQueueResp = new Schema({
         type: Number,
         required: true,
         message: {
-            type: path => `Идентификатор позиции очереди ((${path}) имеет некорректный тип данных (ожидалось - Number)`,
-            required: path => `Не указан идентификатор позиции очереди ((${path})`
+            type: path => `Идентификатор позиции очереди (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди (${path})`
         }
     }
 });
@@ -453,8 +459,8 @@ exports.setQueueResp = new Schema({
         type: Number,
         required: true,
         message: {
-            type: path => `Идентификатор позиции очереди ((${path}) имеет некорректный тип данных (ожидалось - Number)`,
-            required: path => `Не указан идентификатор позиции очереди ((${path})`
+            type: path => `Идентификатор позиции очереди (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди (${path})`
         }
     },
     //Данные ответа сообщения очереди обмена
@@ -466,8 +472,20 @@ exports.setQueueResp = new Schema({
                 `Данные ответа сообщения очереди обмена (${path}) имеют некорректный тип данных (ожидалось - null или Buffer)`,
             required: path => `Не указаны данные ответа сообщения очереди обмена (${path})`
         }
+    },
+    //Признак передачи оригинала ответа
+    nIsOriginal: {
+        type: Number,
+        enum: [NIS_ORIGINAL_NO, NIS_ORIGINAL_YES],
+        required: true,
+        message: {
+            type: path =>
+                `Признак передачи оригинала ответа (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            enum: path => `Значение признака передачи оригинала ответа (${path}) не поддерживается`,
+            required: path => `Не указан признак передачи оригинала ответа (${path})`
+        }
     }
-}).validator({ required: val => val === null || val });
+}).validator({ required: val => val === null || val === 0 || val });
 
 //Схема валидации параметров функции установки результата обработки позиции очереди
 exports.setQueueAppSrvResult = new Schema({
@@ -476,8 +494,8 @@ exports.setQueueAppSrvResult = new Schema({
         type: Number,
         required: true,
         message: {
-            type: path => `Идентификатор позиции очереди ((${path}) имеет некорректный тип данных (ожидалось - Number)`,
-            required: path => `Не указан идентификатор позиции очереди ((${path})`
+            type: path => `Идентификатор позиции очереди (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди (${path})`
         }
     },
     //Данные сообщения очереди обмена

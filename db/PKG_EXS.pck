@@ -120,6 +120,10 @@ create or replace package PKG_EXS as
   NQUEUE_RESET_DATA_NO      constant number(1) := 0; -- Не сбрасывать
   NQUEUE_RESET_DATA_YES     constant number(1) := 1; -- Сбрасывать
   
+  /* Константы - признак оригинала данных */
+  NIS_ORIGINAL_NO           constant number(1) := 0; -- Оригинал
+  NIS_ORIGINAL_YES          constant number(1) := 1; -- Не оригинал
+  
   /* Константы - ожидаемый интерфейс процедуры обработки сообщения очереди на стороне БД */
   SPRC_RESP_ARGS            constant varchar2(80) := 'NIDENT,IN,NUMBER;NEXSQUEUE,IN,NUMBER;'; -- Список параметров процедуры обработки
 
@@ -478,16 +482,18 @@ create or replace package PKG_EXS as
   /* Установка результата обработки записи очереди */
   procedure QUEUE_RESP_SET
   (
-    NEXSQUEUE               in number,  -- Рег. номер записи очереди
-    BRESP                   in blob     -- Результат обработки
+    NEXSQUEUE               in number,                   -- Рег. номер записи очереди
+    BRESP                   in blob,                     -- Результат обработки
+    NIS_ORIGINAL            in number := NIS_ORIGINAL_NO -- Признак передачи оригинального результата обработки (см. константы NIS_ORIGINAL*, null - не оригинал)
   );
 
   /* Установка результата обработки записи очереди (возвращает измененную позицию очереди) */
   procedure QUEUE_RESP_SET
   (
-    NEXSQUEUE               in number,        -- Рег. номер записи очереди
-    BRESP                   in blob,          -- Результат обработки
-    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
+    NEXSQUEUE               in number,                    -- Рег. номер записи очереди
+    BRESP                   in blob,                      -- Результат обработки
+    NIS_ORIGINAL            in number := NIS_ORIGINAL_NO, -- Признак передачи оригинального результата обработки (см. константы NIS_ORIGINAL*, null - не оригинал)    
+    RCQUEUE                 out sys_refcursor             -- Курсор с изменённой позицией очереди
   );
 
   /* Считывание данных сообщения записи очереди */
@@ -2115,13 +2121,17 @@ create or replace package body PKG_EXS as
   /* Установка результата обработки записи очереди */
   procedure QUEUE_RESP_SET
   (
-    NEXSQUEUE               in number,  -- Рег. номер записи очереди
-    BRESP                   in blob     -- Результат обработки
+    NEXSQUEUE               in number,                   -- Рег. номер записи очереди
+    BRESP                   in blob,                     -- Результат обработки
+    NIS_ORIGINAL            in number := NIS_ORIGINAL_NO -- Признак передачи оригинального результата обработки (см. константы NIS_ORIGINAL*, null - не оригинал)
   )
   is
   begin
     /* Выставим результат */
-    update EXSQUEUE T set T.RESP = BRESP where T.RN = NEXSQUEUE;
+    update EXSQUEUE T
+       set T.RESP          = BRESP,
+           T.RESP_ORIGINAL = DECODE(NVL(NIS_ORIGINAL, NIS_ORIGINAL_NO), NIS_ORIGINAL_NO, T.RESP_ORIGINAL, BRESP)
+     where T.RN = NEXSQUEUE;
     if (sql%rowcount = 0) then
       PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NEXSQUEUE, SUNIT_TABLE => 'EXSQUEUE');
     end if;
@@ -2130,14 +2140,15 @@ create or replace package body PKG_EXS as
   /* Установка результата обработки записи очереди (возвращает измененную позицию очереди) */
   procedure QUEUE_RESP_SET
   (
-    NEXSQUEUE               in number,        -- Рег. номер записи очереди
-    BRESP                   in blob,          -- Результат обработки
-    RCQUEUE                 out sys_refcursor -- Курсор с изменённой позицией очереди
+    NEXSQUEUE               in number,                    -- Рег. номер записи очереди
+    BRESP                   in blob,                      -- Результат обработки
+    NIS_ORIGINAL            in number := NIS_ORIGINAL_NO, -- Признак передачи оригинального результата обработки (см. константы NIS_ORIGINAL*, null - не оригинал)    
+    RCQUEUE                 out sys_refcursor             -- Курсор с изменённой позицией очереди
   )
   is
   begin
     /* Выставим результат */
-    QUEUE_RESP_SET(NEXSQUEUE => NEXSQUEUE, BRESP => BRESP);
+    QUEUE_RESP_SET(NEXSQUEUE => NEXSQUEUE, BRESP => BRESP, NIS_ORIGINAL => NIS_ORIGINAL);
     /* Вернем измененную позицию очереди */
     QUEUE_GET(NFLAG_SMART => 0, NEXSQUEUE => NEXSQUEUE, RCQUEUE => RCQUEUE);
   end QUEUE_RESP_SET;
@@ -2401,7 +2412,7 @@ create or replace package body PKG_EXS as
             /* Зафиксируем результат обработки (для входящих - всегда, для исходящих - только если не пустой) */
             if ((REXSSERVICE.SRV_TYPE = NSRV_TYPE_RECIVE) or
                ((REXSSERVICE.SRV_TYPE = NSRV_TYPE_SEND) and (BRESP is not null) and (DBMS_LOB.GETLENGTH(BRESP) > 0))) then
-              QUEUE_RESP_SET(NEXSQUEUE => REXSQUEUE.RN, BRESP => BRESP);
+              QUEUE_RESP_SET(NEXSQUEUE => REXSQUEUE.RN, BRESP => BRESP, NIS_ORIGINAL => NIS_ORIGINAL_NO);
             end if;
             /* Если это была функция начала сеанса */
             if (REXSSERVICEFN.FN_TYPE = NFN_TYPE_LOGIN) then

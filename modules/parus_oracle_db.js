@@ -341,10 +341,11 @@ const getQueueResp = async prms => {
 const setQueueResp = async prms => {
     try {
         let res = await prms.connection.execute(
-            "BEGIN PKG_EXS.QUEUE_RESP_SET(NEXSQUEUE => :NEXSQUEUE, BRESP => :BRESP, RCQUEUE => :RCQUEUE); END;",
+            "BEGIN PKG_EXS.QUEUE_RESP_SET(NEXSQUEUE => :NEXSQUEUE, BRESP => :BRESP, NIS_ORIGINAL => :NIS_ORIGINAL, RCQUEUE => :RCQUEUE); END;",
             {
                 NEXSQUEUE: prms.nQueueId,
                 BRESP: prms.blResp,
+                NIS_ORIGINAL: prms.nIsOriginal,
                 RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
             { outFormat: oracledb.OBJECT, autoCommit: true }

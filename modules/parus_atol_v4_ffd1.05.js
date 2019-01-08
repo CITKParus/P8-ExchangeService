@@ -288,6 +288,7 @@ const afterConnect = async prms => {
     }
     if (resp.error === null) {
         return {
+            blResp: new Buffer(resp.token),
             sCtx: resp.token,
             dCtxExp: strDDMMYYYYHHMISStoDate(resp.timestamp).addHours(24)
         };

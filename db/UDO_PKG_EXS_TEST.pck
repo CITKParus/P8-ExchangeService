@@ -123,7 +123,10 @@ create or replace package body UDO_PKG_EXS_TEST as
     /* Считаем ответ сервера и конвертируем в кодировку БД */
     CRESP := BLOB2CLOB(LBDATA => REXSQUEUE.RESP, SCHARSET => 'UTF8');
     /* Кладём конвертированное обратно (просто для удобства мониторинга) */
-    PKG_EXS.QUEUE_RESP_SET(NEXSQUEUE => REXSQUEUE.RN, BRESP => CLOB2BLOB(LCDATA => CRESP), RCQUEUE => RCTMP);
+    PKG_EXS.QUEUE_RESP_SET(NEXSQUEUE    => REXSQUEUE.RN,
+                           BRESP        => CLOB2BLOB(LCDATA => CRESP),
+                           NIS_ORIGINAL => PKG_EXS.NIS_ORIGINAL_NO,
+                           RCQUEUE      => RCTMP);
     /* Заберем организацию из исходящего сообщения */
     begin
       select EXTRACTVALUE(XMLTYPE(CMSG), '/MSG/NCOMPANY') NCOMPANY into NCOMPANY from DUAL;

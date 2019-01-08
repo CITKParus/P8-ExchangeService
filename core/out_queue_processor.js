@@ -26,7 +26,12 @@ const {
     SERR_DB_SERVER,
     SERR_UNAUTH
 } = require("./constants"); //Глобальные константы
-const { NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
+const {
+    NINC_EXEC_CNT_YES,
+    NINC_EXEC_CNT_NO,
+    NIS_ORIGINAL_NO,
+    NIS_ORIGINAL_YES
+} = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 
 //--------------------------
 // Глобальные идентификаторы
@@ -205,7 +210,8 @@ const appProcess = async prms => {
                 prms.queue.blResp = new Buffer(serverResp);
                 await dbConn.setQueueResp({
                     nQueueId: prms.queue.nId,
-                    blResp: prms.queue.blResp
+                    blResp: prms.queue.blResp,
+                    nIsOriginal: NIS_ORIGINAL_YES
                 });
                 //Выполняем обработчик "После" (если он есть)
                 if (prms.function.sAppSrvAfter) {
@@ -231,7 +237,8 @@ const appProcess = async prms => {
                                 prms.queue.blResp = resAfter.blResp;
                                 await dbConn.setQueueResp({
                                     nQueueId: prms.queue.nId,
-                                    blResp: prms.queue.blResp
+                                    blResp: prms.queue.blResp,
+                                    nIsOriginal: NIS_ORIGINAL_NO
                                 });
                             }
                             //Применим ответ "После" - флаг утентификации сервиса
