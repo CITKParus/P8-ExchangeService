@@ -10,6 +10,7 @@
 const Schema = require("validate"); //Схемы валидации
 const { dbConnect } = require("./obj_config"); //Схемы валидации конфигурации сервера приложений
 const { NLOG_STATE_INF, NLOG_STATE_WRN, NLOG_STATE_ERR } = require("./obj_log"); //Схемы валидации записи журнала работы сервиса обмена
+const { NFORCE_NO, NFORCE_YES } = require("./common"); //Общие алгоритмы валидации
 const {
     NQUEUE_EXEC_STATE_INQUEUE,
     NQUEUE_EXEC_STATE_APP,
@@ -165,6 +166,18 @@ exports.putServiceAuthInQueue = new Schema({
         message: {
             type: path => `Идентификатор сервиса (${path}) имеет некорректный тип данных (ожидалось - Number)`,
             required: path => `Не указан идентификатор сервиса (${path})`
+        }
+    },
+    //Признак принудительного завершения сессии
+    nForce: {
+        type: Number,
+        required: false,
+        enum: [NFORCE_YES, NFORCE_NO],
+        message: {
+            type: path =>
+                `Признак принудительного завершения сессии (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            enum: path => `Значение признака принудительного завершения сессии (${path}) не поддерживается`,
+            required: path => `Не указан признак принудительного завершения сессии (${path})`
         }
     }
 });

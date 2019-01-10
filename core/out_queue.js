@@ -15,6 +15,7 @@ const { SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесист
 const { makeErrorText, validateObject } = require("./utils"); //Вспомогательные функции
 const { NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 const objOutQueueProcessorSchema = require("../models/obj_out_queue_processor"); //Схемы валидации сообщений обмена с обработчиком сообщения очереди
+const { NFORCE_YES } = require("../models/common"); //Общие константы и схемы валидации
 const objQueueSchema = require("../models/obj_queue"); //Схемы валидации сообщения очереди
 const objServiceFnSchema = require("../models/obj_service_function"); //Схемы валидации функции сервиса
 const prmsOutQueueSchema = require("../models/prms_out_queue"); //Схемы валидации параметров функций класса
@@ -259,7 +260,18 @@ class OutQueue extends EventEmitter {
                             //Ошибки обработки нет, но может быть есть ошибка аутентификации
                             if (result.sResult == objOutQueueProcessorSchema.STASK_RESULT_UNAUTH) {
                                 //Ставим задачу на аутентификацию сервиса
-                                await this.dbConn.putServiceAuthInQueue({ nServiceId: prms.queue.nServiceId });
+                                try {
+                                    await this.dbConn.putServiceAuthInQueue({
+                                        nServiceId: prms.queue.nServiceId,
+                                        nForce: NFORCE_YES
+                                    });
+                                } catch (e) {
+                                    //Отразим в протоколе ошибку постановки задачи на аутентификацию сервиса
+                                    await self.logger.error(
+                                        `Ошибка постановки задачи на аутентификацию сервиса: ${makeErrorText(e)}`,
+                                        { nQueueId: prms.queue.nId }
+                                    );
+                                }
                             }
                         }
                     } else {

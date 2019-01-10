@@ -143,8 +143,8 @@ const isServiceAuth = async prms => {
 const putServiceAuthInQueue = async prms => {
     try {
         await prms.connection.execute(
-            "BEGIN PKG_EXS.SERVICE_AUTH_PUT_INQUEUE(NEXSSERVICE => :NEXSSERVICE); END;",
-            { NEXSSERVICE: prms.nServiceId },
+            "BEGIN PKG_EXS.SERVICE_AUTH_PUT_INQUEUE(NEXSSERVICE => :NEXSSERVICE, NFORCE => :NFORCE); END;",
+            { NEXSSERVICE: prms.nServiceId, NFORCE: prms.nForce },
             { autoCommit: true }
         );
     } catch (e) {
