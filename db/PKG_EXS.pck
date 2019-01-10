@@ -124,6 +124,10 @@ create or replace package PKG_EXS as
   NIS_ORIGINAL_NO           constant number(1) := 0; -- Оригинал
   NIS_ORIGINAL_YES          constant number(1) := 1; -- Не оригинал
   
+  /* Константы - признак принудительного исполнения действия */
+  NFORCE_NO                 constant number(1) := 0; -- Не выполнять принудительно (нормальный уровень проверок исполения)
+  NFORCE_YES                constant number(1) := 1; -- Выполнить принудительно (пониженный уровень проверок исполнения)
+  
   /* Константы - ожидаемый интерфейс процедуры обработки сообщения очереди на стороне БД */
   SPRC_RESP_ARGS            constant varchar2(80) := 'NIDENT,IN,NUMBER;NEXSQUEUE,IN,NUMBER;'; -- Список параметров процедуры обработки
 
@@ -350,7 +354,8 @@ create or replace package PKG_EXS as
   /* Помещение задания на аутентификацию (начало сеанса) сервиса в очередь обмена */
   procedure SERVICE_AUTH_PUT_INQUEUE
   (
-    NEXSSERVICE             in number   -- Рег. номер сервиса обмена
+    NEXSSERVICE             in number,             -- Рег. номер сервиса обмена
+    NFORCE                  in number := NFORCE_NO -- Флаг принудительной отмены аутентификации, без проверки текущей аутентификации (см. константы NFORCE_*, null - без принудительной отмены аутентификации)  
   );
   
   /* Помещение задания на отмену аутентификации (завершение сеанса) сервиса в очередь обмена */
@@ -1493,7 +1498,8 @@ create or replace package body PKG_EXS as
   /* Помещение задания на аутентификацию (начало сеанса) сервиса в очередь обмена */
   procedure SERVICE_AUTH_PUT_INQUEUE
   (
-    NEXSSERVICE             in number             -- Рег. номер сервиса обмена
+    NEXSSERVICE             in number,             -- Рег. номер сервиса обмена
+    NFORCE                  in number := NFORCE_NO -- Флаг принудительной отмены аутентификации, без проверки текущей аутентификации (см. константы NFORCE_*, null - без принудительной отмены аутентификации)
   )
   is
     pragma autonomous_transaction;
@@ -1503,10 +1509,17 @@ create or replace package body PKG_EXS as
   begin
     /* Считаем запись сервиса */
     REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => NEXSSERVICE);
+    /* Проверим, что корректно указан флаг принудительного помещения задания в очередь */
+    if (NVL(NFORCE, NFORCE_NO) not in (NFORCE_NO, NFORCE_YES)) then
+      P_EXCEPTION(0,
+                  'Значение "%s", признака принудительной отмены аутентификации, не поддерживается',
+                  TO_CHAR(NFORCE));
+    end if;
     /* Работаем только для сервисов отправки сообщений */
     if (REXSSERVICE.SRV_TYPE = NSRV_TYPE_SEND) then
       /* Проверим, что сервис ещё не аутентифицирован */
-      if (SERVICE_IS_AUTH(NEXSSERVICE => REXSSERVICE.RN) = PKG_EXS.NIS_AUTH_NO) then
+      if ((NVL(NFORCE, NFORCE_NO) = NFORCE_YES) or
+         ((NVL(NFORCE, NFORCE_NO) = NFORCE_NO) and (SERVICE_IS_AUTH(NEXSSERVICE => REXSSERVICE.RN) = PKG_EXS.NIS_AUTH_NO))) then
         /* Ищем функцию осуществляющую аутентификацию */
         SERVICE_AUTH_FN_FIND(NFLAG_SMART => 0, NEXSSERVICE => REXSSERVICE.RN, REXSSERVICEFN => REXSSERVICEFN_AUTH);
         /* Проверяем, что в очереди ещё пока нет запросов на аутентификацию */
