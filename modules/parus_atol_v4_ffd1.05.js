@@ -104,12 +104,10 @@
 // Подключение библиотек
 //----------------------
 
-const util = require("util"); //Встроенные вспомогательные утилиты
 const parseString = require("xml2js").parseString; //Конвертация XML в JSON
+const js2xmlparser = require("js2xmlparser"); //Конвертация JSON в XML
 const _ = require("lodash"); //Работа с массивами и коллекциями
-const rqp = require("request-promise"); //Работа с HTTP/HTTPS запросами
 const { buildURL } = require("@core/utils"); //Вспомогательные функции
-const { NFN_TYPE_LOGIN } = require("@models/obj_service_function");
 
 //---------------------
 // Глобальные константы
@@ -117,6 +115,11 @@ const { NFN_TYPE_LOGIN } = require("@models/obj_service_function");
 
 //Код круппы ККТ
 const SGROUP_CODE = "v4-online-atol-ru_4179";
+
+//Статусы документов АТОЛ-онлайн
+const SSTATUS_DONE = "done"; //Готово
+const SSTATUS_FAIL = "fail"; //Ошибка
+const SSTATUS_WAIT = "wait"; //Ожидание
 
 //Словарь - Признак способа расчёта
 const paymentMethod = {
@@ -474,24 +477,34 @@ const beforeRegBillSIR = async prms => {
 
 //Обработчик "После" отправки запроса на регистрацию чека (приход, расход, возврат) серверу "АТОЛ-Онлайн"
 const afterRegBillSIR = async prms => {
+    //Буфер для данных ответа сервера
     let resp = null;
+    //Если есть данные от сервера АТОЛ
     if (prms.queue.blResp) {
+        //Пытаемся их разбирать
         try {
             resp = JSON.parse(prms.queue.blResp.toString());
         } catch (e) {
+            //Пришел не JSON
             throw new Error(`Неожиданный ответ сервера АТОЛ-Онлайн. Ошибка интерпретации: ${e.message}`);
         }
     } else {
+        //Данных от сервера нет
         throw new Error(`Сервер АТОЛ-Онлайн не вернул ответ`);
     }
+    //Данные есть и нам удалось их разобрать, проверяем на наличие ошибок
     if (resp.error === null) {
+        //Ошибок нет - забираем идентификатор документа в системе АТОЛ и кладём в тело ответа - он это то что нам нужно
         return {
             blResp: new Buffer(resp.uuid)
         };
     } else {
+        //Есть ошибки, посмотрим что это, может быть аутентификация (кончился токен)
         if (resp.error.code === 10 || resp.error.code === 11) {
+            //да, это была она - сигнализируем серверу приложений - надо переподключаться
             return { bUnAuth: true };
         } else {
+            //прочие ошибки - фиксируем в журнале
             throw new Error(`Сервер АТОЛ-Онлайн вернул ошибку: ${resp.error.text}`);
         }
     }
@@ -529,8 +542,107 @@ const beforeGetBillInfo = async prms => {
 
 //Обработчик "После" отправки запроса на получение информации о чеке серверу "АТОЛ-Онлайн"
 const afterGetBillInfo = async prms => {
-    if (prms.queue.blResp) console.log(prms.queue.blResp.toString());
-    else console.log("Сервер не вернул ответ");
+    //if (prms.queue.blResp) console.log(prms.queue.blResp.toString());
+    //else console.log("Сервер не вернул ответ");
+    //Буфер для результата работы обработчика
+    let res = null;
+    //Буфер для данных ответа сервера
+    let resp = null;
+    //Если есть данные от сервера АТОЛ
+    if (prms.queue.blResp) {
+        //Пытаемся их разбирать
+        try {
+            resp = JSON.parse(prms.queue.blResp.toString());
+        } catch (e) {
+            //Пришел не JSON
+            throw new Error(`Неожиданный ответ сервера АТОЛ-Онлайн. Ошибка интерпретации: ${e.message}`);
+        }
+    } else {
+        //Данных от сервера нет
+        throw new Error(`Сервер АТОЛ-Онлайн не вернул ответ`);
+    }
+    //Данные есть и нам удалось их разобрать - проверим, что нет ошибок аутентификации
+    //Есть ошибки, посмотрим что это, может быть аутентификация (кончился токен)
+    if (resp.error !== null && (resp.error.code === 10 || resp.error.code === 11)) {
+        //да, это была она - сигнализируем серверу приложений - надо переподключаться и дальше не работаем
+        return { bUnAuth: true };
+    }
+    //Ошибок атуентификации нет - проверяем состояние документа
+    if (resp.status) {
+        //Проверям, может быть документ зарегистрирован
+        if (resp.status === SSTATUS_DONE) {
+            //Документ обработан, проверим наличие данных фискализации
+            if (resp.payload) {
+                //Ошибок нет - забираем данные фискализации и кладём в тело ответа - это то что нам нужно
+                res = {
+                    //Статус обработки документа
+                    STATUS: resp.status,
+                    //Дата и время документа внешней системы
+                    TIMESTAMP: resp.timestamp,
+                    //Дата и время документа из ФН
+                    TAG1012: resp.payload.receipt_datetime,
+                    //Фискальный номер документа
+                    TAG1040: resp.payload.fiscal_document_number,
+                    //Номер ФН
+                    TAG1041: resp.payload.fn_number,
+                    //Фискальный признак документа
+                    TAG1077: resp.payload.fiscal_document_attribute
+                };
+            } else {
+                //В ответе сервера нет ни данных фискализации, при этом документ отработан - это неожиданный ответ
+                throw new Error(
+                    `Неожиданный ответ сервера АТОЛ-Онлайн. Ошибка интерпретации: документ в статусе "Готов" но в ответе сервера нет данных фискализации`
+                );
+            }
+        } else {
+            //Документ не зарегистрирован, может быть ещё обрабатывается
+            if (resp.status === SSTATUS_WAIT) {
+                //Скажем и об этом
+                res = {
+                    //Статус обработки документа
+                    STATUS: resp.status
+                };
+            } else {
+                //Документ не готов и не обрабатывается - очевидно ошибка при регистрации
+                if (resp.status === SSTATUS_FAIL) {
+                    if (resp.error) {
+                        res = {
+                            //Статус обработки документа
+                            STATUS: resp.status,
+                            //Ошибка
+                            ERROR: {
+                                //Код ошибки
+                                CODE: resp.error.code,
+                                //Текст ошибки
+                                TEXT: resp.error.text
+                            }
+                        };
+                    } else {
+                        //Статус - ошибка, но ошибки нет, это неожиданный ответ
+                        throw new Error(
+                            `Неожиданный ответ сервера АТОЛ-Онлайн. Ошибка интерпретации: документ в статусе "Ошибка" но в ответе сервера нет об ошибке`
+                        );
+                    }
+                } else {
+                    //Других статусов быть не должно - это неожиданный ответ
+                    throw new Error(
+                        `Неожиданный ответ сервера АТОЛ-Онлайн. Ошибка интерпретации: неизвестный статус документа - ${
+                            resp.status
+                        }`
+                    );
+                }
+            }
+        }
+    } else {
+        //Нет данных о статусе документа - это неожиданный ответ
+        throw new Error(
+            `Неожиданный ответ сервера АТОЛ-Онлайн. Ошибка интерпретации: статус документа в ответе не определён`
+        );
+    }
+    //Вернём сформированный ответ
+    return {
+        blResp: new Buffer(js2xmlparser.parse("RESP", res))
+    };
 };
 
 //-----------------

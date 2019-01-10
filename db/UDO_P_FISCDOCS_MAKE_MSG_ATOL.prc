@@ -1,20 +1,18 @@
 create or replace procedure UDO_P_FISCDOCS_MAKE_MSG_ATOL
 (
-  NCOMPANY                  in number,              -- Организация
-  NFISCDOC                  in number,              -- Регистрационный номер фискального документа
-  NEXSQUEUE                 out number              -- Регистрационный номер добавленной позиции очереди обмена
+  NCOMPANY                  in number,    -- Организация
+  NFISCDOC                  in number,    -- Регистрационный номер фискального документа
+  NEXSQUEUE                 out number    -- Регистрационный номер добавленной позиции очереди обмена
 )
 as
   /* Локальные переменные */
-  CDATA                     clob;                   -- Буфер для XML-посылки
-  SEXSSERVICE               EXSSERVICEFN.CODE%type; -- Код сервиса-обработчика
-  SEXSSERVICEFN             EXSSERVICEFN.CODE%type; -- Код функции отправки
-  NTMP_RN                   PKG_STD.TREF;           -- Буфер для вычислений
+  CDATA                     clob;         -- Буфер для XML-посылки
+  NTMP_RN                   PKG_STD.TREF; -- Буфер для вычислений
 
   /* Добавление пустой открытой ветки */
   procedure NODE
   (
-    SNAME                   varchar2                -- Имя ветки
+    SNAME                   varchar2      -- Имя ветки
   )
   as
   begin
@@ -27,8 +25,8 @@ as
   /* Добавление ветки со значением (строка) */
   procedure NODE
   (
-    SNAME                   varchar2,               -- Имя ветки
-    SVALUE                  varchar2                -- Значение ветки
+    SNAME                   varchar2,     -- Имя ветки
+    SVALUE                  varchar2      -- Значение ветки (строка)
   )
   as
   begin
@@ -45,8 +43,8 @@ as
   /* Добавление ветки со значением (число) */
   procedure NODE
   (
-    SNAME                   varchar2,               -- Имя ветки
-    NVALUE                  number                  -- Значение ветки
+    SNAME                   varchar2,     -- Имя ветки
+    NVALUE                  number        -- Значение ветки (число)
   )
   as
   begin
@@ -63,8 +61,8 @@ as
   /* Добавление ветки со значением (дата) */
   procedure NODE
   (
-    SNAME                   varchar2,               -- Имя ветки
-    DVALUE                  date                    -- Значение ветки
+    SNAME                   varchar2,     -- Имя ветки
+    DVALUE                  date          -- Значение ветки (дата)
   )
   as
   begin
@@ -92,23 +90,7 @@ begin
               from UDO_V_FISCDOCS T
              where T.NRN = UDO_P_FISCDOCS_MAKE_MSG_ATOL.NFISCDOC
                and T.NCOMPANY = UDO_P_FISCDOCS_MAKE_MSG_ATOL.NCOMPANY)
-  loop
-    /* Выбираем API обмена в зависимости от версии фискального документа */
-    case D.STYPE_VERSION
-      /* ФФД 1.05 */
-      when '1.05' then
-        begin
-          SEXSSERVICE   := 'АТОЛ_V4_ИСХ';
-          SEXSSERVICEFN := 'V4_ФФД1.05_РегистрацияЧекаРПВ';
-        end;
-      /* Неизвестная версия ФФД */
-      else
-        begin
-          P_EXCEPTION(0,
-                      'Версия фискального документа "%s" не поддерживается!',
-                      D.STYPE_VERSION);
-        end;
-    end case;
+  loop    
     /* Данные заголовка фискального документа */
     NODE(SNAME => 'NRN', NVALUE => D.NRN);
     NODE(SNAME => 'NCOMPANY', NVALUE => D.NCOMPANY);
@@ -187,8 +169,7 @@ begin
   /* Финализируем сборку XML-документа */
   PKG_XMLFAST.EPILOGUE(LDATA => CDATA);
   /* Отправляем сформированный документ */
-  PKG_EXS.QUEUE_PUT(SEXSSERVICE   => SEXSSERVICE,
-                    SEXSSERVICEFN => SEXSSERVICEFN,
+  PKG_EXS.QUEUE_PUT(NEXSSERVICEFN => UDO_PKG_EXS_ATOL.UTL_FISCDOC_GET_REG_EXSFN(NFISCDOC => NFISCDOC),
                     BMSG          => CLOB2BLOB(LCDATA => CDATA, SCHARSET => 'UTF8'),
                     NLNK_COMPANY  => NCOMPANY,
                     NLNK_DOCUMENT => NFISCDOC,
