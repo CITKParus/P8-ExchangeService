@@ -7,6 +7,13 @@ create or replace package UDO_PKG_EXS_ATOL as
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
 
+  /* Отработка ответов АТОЛ (v4) на запрос сведений о зарегистрированном документе (ФФД 1.05) */
+  procedure V4_FFD105_PROCESS_GET_BILL_INF
+  (
+    NIDENT                  in number,        -- Идентификатор процесса
+    NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
+  );
+
 end;
 /
 create or replace package body UDO_PKG_EXS_ATOL as
@@ -49,6 +56,30 @@ create or replace package body UDO_PKG_EXS_ATOL as
       /* Вернём ошибку */
       PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end V4_FFD105_PROCESS_REG_BILL_SIR;
-
+  
+  /* Отработка ответов АТОЛ (v4) на запрос сведений о зарегистрированном документе (ФФД 1.05) */
+  procedure V4_FFD105_PROCESS_GET_BILL_INF
+  (
+    NIDENT                  in number,        -- Идентификатор процесса
+    NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
+  )
+  is
+    REXSQUEUE               EXSQUEUE%rowtype; -- Запись позиции очереди
+    CTMP                    clob;             -- Буфер для хранения данных ответа сервера
+  begin
+    /* Считаем запись очереди */
+    REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
+    /* Разбираем ответ */
+    CTMP := BLOB2CLOB(LBDATA => REXSQUEUE.RESP, SCHARSET => 'UTF8');
+    if (CTMP is null) then
+      P_EXCEPTION(0, 'Нет ответа от сервера.');
+    end if;
+    /* Всё прошло успешно */
+    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT);
+  exception
+    when others then
+      /* Вернём ошибку */
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
+  end V4_FFD105_PROCESS_GET_BILL_INF;
 end;
 /

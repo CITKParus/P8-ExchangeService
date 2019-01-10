@@ -115,6 +115,9 @@ const { NFN_TYPE_LOGIN } = require("@models/obj_service_function");
 // Глобальные константы
 //---------------------
 
+//Код круппы ККТ
+const SGROUP_CODE = "v4-online-atol-ru_4179";
+
 //Словарь - Признак способа расчёта
 const paymentMethod = {
     sName: "Признак способа расчёта",
@@ -250,6 +253,12 @@ const getPropValueByCode = (props, sCode, sValType = "STR", sValField = "VALUE")
     return res;
 };
 
+//Добавление определённого количетсва часов к дате
+const addHours = (dDate, nHours) => {
+    dDate.setTime(dDate.getTime() + nHours * 60 * 60 * 1000);
+    return new Date(dDate);
+};
+
 //Конвертация строки в формате ДД.ММ.ГГГГ ЧЧ:МИ:СС в JS Date
 const strDDMMYYYYHHMISStoDate = sDate => {
     let res = null;
@@ -261,11 +270,6 @@ const strDDMMYYYYHHMISStoDate = sDate => {
             res = new Date(year, month - 1, day, hh, min, ss);
             if (isNaN(res.getTime())) {
                 res = null;
-            } else {
-                res.addHours = function(nHours) {
-                    this.setTime(this.getTime() + nHours * 60 * 60 * 1000);
-                    return this;
-                };
             }
         } catch (e) {
             res = null;
@@ -303,7 +307,7 @@ const afterConnect = async prms => {
         return {
             blResp: new Buffer(resp.token),
             sCtx: resp.token,
-            dCtxExp: strDDMMYYYYHHMISStoDate(resp.timestamp).addHours(24)
+            dCtxExp: addHours(new Date(), 23)
         };
     } else {
         throw new Error(`Сервер АТОЛ-Онлайн вернул ошибку: ${resp.error.text}`);
@@ -313,8 +317,6 @@ const afterConnect = async prms => {
 //Обработчик "До" отправки запроса на регистрацию чека (приход, расход, возврат) серверу "АТОЛ-Онлайн"
 const beforeRegBillSIR = async prms => {
     try {
-        //Код круппы ККТ
-        const sGroupCode = "v4-online-atol-ru_4179";
         //Токен доступа
         let sToken = null;
         if (prms.service.sCtx) {
@@ -324,10 +326,14 @@ const beforeRegBillSIR = async prms => {
         if (!sToken) return { bUnAuth: true };
         //Разберем XML-данные фискального документа
         let parseRes = null;
-        try {
-            parseRes = await parseXML(prms.queue.blMsg.toString());
-        } catch (e) {
-            throw new Error("Ошибка рабора XML");
+        if (prms.queue.blMsg) {
+            try {
+                parseRes = await parseXML(prms.queue.blMsg.toString());
+            } catch (e) {
+                throw new Error("Ошибка рабора XML");
+            }
+        } else {
+            throw new Error("В теле сообщения отсутствуют данные фискального документа");
         }
         //Сохраним короткие ссылки на документ и его свойства
         const doc = parseRes.FISCDOC;
@@ -359,7 +365,7 @@ const beforeRegBillSIR = async prms => {
                         payment_method: mapDictionary(paymentMethod, getPropValueByCode(docProps, "1214")),
                         payment_object: mapDictionary(paymentObject, getPropValueByCode(docProps, "1212")),
                         vat: {
-                            type: mapDictionary(receiptItemVat, getPropValueByCode(docProps, "1199")),
+                            type: mapDictionary(receiptItemVat, getPropValueByCode(docProps, "1199", "NUM")),
                             sum: getPropValueByCode(docProps, "1200", "NUM")
                         }
                     }
@@ -449,7 +455,7 @@ const beforeRegBillSIR = async prms => {
         let res = {
             options: {
                 url: buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL })
-                    .replace("<group_code>", sGroupCode)
+                    .replace("<group_code>", SGROUP_CODE)
                     .replace("<operation>", sOperation),
                 headers: {
                     "Content-type": "application/json; charset=utf-8",
@@ -491,6 +497,42 @@ const afterRegBillSIR = async prms => {
     }
 };
 
+//Обработчик "До" отправки запроса на получение информации о чеке серверу "АТОЛ-Онлайн"
+const beforeGetBillInfo = async prms => {
+    //Токен доступа
+    let sToken = null;
+    if (prms.service.sCtx) {
+        sToken = prms.service.sCtx;
+    }
+    //Если не достали из контекста токен доступа - значит нет аутентификации на сервере
+    if (!sToken) return { bUnAuth: true };
+    //Забираем идентификатор документа из тела сообщения
+    let sUUID = null;
+    if (prms.queue.blMsg) sUUID = prms.queue.blMsg.toString();
+    if (!sUUID) throw new Error("В теле сообщения не указан идентификатор документа в АТОЛ-Онлайн");
+    //Собираем общий результат работы
+    let res = {
+        options: {
+            url: buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL })
+                .replace("<group_code>", SGROUP_CODE)
+                .replace("<uuid>", sUUID),
+            headers: {
+                "Content-type": "application/json; charset=utf-8",
+                Token: sToken
+            },
+            simple: false
+        }
+    };
+    //Возврат резульатата
+    return res;
+};
+
+//Обработчик "После" отправки запроса на получение информации о чеке серверу "АТОЛ-Онлайн"
+const afterGetBillInfo = async prms => {
+    if (prms.queue.blResp) console.log(prms.queue.blResp.toString());
+    else console.log("Сервер не вернул ответ");
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -499,3 +541,5 @@ exports.beforeConnect = beforeConnect;
 exports.afterConnect = afterConnect;
 exports.beforeRegBillSIR = beforeRegBillSIR;
 exports.afterRegBillSIR = afterRegBillSIR;
+exports.beforeGetBillInfo = beforeGetBillInfo;
+exports.afterGetBillInfo = afterGetBillInfo;
