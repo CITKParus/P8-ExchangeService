@@ -14,7 +14,7 @@ let dbConnect = {
     //Пароль пользователя БД
     sPassword: "parus",
     //Строка подключения к БД
-    sConnectString: "DEMOP_CITKSERV_WAN",
+    sConnectString: "DEMOP_CITKSERV",
     //Наименование сервера приложений в сессии БД
     sSessionAppName: "PARUS$ExchangeServer",
     //Подключаемый модуль обслуживания БД (низкоуровневые функции работы с СУБД)
@@ -26,7 +26,7 @@ let outGoing = {
     //Количество одновременно обрабатываемых исходящих сообщений
     nMaxWorkers: 3,
     //Интервал проверки наличия исходящих сообщений (мс)
-    nCheckTimeout: 1
+    nCheckTimeout: 5000
 };
 
 //Параметры обработки очереди входящих сообщений
