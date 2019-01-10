@@ -203,7 +203,7 @@ const sendMail = prms => {
             //Отправляем сообщение
             transporter.sendMail(mailOptions, (error, info) => {
                 if (error) {
-                    reject(new ServerError(SERR_MAIL_FAILED, `${error.code}: ${error.response}`));
+                    reject(new ServerError(SERR_MAIL_FAILED, `${error.code}: ${error}`));
                 } else {
                     if (info.rejected && Array.isArray(info.rejected) && info.rejected.length > 0) {
                         reject(
