@@ -2,7 +2,7 @@
   Сервис интеграции ПП Парус 8 с WEB API
   Дополнительный модуль: Взаимодействие с "АТОЛ-Онлайн" (v4) в формате ФФД 1.05
 
-  Полный формат формируемой посылки:
+  Полный формат формируемой посылки для чека:
     reqBody = {
         timestamp: "",
         external_id: 0,
@@ -98,6 +98,39 @@
             }
         }
     };
+
+  Полный формат формируемой посылки для чека коррекции:
+    reqBody = {
+        timestamp: "",
+        external_id: 0,
+        correction: {
+            company: {
+                sno: "",
+                inn: "",
+                payment_address: ""
+            },
+            correction_info: {
+                type: "",
+                base_date: "",
+                base_number: "",
+                base_name: ""
+            },
+            payments: [
+                {
+                    type: "",
+                    sum: 0
+                }
+            ],
+            vats: [
+                {
+                    type: "",
+                    sum: 0
+                }
+            ],
+            cashier: ""
+        }
+    };
+
 */
 
 //----------------------
@@ -113,8 +146,12 @@ const { buildURL } = require("@core/utils"); //Вспомогательные ф
 // Глобальные константы
 //---------------------
 
-//Код круппы ККТ
+//Код круппы ККТ (тестовой, для боевой - прописать его в настройках сервиса)
 const SGROUP_CODE = "v4-online-atol-ru_4179";
+
+//Типы документов по значению "Наименование документа" (тэг 1000)
+const SDOCTYPE_TAG100_CHECK = "3"; //Чек
+const SDOCTYPE_TAG100_CHECK_CORR = "31"; //Чек коррекции
 
 //Статусы документов АТОЛ-онлайн
 const SSTATUS_DONE = "done"; //Готово
@@ -164,14 +201,16 @@ const paymentObject = {
 const paymensOperation = {
     sName: "Тип операции",
     vals: {
-        "1": "sell",
-        "2": "sell_refund",
-        "3": "buy",
-        "4": "buy_refund"
+        "3_1": "sell", //Тэг 1000 = 3 (чек), тэг 1054 = 1 (приход)
+        "31_2": "sell_refund", //Тэг 1000 = 31 (коррекция), тэг 1054 = 2 (возврат прихода)
+        "31_1": "sell_correction", //Тэг 1000 = 31 (коррекция), тэг 1054 = 1 (приход)
+        "3_3": "buy", //Тэг 1000 = 3 (чек), тэг 1054 = 3 (расход)
+        "31_4": "buy_refund", //Тэг 1000 = 31 (коррекция), тэг 1054 = 4 (возврат расхода)
+        "31_3": "buy_correction" //Тэг 1000 = 31 (коррекция), тэг 1054 = 3 (расход)
     }
 };
 
-//Словарь - ставка НДС позиции чека
+//Словарь - Ставка НДС позиции чека
 const receiptItemVat = {
     sName: "Ставка НДС позиции чека",
     vals: {
@@ -181,6 +220,15 @@ const receiptItemVat = {
         "4": "vat110",
         "5": "vat0",
         "6": "none"
+    }
+};
+
+//Словарь - Тип коррекции
+const correctionInfoType = {
+    sName: "Тип коррекции",
+    vals: {
+        "0": "self",
+        "1": "instruction"
     }
 };
 
@@ -281,6 +329,92 @@ const strDDMMYYYYHHMISStoDate = sDate => {
     return res;
 };
 
+//Получение списка оплат по чеку
+const getPayments = props => {
+    //Список платежей
+    let payments = [];
+    //Сумма по чеку электронными
+    if (getPropValueByCode(props, "1081", "NUM") !== null) {
+        payments.push({
+            type: 1,
+            sum: getPropValueByCode(props, "1081", "NUM")
+        });
+    }
+    //Сумма по чеку предоплатой (зачет аванса и (или) предыдущих платежей)
+    if (getPropValueByCode(props, "1215", "NUM") !== null) {
+        payments.push({
+            type: 2,
+            sum: getPropValueByCode(props, "1215", "NUM")
+        });
+    }
+    //Сумма по чеку постоплатой (кредит)
+    if (getPropValueByCode(props, "1216", "NUM") !== null) {
+        payments.push({
+            type: 3,
+            sum: getPropValueByCode(props, "1216", "NUM")
+        });
+    }
+    //Сумма по чеку встречным представлением
+    if (getPropValueByCode(props, "1217", "NUM") !== null) {
+        payments.push({
+            type: 4,
+            sum: getPropValueByCode(props, "1217", "NUM")
+        });
+    }
+    //Возвращаем результат
+    return payments;
+};
+
+//Получение списка налогов по чеку
+const getVats = props => {
+    //Список налогов
+    let vats = [];
+    //Сумма расчета по чеку без НДС;
+    if (getPropValueByCode(props, "1105", "NUM") !== null) {
+        vats.push({
+            type: "none",
+            sum: getPropValueByCode(props, "1105", "NUM")
+        });
+    }
+    //Сумма расчета по чеку с НДС по ставке 0%;
+    if (getPropValueByCode(props, "1104", "NUM") !== null) {
+        vats.push({
+            type: "vat0",
+            sum: getPropValueByCode(props, "1104", "NUM")
+        });
+    }
+    //Сумма НДС чека по ставке 10%;
+    if (getPropValueByCode(props, "1103", "NUM") !== null) {
+        vats.push({
+            type: "vat10",
+            sum: getPropValueByCode(props, "1103", "NUM")
+        });
+    }
+    //Сумма НДС чека по ставке 20%;
+    if (getPropValueByCode(props, "1102", "NUM") !== null) {
+        vats.push({
+            type: "vat20",
+            sum: getPropValueByCode(props, "1102", "NUM")
+        });
+    }
+    //Сумма НДС чека по расч. ставке 10/110;
+    if (getPropValueByCode(props, "1107", "NUM") !== null) {
+        vats.push({
+            type: "vat110",
+            sum: getPropValueByCode(props, "1107", "NUM")
+        });
+    }
+    //Сумма НДС чека по расч. ставке 20/120
+    if (getPropValueByCode(props, "1106", "NUM") !== null) {
+        vats.push({
+            type: "vat120",
+            sum: getPropValueByCode(props, "1106", "NUM")
+        });
+    }
+    //Возвращаем результат
+    return vats;
+};
+
 //Обработчик "До" подключения к сервису
 const beforeConnect = async prms => {
     return {
@@ -341,119 +475,79 @@ const beforeRegBillSIR = async prms => {
         //Сохраним короткие ссылки на документ и его свойства
         const doc = parseRes.FISCDOC;
         const docProps = parseRes.FISCDOC.FISCDOC_PROPS.FISCDOC_PROP;
-        //Определим тип операции
-        const sOperation = mapDictionary(paymensOperation, getPropValueByCode(docProps, "1054"));
+        //Определим тип операции по значению "Наименование документа" (тэг 1000) и "Признак расчета" (тэг 1054)
+        if (!getPropValueByCode(docProps, "1000"))
+            throw new Error("В фискальном документе не указано значение 'Наименование документа' (тэг 1000)");
+        if (!getPropValueByCode(docProps, "1054"))
+            throw new Error("В фискальном документе не указано значение 'Признак расчёта' (тэг 1054)");
+        const sOperation = mapDictionary(
+            paymensOperation,
+            `${getPropValueByCode(docProps, "1000")}_${getPropValueByCode(docProps, "1054")}`
+        );
         //Собираем тело запроса в JSON из XML-данных документа
-        let reqBody = {
-            timestamp: doc.SDDOC_DATE,
-            external_id: doc.NRN,
-            receipt: {
-                client: {
-                    email: getPropValueByCode(docProps, "1008"),
-                    phone: ""
-                },
-                company: {
-                    email: getPropValueByCode(docProps, "1117"),
-                    sno: getPropValueByCode(docProps, "1055"),
-                    inn: getPropValueByCode(docProps, "1018"),
-                    payment_address: getPropValueByCode(docProps, "1187")
-                },
-                items: [
-                    {
-                        name: getPropValueByCode(docProps, "1030"),
-                        price: getPropValueByCode(docProps, "1079", "NUM"),
-                        quantity: getPropValueByCode(docProps, "1023", "NUM"),
-                        sum: getPropValueByCode(docProps, "1043", "NUM"),
-                        measurement_unit: getPropValueByCode(docProps, "1197"),
-                        payment_method: mapDictionary(paymentMethod, getPropValueByCode(docProps, "1214")),
-                        payment_object: mapDictionary(paymentObject, getPropValueByCode(docProps, "1212")),
-                        vat: {
-                            type: mapDictionary(receiptItemVat, getPropValueByCode(docProps, "1199", "NUM")),
-                            sum: getPropValueByCode(docProps, "1200", "NUM")
+        let reqBody = {};
+        if (getPropValueByCode(docProps, "1000") === SDOCTYPE_TAG100_CHECK) {
+            //Собираем чека
+            reqBody = {
+                timestamp: doc.SDDOC_DATE,
+                external_id: doc.NRN,
+                receipt: {
+                    client: {
+                        email: getPropValueByCode(docProps, "1008"),
+                        phone: ""
+                    },
+                    company: {
+                        email: getPropValueByCode(docProps, "1117"),
+                        sno: getPropValueByCode(docProps, "1055"),
+                        inn: getPropValueByCode(docProps, "1018"),
+                        payment_address: getPropValueByCode(docProps, "1187")
+                    },
+                    items: [
+                        {
+                            name: getPropValueByCode(docProps, "1030"),
+                            price: getPropValueByCode(docProps, "1079", "NUM"),
+                            quantity: getPropValueByCode(docProps, "1023", "NUM"),
+                            sum: getPropValueByCode(docProps, "1043", "NUM"),
+                            measurement_unit: getPropValueByCode(docProps, "1197"),
+                            payment_method: mapDictionary(paymentMethod, getPropValueByCode(docProps, "1214")),
+                            payment_object: mapDictionary(paymentObject, getPropValueByCode(docProps, "1212")),
+                            vat: {
+                                type: mapDictionary(receiptItemVat, getPropValueByCode(docProps, "1199", "NUM")),
+                                sum: getPropValueByCode(docProps, "1200", "NUM")
+                            }
                         }
-                    }
-                ],
-                total: getPropValueByCode(docProps, "1020", "NUM")
-            }
-        };
-        //Добавим общие платежи
-        let payments = [];
-        //Сумма по чеку электронными
-        if (getPropValueByCode(docProps, "1081", "NUM") !== null) {
-            payments.push({
-                type: 1,
-                sum: getPropValueByCode(docProps, "1081", "NUM")
-            });
+                    ],
+                    total: getPropValueByCode(docProps, "1020", "NUM")
+                }
+            };
+            //Добавим общие платежи
+            let payments = getPayments(docProps);
+            if (payments.length > 0) reqBody.receipt.payments = payments;
+            //Добавим общие налоги
+            let vats = getVats(docProps);
+            if (vats.length > 0) reqBody.receipt.vats = vats;
+        } else {
+            //Собираем чек коррекции
+            reqBody = {
+                timestamp: doc.SDDOC_DATE,
+                external_id: doc.NRN,
+                correction: {
+                    company: {
+                        sno: getPropValueByCode(docProps, "1055"),
+                        inn: getPropValueByCode(docProps, "1018"),
+                        payment_address: getPropValueByCode(docProps, "1187")
+                    },
+                    correction_info: {
+                        type: mapDictionary(correctionInfoType, getPropValueByCode(docProps, "1173")),
+                        base_date: getPropValueByCode(docProps, "1178"),
+                        base_number: getPropValueByCode(docProps, "1179"),
+                        base_name: getPropValueByCode(docProps, "1177")
+                    },
+                    payments: getPayments(docProps),
+                    vats: getVats(docProps)
+                }
+            };
         }
-        //Сумма по чеку предоплатой (зачет аванса и (или) предыдущих платежей)
-        if (getPropValueByCode(docProps, "1215", "NUM") !== null) {
-            payments.push({
-                type: 2,
-                sum: getPropValueByCode(docProps, "1215", "NUM")
-            });
-        }
-        //Сумма по чеку постоплатой (кредит)
-        if (getPropValueByCode(docProps, "1216", "NUM") !== null) {
-            payments.push({
-                type: 3,
-                sum: getPropValueByCode(docProps, "1216", "NUM")
-            });
-        }
-        //Сумма по чеку встречным представлением
-        if (getPropValueByCode(docProps, "1217", "NUM") !== null) {
-            payments.push({
-                type: 4,
-                sum: getPropValueByCode(docProps, "1217", "NUM")
-            });
-        }
-        //Если есть хоть один платёж - помещаем массив в запрос
-        if (payments.length > 0) reqBody.receipt.payments = payments;
-        //Добавим общие налоги
-        let vats = [];
-        //Сумма расчета по чеку без НДС;
-        if (getPropValueByCode(docProps, "1105", "NUM") !== null) {
-            vats.push({
-                type: "none",
-                sum: getPropValueByCode(docProps, "1105", "NUM")
-            });
-        }
-        //Сумма расчета по чеку с НДС по ставке 0%;
-        if (getPropValueByCode(docProps, "1104", "NUM") !== null) {
-            vats.push({
-                type: "vat0",
-                sum: getPropValueByCode(docProps, "1104", "NUM")
-            });
-        }
-        //Сумма НДС чека по ставке 10%;
-        if (getPropValueByCode(docProps, "1103", "NUM") !== null) {
-            vats.push({
-                type: "vat10",
-                sum: getPropValueByCode(docProps, "1103", "NUM")
-            });
-        }
-        //Сумма НДС чека по ставке 20%;
-        if (getPropValueByCode(docProps, "1102", "NUM") !== null) {
-            vats.push({
-                type: "vat20",
-                sum: getPropValueByCode(docProps, "1102", "NUM")
-            });
-        }
-        //Сумма НДС чека по расч. ставке 10/110;
-        if (getPropValueByCode(docProps, "1107", "NUM") !== null) {
-            vats.push({
-                type: "vat110",
-                sum: getPropValueByCode(docProps, "1107", "NUM")
-            });
-        }
-        //Сумма НДС чека по расч. ставке 20/120
-        if (getPropValueByCode(docProps, "1106", "NUM") !== null) {
-            vats.push({
-                type: "vat120",
-                sum: getPropValueByCode(docProps, "1106", "NUM")
-            });
-        }
-        //Если есть хоть один налог - помещаем массив в запрос
-        if (vats.length > 0) reqBody.receipt.vats = vats;
         //Собираем общий результат работы
         let res = {
             options: {
@@ -581,10 +675,14 @@ const afterGetBillInfo = async prms => {
                     TIMESTAMP: resp.timestamp,
                     //Дата и время документа из ФН
                     TAG1012: resp.payload.receipt_datetime,
+                    //Номер смены
+                    TAG1038: resp.payload.shift_number,
                     //Фискальный номер документа
                     TAG1040: resp.payload.fiscal_document_number,
                     //Номер ФН
                     TAG1041: resp.payload.fn_number,
+                    //Номер чека в смене
+                    TAG1042: resp.payload.fiscal_receipt_number,
                     //Фискальный признак документа
                     TAG1077: resp.payload.fiscal_document_attribute
                 };

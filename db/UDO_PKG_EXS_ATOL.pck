@@ -1,17 +1,36 @@
 create or replace package UDO_PKG_EXS_ATOL as
 
+  /* Константы - тестовое окружение сервера АТОЛ-Онлайн */
+  STEST_SRV_ROOT_PATTERN    constant varchar2(80) := '%testonline.atol.ru%';      -- Шаблон адреса тестового сервера
+  STEST_INN                 constant varchar2(80) := '5544332219';                -- Тестовый ИНН
+  STEST_ADDR                constant varchar2(80) := 'https://v4.online.atol.ru'; -- Тестовый адрес расчётов
+  
   /* Константы - типы функций обработки */
   SFN_TYPE_REG_BILL         constant varchar2(20) := 'REG_BILL';     -- Типовая функция регистрации чека
   SFN_TYPE_GET_BILL_INF     constant varchar2(20) := 'GET_BILL_INF'; -- Типовая функция получения иформации о регистрации чека
+  
+  /* Константы - версии ФФД (строковые представления) */
+  SFFD105                   constant varchar2(20) := '1.05'; -- Версия ФФД 1.05
+  SFFD110                   constant varchar2(20) := '1.10'; -- Версия ФФД 1.10
 
+  /* Константы - значения тэга "Номер версии ФФД" (1209) для версий формата */
+  NTAG1209_FFD105           constant number(2) := 2; -- Значение тэга  1209 для версии ФФД 1.05
+  NTAG1209_FFD110           constant number(2) := 3; -- Значение тэга  1209 для версии ФФД 1.10
+
+  /* Проверка сервиса на то, что он является тестовым */
+  function UTL_EXSSERVICE_IS_TEST
+  (
+    NEXSSERVICE             in number   -- Регистрационный номер сервиса обмена
+  ) return                  boolean;    -- Признак тестового сервиса (true - тестовый, false - не тестовый)
+  
   /* Получение рег. номера функции сервиса обмена для регистрации чека по рег. номеру фискального документа */
-  function UTL_FISCDOC_GET_REG_EXSFN
+  function UTL_FISCDOC_GET_EXSFN_REG
   (
     NFISCDOC                in number   -- Рег. номер фискального документа
   ) return                  number;     -- Рег. номер функции регистрации чека в сервисе АТОЛ-Онлайн
 
   /* Получение рег. номера функции сервиса обмена для запроса информации о регистрации чека по рег. номеру фискального документа */
-  function UTL_FISCDOC_GET_INF_EXSFN
+  function UTL_FISCDOC_GET_EXSFN_INF
   (
     NFISCDOC                in number   -- Рег. номер фискального документа
   ) return                  number;     -- Рег. номер функции запроса информации о регистрации чека в сервисе АТОЛ-Онлайн    
@@ -72,13 +91,13 @@ create or replace package body UDO_PKG_EXS_ATOL as
   /* Считывание записи фискального документа */
   function UTL_FISCDOC_GET
   (
-    NFISCDOC                in number               -- Рег. номер фискального документа
-  ) return                  UDO_V_FISCDOCS%rowtype  -- Найденная запись фискального документа
+    NFISCDOC                in number             -- Рег. номер фискального документа
+  ) return                  UDO_FISCDOCS%rowtype  -- Найденная запись фискального документа
   is
-    RRES                    UDO_V_FISCDOCS%rowtype; -- Буфер для результата
+    RRES                    UDO_FISCDOCS%rowtype; -- Буфер для результата
   begin
     /* Считаем запись */
-    select T.* into RRES from UDO_V_FISCDOCS T where T.NRN = NFISCDOC;
+    select T.* into RRES from UDO_FISCDOCS T where T.RN = NFISCDOC;
     /* Вернём результат */
     return RRES;
   exception
@@ -87,137 +106,115 @@ create or replace package body UDO_PKG_EXS_ATOL as
   end UTL_FISCDOC_GET;
   
   /* Получение мнемокода сервиса обмена и мнемокода его функции по типу функции обработки и версии ФФД */
-  procedure UTL_FISCDOC_GET_EXSFN_BY_FFD
+  procedure UTL_FISCDOC_GET_EXSFN
   (
+    NFISCDOC                in number,   -- Рег. номер фискального документа
     SFN_TYPE                in varchar2, -- Тип функции обработки (см. константы SFN_TYPE_*)
-    SFFD_VERSION            in varchar2, -- Версия ФФД    
-    SEXSSERVICE             out varchar2, -- Код сервиса-обработчика
-    SEXSSERVICEFN           out varchar2 -- Код функции-обработчика    
+    NEXSSERVICEFN           out number   -- Рег. номер функции-обработчика    
   )
   is
   begin
-    /* Работаем от типовой функции */
-    case SFN_TYPE
-      /* Регистрация чека */
-      when SFN_TYPE_REG_BILL then
-        begin
-          /* Выбираем API обмена в зависимости от версии фискального документа */
-          case SFFD_VERSION
-            /* ФФД 1.05 */
-            when '1.05' then
-              begin
-                SEXSSERVICE   := 'АТОЛ_V4_ИСХ';
-                SEXSSERVICEFN := 'V4_ФФД1.05_РегистрацияЧекаРПВ';
-              end;
-            /* Неизвестная версия ФФД */
-            else
-              begin
-                P_EXCEPTION(0,
-                            'Версия фискального документа "%s" не поддерживается!',
-                            SFFD_VERSION);
-              end;
-          end case;
-        end;
-      /* Получение иформации о регистрации чека */
-      when SFN_TYPE_GET_BILL_INF then
-        begin
-          /* Выбираем API обмена в зависимости от версии фискального документа */
-          case SFFD_VERSION
-            /* ФФД 1.05 */
-            when '1.05' then
-              begin
-                SEXSSERVICE   := 'АТОЛ_V4_ИСХ';
-                SEXSSERVICEFN := 'V4_ФФД1.05_РезОбрабЧека';
-              end;
-            /* Неизвестная версия ФФД */
-            else
-              begin
-                P_EXCEPTION(0,
-                            'Версия фискального документа "%s" не поддерживается!',
-                            SFFD_VERSION);
-              end;
-          end case;
-        end;
-      /* Неизвестная типовая функция */
-      else
-        begin
-          P_EXCEPTION(0, 'Типовая функция "%s" не поддерживается!', SFN_TYPE);
-        end;
-    end case;
-  end UTL_FISCDOC_GET_EXSFN_BY_FFD;
+    begin
+      select DECODE(SFN_TYPE, SFN_TYPE_REG_BILL, SFNREG.RN, SFN_TYPE_GET_BILL_INF, SFNINF.RN)
+        into NEXSSERVICEFN
+        from UDO_FISCDOCS  FD,
+             UDO_FDKNDVERS TV,
+             EXSSERVICEFN  SFNREG,
+             EXSSERVICEFN  SFNINF
+       where FD.RN = NFISCDOC
+         and FD.TYPE_VERSION = TV.RN
+         and TV.FUNCTION_SEND = SFNREG.RN(+)
+         and TV.FUNCTION_RESP = SFNINF.RN(+);
+    exception
+      when others then
+        NEXSSERVICEFN := null;
+    end;
+    /* Проверим, что хоть что-то нашлось */
+    if (NEXSSERVICEFN is null) then
+      P_EXCEPTION(0,
+                  'Для фискального документа (RN: %s) не определеная типовая функция "%s".',
+                  TO_CHAR(NFISCDOC),
+                  SFN_TYPE);
+    end if;
+  end UTL_FISCDOC_GET_EXSFN;
   
   /* Получение рег. номера функции сервиса обмена для регистрации чека по рег. номеру фискального документа */
-  function UTL_FISCDOC_GET_REG_EXSFN
+  function UTL_FISCDOC_GET_EXSFN_REG
   (
-    NFISCDOC                in number               -- Рег. номер фискального документа
-  ) return                  number                  -- Рег. номер функции регистрации чека в сервисе АТОЛ-Онлайн
+    NFISCDOC                in number     -- Рег. номер фискального документа
+  ) return                  number        -- Рег. номер функции регистрации чека в сервисе АТОЛ-Онлайн
   is
-    NRES                    PKG_STD.TREF;           -- Буфер для результата
-    RFISCDOC                UDO_V_FISCDOCS%rowtype; -- Запись фискального документа
-    NEXSSERVICE             EXSSERVICEFN.RN%type;   -- Рег. номер сервиса-обработчика
-    SEXSSERVICE             EXSSERVICEFN.CODE%type; -- Код сервиса-обработчика
-    SEXSSERVICEFN           EXSSERVICEFN.CODE%type; -- Код функции-обработчика    
+    NRES                    PKG_STD.TREF; -- Буфер для результата
   begin
-    /* Считаем запись фискального документа */
-    RFISCDOC := UTL_FISCDOC_GET(NFISCDOC => NFISCDOC);
     /* Определим мнемокоды сервиса и функции для обработки */
-    UTL_FISCDOC_GET_EXSFN_BY_FFD(SFN_TYPE      => SFN_TYPE_REG_BILL,
-                                 SFFD_VERSION  => RFISCDOC.STYPE_VERSION,
-                                 SEXSSERVICE   => SEXSSERVICE,
-                                 SEXSSERVICEFN => SEXSSERVICEFN);
-    /* Находим рег. номер сервиса */
-    FIND_EXSSERVICE_CODE(NFLAG_SMART => 0, NFLAG_OPTION => 0, SCODE => SEXSSERVICE, NRN => NEXSSERVICE);
-    /* Находим рег. номер функции сервиса */
-    FIND_EXSSERVICEFN_CODE(NFLAG_SMART  => 0,
-                           NFLAG_OPTION => 0,
-                           NEXSSERVICE  => NEXSSERVICE,
-                           SCODE        => SEXSSERVICEFN,
-                           NRN          => NRES);
+    UTL_FISCDOC_GET_EXSFN(NFISCDOC => NFISCDOC, SFN_TYPE => SFN_TYPE_REG_BILL, NEXSSERVICEFN => NRES);
     /* Вернём результат */
     return NRES;
-  end UTL_FISCDOC_GET_REG_EXSFN;
+  end UTL_FISCDOC_GET_EXSFN_REG;
   
   /* Получение рег. номера функции сервиса обмена для запроса информации о регистрации чека по рег. номеру фискального документа */
-  function UTL_FISCDOC_GET_INF_EXSFN
+  function UTL_FISCDOC_GET_EXSFN_INF
   (
-    NFISCDOC                in number               -- Рег. номер фискального документа
-  ) return                  number                  -- Рег. номер функции запроса информации о регистрации чека в сервисе АТОЛ-Онлайн
+    NFISCDOC                in number     -- Рег. номер фискального документа
+  ) return                  number        -- Рег. номер функции запроса информации о регистрации чека в сервисе АТОЛ-Онлайн
   is
-    NRES                    PKG_STD.TREF;           -- Буфер для результата
-    RFISCDOC                UDO_V_FISCDOCS%rowtype; -- Запись фискального документа
-    NEXSSERVICE             EXSSERVICEFN.RN%type;   -- Рег. номер сервиса-обработчика
-    SEXSSERVICE             EXSSERVICEFN.CODE%type; -- Код сервиса-обработчика
-    SEXSSERVICEFN           EXSSERVICEFN.CODE%type; -- Код функции-обработчика    
+    NRES                    PKG_STD.TREF; -- Буфер для результата
   begin
-    /* Считаем запись фискального документа */
-    RFISCDOC := UTL_FISCDOC_GET(NFISCDOC => NFISCDOC);
     /* Определим мнемокоды сервиса и функции для обработки */
-    UTL_FISCDOC_GET_EXSFN_BY_FFD(SFN_TYPE      => SFN_TYPE_GET_BILL_INF,
-                                 SFFD_VERSION  => RFISCDOC.STYPE_VERSION,
-                                 SEXSSERVICE   => SEXSSERVICE,
-                                 SEXSSERVICEFN => SEXSSERVICEFN);
-    /* Находим рег. номер сервиса */
-    FIND_EXSSERVICE_CODE(NFLAG_SMART => 0, NFLAG_OPTION => 0, SCODE => SEXSSERVICE, NRN => NEXSSERVICE);
-    /* Находим рег. номер функции сервиса */
-    FIND_EXSSERVICEFN_CODE(NFLAG_SMART  => 0,
-                           NFLAG_OPTION => 0,
-                           NEXSSERVICE  => NEXSSERVICE,
-                           SCODE        => SEXSSERVICEFN,
-                           NRN          => NRES);
+    UTL_FISCDOC_GET_EXSFN(NFISCDOC => NFISCDOC, SFN_TYPE => SFN_TYPE_GET_BILL_INF, NEXSSERVICEFN => NRES);
     /* Вернём результат */
     return NRES;
-  end UTL_FISCDOC_GET_INF_EXSFN;     
+  end UTL_FISCDOC_GET_EXSFN_INF;
+
+  /* Контроль версии ФФД */
+  procedure UTL_FISCDOC_CHECK_FFD_VERS
+  (
+    NCOMPANY                in number,  -- Рег. номер организации
+    NFISCDOC                in number,  -- Рег. номер фискального документа    
+    NEXPECTED_VERS          in number,  -- Ожидаемая версия ФФД (по значению тэга 1209, см. констнаты NTAG1209_FFD*)
+    SEXPECTED_VERS          in varchar2 -- Ожидаемая версия ФФД (строковое представление)
+  )
+  is
+  begin
+    /* Считаем тэг 1209 (в нем хранится номер версии ФФД) и сверим значения, фактическое и ожидаемое процедурой */
+    if (UDO_F_FISCDOCS_GET_NUMB(NRN => NFISCDOC, NCOMPANY => NCOMPANY, SATTRIBUTE => '1209') != NEXPECTED_VERS) then
+      P_EXCEPTION(0,
+                  'Версия формата фискального документа (значение тэга 1209 - %s) не поддерживается. Ожидаемая версия - %s (значение тэга 1209 - %s).',
+                  NVL(TO_CHAR(UDO_F_FISCDOCS_GET_NUMB(NRN => NFISCDOC, NCOMPANY => NCOMPANY, SATTRIBUTE => '1209')),
+                      '<НЕ УКАЗАНО>'),
+                  NVL(SEXPECTED_VERS, '<НЕ УКАЗАНА>'),
+                  NVL(TO_CHAR(NEXPECTED_VERS), '<НЕ УКАЗАНО>'));
+    end if;
+  end UTL_FISCDOC_CHECK_FFD_VERS;
+  
+  /* Проверка сервиса на то, что он является тестовым */
+  function UTL_EXSSERVICE_IS_TEST
+  (
+    NEXSSERVICE             in number           -- Регистрационный номер сервиса обмена
+  ) return                  boolean             -- Признак тестового сервиса (true - тестовый, false - не тестовый)
+  is
+    REXSSERVICE             EXSSERVICE%rowtype; -- Запись сервиса обмена
+  begin
+    /* Считаем запись сервиса обмена */
+    REXSSERVICE := GET_EXSSERVICE_ID(NFLAG_SMART => 0, NRN => NEXSSERVICE);
+    /* Проверим его по адресу */
+    if (REXSSERVICE.SRV_ROOT like STEST_SRV_ROOT_PATTERN) then
+      return true;
+    else
+      return false;
+    end if;
+  end;
 
   /* Отработка ответов АТОЛ (v4) на регистрацию чека на приход, расход, возврат (ФФД 1.05) */
   procedure V4_FFD105_PROCESS_REG_BILL_SIR
   (
-    NIDENT                  in number,              -- Идентификатор процесса
-    NEXSQUEUE               in number               -- Регистрационный номер обрабатываемой позиции очереди обмена
+    NIDENT                  in number,            -- Идентификатор процесса
+    NEXSQUEUE               in number             -- Регистрационный номер обрабатываемой позиции очереди обмена
   )
   is
-    REXSQUEUE               EXSQUEUE%rowtype;       -- Запись позиции очереди
-    RFISCDOC                UDO_V_FISCDOCS%rowtype; -- Запись фискального документа
-    CTMP                    clob;                   -- Буфер для хранения данных ответа сервера
+    REXSQUEUE               EXSQUEUE%rowtype;     -- Запись позиции очереди
+    RFISCDOC                UDO_FISCDOCS%rowtype; -- Запись фискального документа
+    CTMP                    clob;                 -- Буфер для хранения данных ответа сервера
   begin
     /* Считаем запись очереди */
     REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
@@ -226,11 +223,10 @@ create or replace package body UDO_PKG_EXS_ATOL as
     /* Считаем запись фискального документа */
     RFISCDOC := UTL_FISCDOC_GET(NFISCDOC => REXSQUEUE.LNK_DOCUMENT);
     /* Проверим, что он верного формата */
-    if (RFISCDOC.STYPE_VERSION <> '1.05') then
-      P_EXCEPTION(0,
-                  'Версия формата фискального документа (%s) не поддерживается. Ожидаемая версия - 1.05.',
-                  RFISCDOC.STYPE_VERSION);
-    end if;
+    UTL_FISCDOC_CHECK_FFD_VERS(NCOMPANY       => RFISCDOC.COMPANY,
+                               NFISCDOC       => RFISCDOC.RN,
+                               NEXPECTED_VERS => NTAG1209_FFD105,
+                               SEXPECTED_VERS => SFFD105);
     /* Разбираем ответ */
     CTMP := BLOB2CLOB(LBDATA => REXSQUEUE.RESP, SCHARSET => 'UTF8');
     if (CTMP is null) then
@@ -249,23 +245,25 @@ create or replace package body UDO_PKG_EXS_ATOL as
   /* Отработка ответов АТОЛ (v4) на запрос сведений о зарегистрированном документе (ФФД 1.05) */
   procedure V4_FFD105_PROCESS_GET_BILL_INF
   (
-    NIDENT                  in number,              -- Идентификатор процесса
-    NEXSQUEUE               in number               -- Регистрационный номер обрабатываемой позиции очереди обмена
+    NIDENT                  in number,            -- Идентификатор процесса
+    NEXSQUEUE               in number             -- Регистрационный номер обрабатываемой позиции очереди обмена
   )
   is
-    REXSQUEUE               EXSQUEUE%rowtype;       -- Запись позиции очереди
-    RFISCDOC                UDO_V_FISCDOCS%rowtype; -- Запись фискального документа
-    RDOC                    PKG_XPATH.TDOCUMENT;    -- Разобранный XML-документ
-    RROOT_NODE              PKG_XPATH.TNODE;        -- Корневой тэг XML-документа
-    SSTATUS                 PKG_STD.TSTRING;        -- Буфер для значения "Статус обработки документа"
-    STIMESTAMP              PKG_STD.TSTRING;        -- Буфер для значения "Дата и время документа внешней системы" (строковое представление)
-    DTIMESTAMP              PKG_STD.TLDATE;         -- Буфер для значения "Дата и время документа внешней системы"
-    STAG1012                PKG_STD.TSTRING;        -- Буфер для значения "Дата и время документа из ФН" (тэг 1012)
-    STAG1040                PKG_STD.TSTRING;        -- Буфер для значения "Фискальный номер документа" (тэг 1040)
-    STAG1041                PKG_STD.TSTRING;        -- Буфер для значения "Номер ФН" (тэг 1041)
-    STAG1077                PKG_STD.TSTRING;        -- Буфер для значения "Фискальный признак документа" (тэг 1077)
-    SERR_CODE               PKG_STD.TSTRING;        -- Буфер для значения "Код ошибки"
-    SERR_TEXT               PKG_STD.TSTRING;        -- Буфер для значения "Текст ошибки"
+    REXSQUEUE               EXSQUEUE%rowtype;     -- Запись позиции очереди
+    RFISCDOC                UDO_FISCDOCS%rowtype; -- Запись фискального документа
+    RDOC                    PKG_XPATH.TDOCUMENT;  -- Разобранный XML-документ
+    RROOT_NODE              PKG_XPATH.TNODE;      -- Корневой тэг XML-документа
+    SSTATUS                 PKG_STD.TSTRING;      -- Буфер для значения "Статус обработки документа"
+    STIMESTAMP              PKG_STD.TSTRING;      -- Буфер для значения "Дата и время документа внешней системы" (строковое представление)
+    DTIMESTAMP              PKG_STD.TLDATE;       -- Буфер для значения "Дата и время документа внешней системы"
+    STAG1012                PKG_STD.TSTRING;      -- Буфер для значения "Дата и время документа из ФН" (тэг 1012)
+    STAG1038                PKG_STD.TSTRING;      -- Буфер для значения "Номер смены" (тэг 1038)
+    STAG1040                PKG_STD.TSTRING;      -- Буфер для значения "Фискальный номер документа" (тэг 1040)
+    STAG1041                PKG_STD.TSTRING;      -- Буфер для значения "Номер ФН" (тэг 1041)
+    STAG1042                PKG_STD.TSTRING;      -- Буфер для значения "Номер чека в смене" (тэг 1042)
+    STAG1077                PKG_STD.TSTRING;      -- Буфер для значения "Фискальный признак документа" (тэг 1077)
+    SERR_CODE               PKG_STD.TSTRING;      -- Буфер для значения "Код ошибки"
+    SERR_TEXT               PKG_STD.TSTRING;      -- Буфер для значения "Текст ошибки"
   begin
     /* Считаем запись очереди */
     REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
@@ -274,11 +272,10 @@ create or replace package body UDO_PKG_EXS_ATOL as
     /* Считаем запись фискального документа */
     RFISCDOC := UTL_FISCDOC_GET(NFISCDOC => REXSQUEUE.LNK_DOCUMENT);
     /* Проверим, что он верного формата */
-    if (RFISCDOC.STYPE_VERSION <> '1.05') then
-      P_EXCEPTION(0,
-                  'Версия формата фискального документа (%s) не поддерживается. Ожидаемая версия - 1.05.',
-                  RFISCDOC.STYPE_VERSION);
-    end if;
+    UTL_FISCDOC_CHECK_FFD_VERS(NCOMPANY       => RFISCDOC.COMPANY,
+                               NFISCDOC       => RFISCDOC.RN,
+                               NEXPECTED_VERS => NTAG1209_FFD105,
+                               SEXPECTED_VERS => SFFD105);
     /* Разбираем ответ */
     begin
       RDOC := PKG_XPATH.PARSE_FROM_BLOB(LBXML => REXSQUEUE.RESP, SCHARSET => 'UTF8');
@@ -290,12 +287,14 @@ create or replace package body UDO_PKG_EXS_ATOL as
     RROOT_NODE := PKG_XPATH.ROOT_NODE(RDOCUMENT => RDOC);
     /* Забираем значения документа */
     SSTATUS    := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE, SPATTERN => '/RESP/STATUS'));
-    STIMESTAMP := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE,
-                                                                 SPATTERN     => '/RESP/TIMESTAMP'));
     STAG1012   := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE, SPATTERN => '/RESP/TAG1012'));
+    STAG1038   := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE, SPATTERN => '/RESP/TAG1038'));
     STAG1040   := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE, SPATTERN => '/RESP/TAG1040'));
     STAG1041   := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE, SPATTERN => '/RESP/TAG1041'));
+    STAG1042   := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE, SPATTERN => '/RESP/TAG1042'));
     STAG1077   := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE, SPATTERN => '/RESP/TAG1077'));
+    STIMESTAMP := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE,
+                                                                 SPATTERN     => '/RESP/TIMESTAMP'));
     SERR_CODE  := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE,
                                                                  SPATTERN     => '/RESP/ERROR/CODE'));
     SERR_TEXT  := PKG_XPATH.VALUE(RNODE => PKG_XPATH.SINGLE_NODE(RPARENT_NODE => RROOT_NODE,
@@ -323,6 +322,16 @@ create or replace package body UDO_PKG_EXS_ATOL as
                         'Документ в статусе "%s", но не указано значение "Дата и время документа внешней системы".',
                         SSTATUS);
           end if;
+          if (STAG1012 is null) then
+            P_EXCEPTION(0,
+                        'Документ в статусе "%s", но не указано значение "Дата и время документа из ФН" (тэг 1012).',
+                        SSTATUS);
+          end if;          
+          if (STAG1038 is null) then
+            P_EXCEPTION(0,
+                        'Документ в статусе "%s", но не указано значение "Номер смены" (тэг 1038).',
+                        SSTATUS);
+          end if;          
           if (STAG1040 is null) then
             P_EXCEPTION(0,
                         'Документ в статусе "%s", но не указано значение "Фискальный номер документа" (тэг 1040).',
@@ -331,6 +340,11 @@ create or replace package body UDO_PKG_EXS_ATOL as
           if (STAG1041 is null) then
             P_EXCEPTION(0,
                         'Документ в статусе "%s", но не указано значение "Номер ФН" (тэг 1041).',
+                        SSTATUS);
+          end if;
+          if (STAG1042 is null) then
+            P_EXCEPTION(0,
+                        'Документ в статусе "%s", но не указано значение "Номер чека в смене" (тэг 1042).',
                         SSTATUS);
           end if;
           if (STAG1077 is null) then
@@ -353,19 +367,31 @@ create or replace package body UDO_PKG_EXS_ATOL as
                  T.DOC_URL      = replace(replace(replace(SBILL_OFD_UTL, '<1040>', STAG1040), '<1041>', STAG1041),
                                           '<1077>',
                                           STAG1077)
-           where T.RN = RFISCDOC.NRN;
+           where T.RN = RFISCDOC.RN;
           /* Устанавливаем значения тэгов */
           begin
-            UDO_P_FISCDOCSPROP_SET_VAL(NPRN       => RFISCDOC.NRN,
-                                       NCOMPANY   => RFISCDOC.NCOMPANY,
+            UDO_P_FISCDOCSPROP_SET_VAL(NPRN          => RFISCDOC.RN,
+                                       NCOMPANY      => RFISCDOC.COMPANY,
+                                       SATTRIBUTE    => '1012',
+                                       DVAL_DATETIME => TO_DATE(STAG1012, 'dd.mm.yyyy hh24:mi:ss'));
+            UDO_P_FISCDOCSPROP_SET_VAL(NPRN       => RFISCDOC.RN,
+                                       NCOMPANY   => RFISCDOC.COMPANY,
+                                       SATTRIBUTE => '1038',
+                                       NVAL_NUMB  => TO_NUMBER(STAG1038));
+            UDO_P_FISCDOCSPROP_SET_VAL(NPRN       => RFISCDOC.RN,
+                                       NCOMPANY   => RFISCDOC.COMPANY,
                                        SATTRIBUTE => '1040',
                                        NVAL_NUMB  => TO_NUMBER(STAG1040));
-            UDO_P_FISCDOCSPROP_SET_VAL(NPRN       => RFISCDOC.NRN,
-                                       NCOMPANY   => RFISCDOC.NCOMPANY,
+            UDO_P_FISCDOCSPROP_SET_VAL(NPRN       => RFISCDOC.RN,
+                                       NCOMPANY   => RFISCDOC.COMPANY,
                                        SATTRIBUTE => '1041',
                                        SVAL_STR   => STAG1041);
-            UDO_P_FISCDOCSPROP_SET_VAL(NPRN       => RFISCDOC.NRN,
-                                       NCOMPANY   => RFISCDOC.NCOMPANY,
+            UDO_P_FISCDOCSPROP_SET_VAL(NPRN       => RFISCDOC.RN,
+                                       NCOMPANY   => RFISCDOC.COMPANY,
+                                       SATTRIBUTE => '1042',
+                                       NVAL_NUMB   => TO_NUMBER(STAG1042));            
+            UDO_P_FISCDOCSPROP_SET_VAL(NPRN       => RFISCDOC.RN,
+                                       NCOMPANY   => RFISCDOC.COMPANY,
                                        SATTRIBUTE => '1077',
                                        SVAL_STR   => STAG1077);
           exception
@@ -390,7 +416,7 @@ create or replace package body UDO_PKG_EXS_ATOL as
                                        REGEXP_REPLACE(replace(SERR_TEXT, CHR(10), ''), '[[:space:]]+', ' '),
                                        1,
                                        4000)
-           where T.RN = RFISCDOC.NRN;
+           where T.RN = RFISCDOC.RN;
         end;
       /* Неизвестный статус */
       else

@@ -13,10 +13,10 @@ begin
                and Q.LNK_UNITCODE = 'UDO_FiscalDocuments'
                and Q.LNK_DOCUMENT = T.RN
                and Q.EXEC_STATE = PKG_EXS.NQUEUE_EXEC_STATE_OK
-               and Q.EXSSERVICEFN = UDO_PKG_EXS_ATOL.UTL_FISCDOC_GET_REG_EXSFN(T.RN))
+               and Q.EXSSERVICEFN = UDO_PKG_EXS_ATOL.UTL_FISCDOC_GET_EXSFN_REG(T.RN))
   loop
     /* Ставим запрос на получение статуса документа в очередь */
-    PKG_EXS.QUEUE_PUT(NEXSSERVICEFN => UDO_PKG_EXS_ATOL.UTL_FISCDOC_GET_INF_EXSFN(NFISCDOC => C.RN),
+    PKG_EXS.QUEUE_PUT(NEXSSERVICEFN => UDO_PKG_EXS_ATOL.UTL_FISCDOC_GET_EXSFN_INF(NFISCDOC => C.RN),
                       BMSG          => C.BUUID,
                       NLNK_COMPANY  => C.COMPANY,
                       NLNK_DOCUMENT => C.RN,
