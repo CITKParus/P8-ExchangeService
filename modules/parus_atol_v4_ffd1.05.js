@@ -277,6 +277,7 @@ const getPropValueByCode = (props, sCode, sValType = "STR", sValField = "VALUE")
                     break;
                 }
                 case "NUM": {
+                    res = res.replace(",", ".");
                     if (isNaN(res)) throw Error(`Значение "${res}" не является числом`);
                     try {
                         res = Number(res);
