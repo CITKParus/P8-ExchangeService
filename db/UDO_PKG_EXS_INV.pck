@@ -56,13 +56,6 @@ create or replace package UDO_PKG_EXS_INV as
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
   
-  /* Электронная инвентаризация - сохранение результатов инвентаризации (ДЕМО, убрать!!!!) */
-  procedure SAVESHEETITEM_TMP
-  (
-    NIDENT                  in number,  -- Идентификатор процесса
-    NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
-  );
-  
 end;
 /
 create or replace package body UDO_PKG_EXS_INV as
@@ -582,7 +575,7 @@ create or replace package body UDO_PKG_EXS_INV as
     /* Считываем "Номер" (параметр отбора) */
     SREQNUMBER := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => SNUMBER);
     /* Считываем "Дату" (параметр отбора) */
-    DREQDATE := TO_DATE(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => SDATE), 'yyyy-mm-dd');
+    DREQDATE := TO_DATE(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => SDATE), 'YYYY-MM-DD');
     /* Контроль индетификатора устройства по лицензии */
     /* UTL_CHECK_DEVICEID(SDEVICEID => SREQDEVICEID); */
     /* Подготавливаем документ для ответа */
@@ -703,7 +696,11 @@ create or replace package body UDO_PKG_EXS_INV as
       /* Создаём пространство имён для ответа */
       XGETSHEETITEMSRESPONSE := UTL_CREATENODE(XDOC => XDOC, STAG => SGETSHEETITEMSRESPONSE, SNS => STSD);
       /* Обходим типы документов связанные с разделом "Электронные инвентаризации" */
-      for REC in (select DECODE(T.INVPACK, null, O.PLACE_MNEMO, OP.PLACE_MNEMO) SSTORAGEMNEMOCODE,
+      for REC in (select T.RN NRN,
+                         T.COMPANY NCOMPANY,
+                         T.BARCODE SBARCODE,
+                         T.IS_LOADED NIS_LOADED,
+                         DECODE(T.INVPACK, null, O.PLACE_MNEMO, OP.PLACE_MNEMO) SSTORAGEMNEMOCODE,
                          DECODE(T.INVPACK, null, O.BARCODE, OP.BARCODE) SOBARCODE,
                          T.INVPERSONS NINVPERSONS,
                          DECODE(PS.RN,
@@ -759,6 +756,14 @@ create or replace package body UDO_PKG_EXS_INV as
         XNODE             := DBMS_XMLDOM.APPENDCHILD(N => XITEM, NEWCHILD => XITEMNUMBER);
         XNODE             := DBMS_XMLDOM.APPENDCHILD(N => XITEM, NEWCHILD => XQUANTITY);
         XNODE             := DBMS_XMLDOM.APPENDCHILD(N => XGETSHEETITEMSRESPONSE, NEWCHILD => XITEM);
+        /* Выставим дату выгрузки в терминал для позиции ведомости инвентаризации */
+        P_ELINVOBJECT_BASE_UPDATE(NCOMPANY     => REC.NCOMPANY,
+                                  NRN          => REC.NRN,
+                                  DUNLOAD_DATE => sysdate,
+                                  DINV_DATE    => null,
+                                  NINVPERSONS  => REC.NINVPERSONS,
+                                  SBARCODE     => REC.SBARCODE,
+                                  NIS_LOADED   => REC.NIS_LOADED);
       end loop;
       /* Оборачиваем ответ в конверт */
       CRESPONSE := UTL_CREATERESPONSE(XDOC => XDOC, XCONTENT => XGETSHEETITEMSRESPONSE);
@@ -849,7 +854,8 @@ create or replace package body UDO_PKG_EXS_INV as
                              NVL(UTL_GEOGRAFY_GET_HIER_ITEM(G.RN, 4),
                                  NVL(UTL_GEOGRAFY_GET_HIER_ITEM(G.RN, 3), UTL_GEOGRAFY_GET_HIER_ITEM(G.RN, 2)))) SLOCALITY,
                          UTL_GEOGRAFY_GET_HIER_ITEM(G.RN, 5) SSTREET,
-                         T.ADDR_HOUSE SHOUSENUMBER
+                         T.ADDR_HOUSE SHOUSENUMBER,
+                         T.BARCODE SBARCODE
                     from DICPLACE T,
                          GEOGRAFY G
                    where T.COMPANY = 136018
@@ -866,7 +872,7 @@ create or replace package body UDO_PKG_EXS_INV as
       loop
         /* Собираем информацию по месту хранения в ответ */
         XITEM        := UTL_CREATENODE(XDOC => XDOC, STAG => SITEM, SNS => STSD);
-        XCODE        := UTL_CREATENODE(XDOC => XDOC, STAG => SCODE, SNS => STSD, SVAL => REC.NRN);
+        XCODE        := UTL_CREATENODE(XDOC => XDOC, STAG => SCODE, SNS => STSD, SVAL => REC.SBARCODE);
         XNAME        := UTL_CREATENODE(XDOC => XDOC, STAG => SNAME, SNS => STSD, SVAL => REC.SNAME);
         XMNEMOCODE   := UTL_CREATENODE(XDOC => XDOC, STAG => SMNEMOCODE, SNS => STSD, SVAL => REC.SMNEMOCODE);
         XLATITUDE    := UTL_CREATENODE(XDOC => XDOC, STAG => SLATITUDE, SNS => STSD, SVAL => REC.SLATITUDE);
@@ -951,17 +957,21 @@ create or replace package body UDO_PKG_EXS_INV as
     SREQROOM                PKG_STD.TSTRING;         -- Помещение расположения ОС из запроса (параметр сохранения)
     SREQRACK                PKG_STD.TSTRING;         -- Стеллаж расположения ОС из запроса (параметр сохранения)
     NELINVOBJECT            PKG_STD.TREF;            -- Рег. номер позиции ведомости инвентаризации
-    NDICPLACE               PKG_STD.TREF;            -- Рег. номер места хранения
+    SDICPLACEBARCODE        PKG_STD.TSTRING;         -- Штрих-код места хранения gсогласно ведомости
     NINVENTORY              PKG_STD.TREF;            -- Рег. номер ОС (карточки "Инвентарной картотеки")
     NCOMPANY                PKG_STD.TREF;            -- Рег. номер организации
+    NPROPERTY               PKG_STD.TREF;            -- Рег. номер ДС позиции ведомости инвентаризации для хранения комментария
     SERR                    PKG_STD.TSTRING;         -- Буфер для ошибок
+    NTMP                    PKG_STD.TREF;            -- Буфер для рег. номеров
   begin
     /* Инициализируем организацию */
     NCOMPANY := 136018;
+    /* Инициализируем ДС для хранения примечания */
+    FIND_DOCS_PROPS_CODE(NFLAG_SMART => 0, NCOMPANY => NCOMPANY, SCODE => 'COMMENT', NRN => NPROPERTY);
     /* Считаем запись очереди */
     REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
     /* Возьмем текст запроса */
-    CREQ := BLOB2CLOB(LBDATA => REXSQUEUE.MSG);
+    CREQ := BLOB2CLOB(LBDATA => REXSQUEUE.MSG, SCHARSET => 'UTF8');
     /* Создаем инстанс XML парсера */
     XMLPARCER := DBMS_XMLPARSER.NEWPARSER;
     /* Разбираем XML из запроса */
@@ -1017,7 +1027,7 @@ create or replace package body UDO_PKG_EXS_INV as
     /* Считываем "Количество ОС" (параметр сохранения) */
     NREQQUANTITY := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => SQUANTITY));
     /* Считываем "Дата проведения инвентаризации ОС" (параметр сохранения) */
-    DREQCHECKDATE := TO_DATE(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => SCHECKDATE), 'yyyy-mm-dd');
+    DREQCHECKDATE := TO_DATE(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => SCHECKDATE), 'YYYY-MM-DD"T"HH24:MI:SS');
     /* Считываем "Комментарий МОЛ ОС" (параметр сохранения) */
     SREQCOMMENT := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => SCOMMENT);
     /* Считываем "Широта" (параметр сохранения) */
@@ -1046,16 +1056,16 @@ create or replace package body UDO_PKG_EXS_INV as
         */
         /* Если задан штрих-код местанхождения ОС */
         if (SREQSTORAGECODE is not null) then
-          /* Проверяем местонахохждение по штрих-коду */
+          /* Проверяем наличие местонахохждения */
           begin
-            select T.RN
-              into NDICPLACE
+            select T.BARCODE
+              into SDICPLACEBARCODE
               from DICPLACE T
              where T.COMPANY = NCOMPANY
                and T.BARCODE = SREQSTORAGECODE;
           exception
             when NO_DATA_FOUND then
-              SERR := 'Местонахождение инвентарных объектов с штрих-кодом: ' || SREQSTORAGECODE || ' не найдено';
+              SERR := 'Местонахождение инвентарных объектов с штрих-кодом "' || SREQSTORAGECODE || '" не найдено';
           end;
         end if;
         /* Пробуем найти позицию ведомости инвентаризации по штрих-коду (если передан рег. номер ведомости и пока нет ошибок) */
@@ -1078,35 +1088,57 @@ create or replace package body UDO_PKG_EXS_INV as
                    and T.COMPANY = NCOMPANY;
               exception
                 when NO_DATA_FOUND then
-                  SERR := 'Инвентарная карточка с штрих-кодом: ' || SREQITEMCODE || ' не найдена';
+                  SERR := 'Инвентарная карточка с штрих-кодом "' || SREQITEMCODE || '" не найдена';
               end;
           end;
         end if;
         /* Если нет ошибок при проверках */
         if (SERR is null) then
-          /* Если позиция ведомости инвентаризации найдена */
-          if (NELINVOBJECT is not null) then
-            /* Обновим её */
-            P_ELINVOBJECT_BASE_UPDATE(NCOMPANY     => NCOMPANY,
-                                      NRN          => NELINVOBJECT,
-                                      DUNLOAD_DATE => null,
-                                      DINV_DATE    => DREQCHECKDATE,
-                                      NINVPERSONS  => NREQUSERCODE,
-                                      SBARCODE     => SREQSTORAGECODE,
-                                      NIS_LOADED   => 0);
+          /* И у нас есть штрихкод фактического местонахождения */
+          if (SDICPLACEBARCODE is not null) then
+            /* Если позиция ведомости инвентаризации найдена */
+            if (NELINVOBJECT is not null) then
+              /* Обновим её */
+              for C in (select T.* from ELINVOBJECT T where T.RN = NELINVOBJECT)
+              loop
+                P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => C.RN,
+                                              SUNITCODE   => 'ElectronicInventoriesObjects',
+                                              NPROPERTY   => NPROPERTY,
+                                              SSTR_VALUE  => SREQCOMMENT,
+                                              NNUM_VALUE  => null,
+                                              DDATE_VALUE => null,
+                                              NRN         => NTMP);
+                P_ELINVOBJECT_BASE_UPDATE(NCOMPANY     => C.COMPANY,
+                                          NRN          => C.RN,
+                                          DUNLOAD_DATE => C.UNLOAD_DATE,
+                                          DINV_DATE    => DREQCHECKDATE,
+                                          NINVPERSONS  => NREQUSERCODE,
+                                          SBARCODE     => SDICPLACEBARCODE,
+                                          NIS_LOADED   => C.IS_LOADED);
+              end loop;
+            else
+              /* Или добавим в ведомость найденную ИК если не нашли позицию ведомости по штрих-коду */
+              P_ELINVOBJECT_BASE_INSERT(NCOMPANY     => NCOMPANY,
+                                        NPRN         => NREQSHEETCODE,
+                                        NINVENTORY   => NINVENTORY,
+                                        NINVSUBST    => null,
+                                        NINVPACK     => null,
+                                        DUNLOAD_DATE => null,
+                                        DINV_DATE    => DREQCHECKDATE,
+                                        NINVPERSONS  => NREQUSERCODE,
+                                        SBARCODE     => SDICPLACEBARCODE,
+                                        NIS_LOADED   => 1,
+                                        NRN          => NELINVOBJECT);
+              P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => NELINVOBJECT,
+                                            SUNITCODE   => 'ElectronicInventoriesObjects',
+                                            NPROPERTY   => NPROPERTY,
+                                            SSTR_VALUE  => SREQCOMMENT,
+                                            NNUM_VALUE  => null,
+                                            DDATE_VALUE => null,
+                                            NRN         => NTMP);
+            end if;
           else
-            /* Или добавим в ведомость найденную ИК если не нашли позицию ведомости по штрих-коду */
-            P_ELINVOBJECT_BASE_INSERT(NCOMPANY     => NCOMPANY,
-                                      NPRN         => NREQSHEETCODE,
-                                      NINVENTORY   => NINVENTORY,
-                                      NINVSUBST    => null,
-                                      NINVPACK     => null,
-                                      DUNLOAD_DATE => null,
-                                      DINV_DATE    => DREQCHECKDATE,
-                                      NINVPERSONS  => NREQUSERCODE,
-                                      SBARCODE     => SREQSTORAGECODE,
-                                      NIS_LOADED   => 1,
-                                      NRN          => NELINVOBJECT);
+            SERR := 'Не удалось определить фактическое местонахождение';
           end if;
         end if;
       end if;
@@ -1133,36 +1165,5 @@ create or replace package body UDO_PKG_EXS_INV as
       PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end SAVESHEETITEM;
   
-  /* Электронная инвентаризация - сохранение результатов инвентаризации (ДЕМО, убрать!!!!) */
-  procedure SAVESHEETITEM_TMP
-  (
-    NIDENT                  in number,               -- Идентификатор процесса
-    NEXSQUEUE               in number                -- Регистрационный номер обрабатываемой позиции очереди обмена
-  )
-  is
-    CRESPONSE               clob;                    -- Буфер для ответа
-    XSAVESHEETITEMRESPONSE  DBMS_XMLDOM.DOMNODE;     -- Корневой элемент ответа
-    XNODE                   DBMS_XMLDOM.DOMNODE;     -- Буфер для ветки ответа
-    XITEM                   DBMS_XMLDOM.DOMNODE;     -- Элемент ответного списка
-    XDOC                    DBMS_XMLDOM.DOMDOCUMENT; -- Документ
-  begin
-    UTL_CREATERESPONSEDOC(XDOC => XDOC);
-    /* Создаём пространство имён для ответа */
-    XSAVESHEETITEMRESPONSE := UTL_CREATENODE(XDOC => XDOC, STAG => SSAVESHEETITEMRESPONSE, SNS => STSD);
-    /* Формируем результат */
-    XITEM := UTL_CREATENODE(XDOC => XDOC, STAG => SRESULT, SNS => STSD, SVAL => 'true');
-    XNODE := DBMS_XMLDOM.APPENDCHILD(N => XSAVESHEETITEMRESPONSE, NEWCHILD => XITEM);
-    /* Оборачиваем ответ в конверт */
-    CRESPONSE := UTL_CREATERESPONSE(XDOC => XDOC, XCONTENT => XSAVESHEETITEMRESPONSE);
-    /* Возвращаем ответ */
-    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT  => NIDENT,
-                                SRESULT => PKG_EXS.SPRC_RESP_RESULT_OK,
-                                BRESP   => CLOB2BLOB(LCDATA => CRESPONSE, SCHARSET => 'UTF8'));
-  exception
-    when others then
-      /* Вернём ошибку */
-      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
-  end SAVESHEETITEM_TMP;
-
 end;
 /
