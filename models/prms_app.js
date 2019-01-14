@@ -21,7 +21,7 @@ exports.init = new Schema({
         schema: config,
         required: true,
         message: {
-            required: "Не указаны параметры конфигурации сервера приложений (config)"
+            required: path => `Не указаны параметры конфигурации сервера приложений (${path})`
         }
     }
 });

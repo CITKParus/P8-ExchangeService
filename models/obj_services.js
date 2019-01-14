@@ -21,8 +21,8 @@ const defServices = (bRequired, sName) => {
         required: bRequired,
         each: Service,
         message: {
-            type: "Список сервисов (" + sName + ") имеет некорректный тип данных (ожидалось - Array)",
-            required: "Не указан список сервисов (" + sName + ")"
+            type: `Список сервисов (${sName}) имеет некорректный тип данных (ожидалось - Array)`,
+            required: `Не указан список сервисов (${sName})`
         }
     };
 };

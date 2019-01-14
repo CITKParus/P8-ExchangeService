@@ -29,9 +29,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция подключения к БД (connect) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция подключения к БД (connect)"
+            validateAsyncFunctionType: path =>
+                `Функция подключения к БД (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция подключения к БД (${path})`
         }
     },
     //Отключение от БД
@@ -39,9 +39,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция отключения от БД (disconnect) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция отключения от БД (disconnect)"
+            validateAsyncFunctionType: path =>
+                `Функция отключения от БД (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция отключения от БД (${path})`
         }
     },
     //Получение списка сервисов
@@ -49,9 +49,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция получения списка сервисов (getServices) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция получения списка сервисов (getServices)"
+            validateAsyncFunctionType: path =>
+                `Функция получения списка сервисов (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция получения списка сервисов (${path})`
         }
     },
     //Получения списка функций сервиса
@@ -59,9 +59,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция получения списка функций сервиса (getServiceFunctions) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция получения списка функций сервиса (getServiceFunctions)"
+            validateAsyncFunctionType: path =>
+                `Функция получения списка функций сервиса (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция получения списка функций сервиса (${path})`
         }
     },
     //Получение контекста сервиса
@@ -69,9 +69,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция получения контекста сервиса (getServiceContext) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция получения контекста сервиса (getServiceContext)"
+            validateAsyncFunctionType: path =>
+                `Функция получения контекста сервиса (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция получения контекста сервиса (${path})`
         }
     },
     //Установка контекста сервиса
@@ -79,9 +79,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция установки контекста сервиса (setServiceContext) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция установки контекста сервиса (setServiceContext)"
+            validateAsyncFunctionType: path =>
+                `Функция установки контекста сервиса (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция установки контекста сервиса (${path})`
         }
     },
     //Очистка контекста сервиса
@@ -89,9 +89,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция очистки контекста сервиса (clearServiceContext) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция очистки контекста сервиса (clearServiceContext)"
+            validateAsyncFunctionType: path =>
+                `Функция очистки контекста сервиса (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция очистки контекста сервиса (${path})`
         }
     },
     //Проверка атуентифицированности сервиса
@@ -99,9 +99,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция проверки атуентифицированности сервиса (isServiceAuth) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция проверки атуентифицированности сервиса (isServiceAuth)"
+            validateAsyncFunctionType: path =>
+                `Функция проверки атуентифицированности сервиса (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция проверки атуентифицированности сервиса (${path})`
         }
     },
     //Постановка в очередь задания на аутентификацию сервиса
@@ -109,10 +109,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция постановки в очередь задания на аутентификацию сервиса (putServiceAuthInQueue) имеет неверный формат (ожидалось - AsyncFunction)",
-            required:
-                "Не реализована функция постановки в очередь задания на аутентификацию сервиса (putServiceAuthInQueue)"
+            validateAsyncFunctionType: path =>
+                `Функция постановки в очередь задания на аутентификацию сервиса (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция постановки в очередь задания на аутентификацию сервиса (${path})`
         }
     },
     //Получение информации о просроченных сообщениях обмена сервиса
@@ -120,10 +119,10 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция получения информации о просроченных сообщениях обмена сервиса (getServiceExpiredQueueInfo) имеет неверный формат (ожидалось - AsyncFunction)",
-            required:
-                "Не реализована функция получения информации о просроченных сообщениях обмена сервиса (getServiceExpiredQueueInfo)"
+            validateAsyncFunctionType: path =>
+                `Функция получения информации о просроченных сообщениях обмена сервиса (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path =>
+                `Не реализована функция получения информации о просроченных сообщениях обмена сервиса (${path})`
         }
     },
     //Протоколирование работы сервиса
@@ -131,9 +130,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция протоколирования работы сервиса (log) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция протоколирования работы сервиса (log)"
+            validateAsyncFunctionType: path =>
+                `Функция протоколирования работы сервиса (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция протоколирования работы сервиса (${path})`
         }
     },
     //Считывание записи очереди обмена
@@ -141,9 +140,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция считывания записи очереди обмена (getQueue) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция считывания записи очереди обмена (getQueue)"
+            validateAsyncFunctionType: path =>
+                `Функция считывания записи очереди обмена (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция считывания записи очереди обмена (${path})`
         }
     },
     //Добавление сообщения очереди
@@ -151,9 +150,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция добавления сообщения очереди (putQueue) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция добавления сообщения очереди (putQueue)"
+            validateAsyncFunctionType: path =>
+                `Функция добавления сообщения очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция добавления сообщения очереди (${path})`
         }
     },
     //Считывание записей исходящих сообщений очереди
@@ -161,9 +160,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция считывания записей исходящих сообщений очереди (getQueueOutgoing) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция считывания записей исходящих сообщений очереди (getQueueOutgoing)"
+            validateAsyncFunctionType: path =>
+                `Функция считывания записей исходящих сообщений очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция считывания записей исходящих сообщений очереди (${path})`
         }
     },
     //Уставновка состояния записи очереди
@@ -171,9 +170,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция установки состояния записи очереди (setQueueState) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция установки состояния записи очереди (setQueueState)"
+            validateAsyncFunctionType: path =>
+                `Функция установки состояния записи очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция установки состояния записи очереди (${path})`
         }
     },
     //Считывание данных сообщения очереди
@@ -181,9 +180,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция считывания данных сообщения очереди (getQueueMsg) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция считывания данных сообщения очереди (getQueueMsg)"
+            validateAsyncFunctionType: path =>
+                `Функция считывания данных сообщения очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция считывания данных сообщения очереди (${path})`
         }
     },
     //Установка данных сообщения очереди
@@ -191,9 +190,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция установки данных сообщения очереди (setQueueMsg) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция установки данных сообщения очереди (setQueueMsg)"
+            validateAsyncFunctionType: path =>
+                `Функция установки данных сообщения очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция установки данных сообщения очереди (${path})`
         }
     },
     //Считывание результата обработки сообщения очереди
@@ -201,9 +200,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция считывания результата обработки сообщения очереди (getQueueResp) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция считывания результата обработки сообщения очереди (getQueueResp)"
+            validateAsyncFunctionType: path =>
+                `Функция считывания результата обработки сообщения очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция считывания результата обработки сообщения очереди (${path})`
         }
     },
     //Установка результата обработки сообщения очереди
@@ -211,9 +210,9 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция установки результата обработки сообщения очереди (setQueueResp) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция установки результата обработки сообщения очереди (setQueueResp)"
+            validateAsyncFunctionType: path =>
+                `Функция установки результата обработки сообщения очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция установки результата обработки сообщения очереди (${path})`
         }
     },
     //Исполнение обработчика со стороны БД для сообщения очереди
@@ -221,9 +220,10 @@ exports.dbConnectorModule = new Schema({
         use: { validateAsyncFunctionType },
         required: true,
         message: {
-            validateAsyncFunctionType:
-                "Функция исполнения обработчика со стороны БД для сообщения очереди (execQueuePrc) имеет неверный формат (ожидалось - AsyncFunction)",
-            required: "Не реализована функция исполнения обработчика со стороны БД для сообщения очереди (execQueuePrc)"
+            validateAsyncFunctionType: path =>
+                `Функция исполнения обработчика со стороны БД для сообщения очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path =>
+                `Не реализована функция исполнения обработчика со стороны БД для сообщения очереди (${path})`
         }
     }
 });
