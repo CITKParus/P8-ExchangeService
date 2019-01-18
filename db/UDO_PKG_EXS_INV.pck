@@ -7,6 +7,19 @@ create or replace package UDO_PKG_EXS_INV as
     NGEOGRTYPE              in number   -- Тип искомого структурного элемента адреса (1 - страна, 2 - регион, 3 - район, 4 - населенный пункт, 5 - улица, 6 - административный округ, 7 - муниципальный округ, 8 - город, 9 - уровень внутригородской территории, 10 - уровень дополнительных территорий, 11 - уровень подчиненных дополнительным территориям объектов)
   ) return                  varchar2;   -- Наименование найденного стуктурного элемента адреса
   
+  /* Получение данных о местонахождении позиции ведомости инвентаризации */
+  function UTL_ELINVOBJECT_DICPLACE_GET
+  (
+    NELINVOBJECT            in number,  -- Рег. номер записи ведомости инвентаризации
+    SRESULT_TYPE            in varchar2 -- Тип результата (см. констнаты SRESULT_TYPE*)
+  ) return                  varchar2;   -- Штрих-код ОС
+  
+  /* Получение штрих-кода позиции ведомости инвентаризации */
+  function UTL_ELINVOBJECT_BARCODE_GET
+  (
+    NELINVOBJECT            in number   -- Рег. номер записи ведомости инвентаризации
+  ) return                  varchar2;   -- Штрих-код ОС
+  
   /* Электронная инвентаризация - аутентификация */
   procedure CHECKAUTH
   (
@@ -42,14 +55,14 @@ create or replace package UDO_PKG_EXS_INV as
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
   
-  /* Электронная инвентаризация - считывание мест хранения */
+  /* Электронная инвентаризация - считывание местонахождений */
   procedure GETSTORAGES
   (
     NIDENT                  in number,  -- Идентификатор процесса
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );  
   
-  /* Электронная инвентаризация - сохранение результатов инвентаризации */
+  /* Электронная инвентаризация - сохранение результатов инвентаризации элемента хранения */
   procedure SAVESHEETITEM
   (
     NIDENT                  in number,  -- Идентификатор процесса
@@ -115,13 +128,14 @@ create or replace package body UDO_PKG_EXS_INV as
   STAG_CHECKDATE            constant varchar2(40) := 'CheckDate';
   STAG_COMMENT              constant varchar2(40) := 'Comment';
   STAG_DISTANCETOSTORAGE    constant varchar2(40) := 'DistanceToStorage';
-  STAG_FLOOR                constant varchar2(40) := 'Floor';
-  STAG_ROOM                 constant varchar2(40) := 'Room';
-  STAG_RACK                 constant varchar2(40) := 'Rack'; 
   STAG_FAULT                constant varchar2(40) := 'Fault';
   STAG_DETAIL               constant varchar2(40) := 'detail';
   STAG_MESSAGE              constant varchar2(40) := 'Message';
   STAG_ERRORMESSAGE         constant varchar2(40) := 'ErrorMessage';
+  
+  /* Константы - типы возвращаемых значений */
+  SRESULT_TYPE_MNEMO        constant varchar2(40):='MNEMO';   -- Мнемокод
+  SRESULT_TYPE_BARCODE      constant varchar2(40):='BARCODE'; -- Штрих-код
    
   /* Нормализация сообщения об ошибке */
   function UTL_CORRECT_ERR
@@ -394,6 +408,76 @@ create or replace package body UDO_PKG_EXS_INV as
     /* Берем первый дочерний элемент */
     XNODE_ROOT := DBMS_XMLDOM.ITEM(NL => XNODELIST, IDX => 0);
   end UTL_EXSQUEUE_MSG_GET_BODY_ROOT;
+  
+  /* Получение данных о местонахождении позиции ведомости инвентаризации */
+  function UTL_ELINVOBJECT_DICPLACE_GET
+  (
+    NELINVOBJECT            in number,       -- Рег. номер записи ведомости инвентаризации
+    SRESULT_TYPE            in varchar2      -- Тип результата (см. констнаты SRESULT_TYPE*)
+  ) return                  varchar2         -- Штрих-код ОС
+  is
+    SRES                    PKG_STD.TSTRING; -- Результат работы
+  begin
+    /* Найдем искомые значения атрибутов местонахождения */
+    begin
+      select DECODE(SRESULT_TYPE,
+                    SRESULT_TYPE_MNEMO,
+                    DECODE(T.INVPACK, null, O.PLACE_MNEMO, OP.PLACE_MNEMO),
+                    SRESULT_TYPE_BARCODE,
+                    DECODE(T.INVPACK, null, O.BARCODE, OP.BARCODE),
+                    null)
+        into SRES
+        from ELINVOBJECT T,
+             INVENTORY   I,
+             DICPLACE    O,
+             DICPLACE    OP,
+             INVPACK     P
+       where T.RN = NELINVOBJECT
+         and T.INVENTORY = I.RN
+         and I.OBJECT_PLACE = O.RN(+)
+         and T.INVPACK = P.RN(+)
+         and P.OBJECT_PLACE = OP.RN(+);
+    exception
+      when NO_DATA_FOUND then
+        SRES := null;
+    end;
+    /* Вернём результат */
+    return SRES;
+  end UTL_ELINVOBJECT_DICPLACE_GET;
+  
+  /* Получение штрих-кода позиции ведомости инвентаризации */
+  function UTL_ELINVOBJECT_BARCODE_GET
+  (
+    NELINVOBJECT            in number        -- Рег. номер записи ведомости инвентаризации
+  ) return                  varchar2         -- Штрих-код ОС
+  is
+    SRES                    PKG_STD.TSTRING; -- Результат работы
+  begin
+    /* Считаем штрих-код позиции ведомости инвентаризации */
+    begin
+      select DECODE(PS.RN,
+                    null,
+                    DECODE(T.INVPACK, null, DECODE(T.INVSUBST, null, I.BARCODE, U.BARCODE), P.BARCODE),
+                    PS.BARCODE)
+        into SRES
+        from ELINVOBJECT T,
+             INVENTORY   I,
+             INVPACK     P,
+             INVPACKPOS  PS,
+             INVSUBST    U
+       where T.RN = NELINVOBJECT
+         and T.INVENTORY = I.RN
+         and T.INVPACK = P.RN(+)
+         and T.INVPACK = PS.PRN(+)
+         and T.INVSUBST = PS.INVSUBST(+)
+         and T.INVSUBST = U.RN(+);
+    exception
+      when NO_DATA_FOUND then
+        SRES := null;
+    end;
+    /* Вернём результат */
+    return SRES;
+  end UTL_ELINVOBJECT_BARCODE_GET;
 
   /* Электронная инвентаризация - аутентификация */
   procedure CHECKAUTH
@@ -408,15 +492,15 @@ create or replace package body UDO_PKG_EXS_INV as
     XDOC                    DBMS_XMLDOM.DOMDOCUMENT; -- Документ
     XNODE_ROOT              DBMS_XMLDOM.DOMNODE;     -- Корневой элемент первой ветки тела документа
     CRESPONSE               clob;                    -- Буфер для ответа
-    SREQDEVICEID            PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
+    SREQ_DEVICEID           PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
   begin
     begin
       /* Считываем корневой элемент тела посылки */
       UTL_EXSQUEUE_MSG_GET_BODY_ROOT(NEXSQUEUE => NEXSQUEUE, XNODE_ROOT => XNODE_ROOT);
       /* Считываем идентификатор устройства */
-      SREQDEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
+      SREQ_DEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
       /* Контроль индетификатора устройства по лицензии */
-      UTL_CHECK_DEVICEID(SDEVICEID => SREQDEVICEID);
+      UTL_CHECK_DEVICEID(SDEVICEID => SREQ_DEVICEID);
       /* Подготавливаем документ для ответа */
       UTL_CREATERESPONSEDOC(XDOC => XDOC);
       /* Т.к. пока проверок нет никаких - всегда возвращаем положительный ответ */
@@ -455,15 +539,15 @@ create or replace package body UDO_PKG_EXS_INV as
     XDOC                    DBMS_XMLDOM.DOMDOCUMENT; -- Документ
     XNODE_ROOT              DBMS_XMLDOM.DOMNODE;     -- Корневой элемент первой ветки тела документа
     CRESPONSE               clob;                    -- Буфер для ответа
-    SREQDEVICEID            PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
+    SREQ_DEVICEID           PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
   begin
     begin
       /* Считываем корневой элемент тела посылки */
       UTL_EXSQUEUE_MSG_GET_BODY_ROOT(NEXSQUEUE => NEXSQUEUE, XNODE_ROOT => XNODE_ROOT);
       /* Считываем идентификатор устройства */
-      SREQDEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
+      SREQ_DEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
       /* Контроль индетификатора устройства по лицензии */
-      UTL_CHECK_DEVICEID(SDEVICEID => SREQDEVICEID);
+      UTL_CHECK_DEVICEID(SDEVICEID => SREQ_DEVICEID);
       /* Подготавливаем документ для ответа */
       UTL_CREATERESPONSEDOC(XDOC => XDOC);
       /* Создаём пространство имён для ответа */
@@ -516,15 +600,15 @@ create or replace package body UDO_PKG_EXS_INV as
     XDOC                    DBMS_XMLDOM.DOMDOCUMENT; -- Документ
     XNODE_ROOT              DBMS_XMLDOM.DOMNODE;     -- Корневой элемент первой ветки тела документа
     CRESPONSE               clob;                    -- Буфер для ответа
-    SREQDEVICEID            PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
+    SREQ_DEVICEID           PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
   begin
     begin
       /* Считываем корневой элемент тела посылки */
       UTL_EXSQUEUE_MSG_GET_BODY_ROOT(NEXSQUEUE => NEXSQUEUE, XNODE_ROOT => XNODE_ROOT);
       /* Считываем идентификатор устройства */
-      SREQDEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
+      SREQ_DEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
       /* Контроль индетификатора устройства по лицензии */
-      UTL_CHECK_DEVICEID(SDEVICEID => SREQDEVICEID);
+      UTL_CHECK_DEVICEID(SDEVICEID => SREQ_DEVICEID);
       /* Подготавливаем документ для ответа */
       UTL_CREATERESPONSEDOC(XDOC => XDOC);
       /* Создаём пространство имён для ответа */
@@ -583,27 +667,27 @@ create or replace package body UDO_PKG_EXS_INV as
     XDOC                    DBMS_XMLDOM.DOMDOCUMENT; -- Документ
     XNODE_ROOT              DBMS_XMLDOM.DOMNODE;     -- Корневой элемент первой ветки тела документа
     CRESPONSE               clob;                    -- Буфер для ответа
-    SREQDEVICEID            PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
-    NREQTYPECODE            PKG_STD.TREF;            -- Тип ведомости из запроса (параметр отбора)
-    SREQPREFIX              PKG_STD.TSTRING;         -- Префикс ведомости из запроса (параметр отбора)
-    SREQNUMBER              PKG_STD.TSTRING;         -- Номер ведомости из запроса (параметр отбора)
-    DREQDATE                PKG_STD.TLDATE;          -- Дата ведомости из запроса (параметр отбора)
+    SREQ_DEVICEID           PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
+    NREQ_TYPECODE           PKG_STD.TREF;            -- Тип ведомости из запроса (параметр отбора)
+    SREQ_PREFIX             PKG_STD.TSTRING;         -- Префикс ведомости из запроса (параметр отбора)
+    SREQ_NUMBER             PKG_STD.TSTRING;         -- Номер ведомости из запроса (параметр отбора)
+    DREQ_DATE               PKG_STD.TLDATE;          -- Дата ведомости из запроса (параметр отбора)
   begin
     begin
       /* Считываем корневой элемент тела посылки */
       UTL_EXSQUEUE_MSG_GET_BODY_ROOT(NEXSQUEUE => NEXSQUEUE, XNODE_ROOT => XNODE_ROOT);
       /* Считываем идентификатор устройства */
-      SREQDEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
+      SREQ_DEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
       /* Считываем "Тип ведомости" (параметр отбора) */
-      NREQTYPECODE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_TYPECODE));
+      NREQ_TYPECODE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_TYPECODE));
       /* Считываем "Префикс" (параметр отбора) */
-      SREQPREFIX := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_PREFIX);
+      SREQ_PREFIX := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_PREFIX);
       /* Считываем "Номер" (параметр отбора) */
-      SREQNUMBER := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_NUMBER);
+      SREQ_NUMBER := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_NUMBER);
       /* Считываем "Дату" (параметр отбора) */
-      DREQDATE := TO_DATE(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DATE), 'YYYY-MM-DD');
+      DREQ_DATE := TO_DATE(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DATE), 'YYYY-MM-DD');
       /* Контроль индетификатора устройства по лицензии */
-      UTL_CHECK_DEVICEID(SDEVICEID => SREQDEVICEID);
+      UTL_CHECK_DEVICEID(SDEVICEID => SREQ_DEVICEID);
       /* Подготавливаем документ для ответа */
       UTL_CREATERESPONSEDOC(XDOC => XDOC);
       /* Создаём пространство имён для ответа */
@@ -619,10 +703,10 @@ create or replace package body UDO_PKG_EXS_INV as
                          DOCTYPES    DT
                    where T.COMPANY = 136018
                      and T.DOC_TYPE = DT.RN
-                     and (NREQTYPECODE is null or (NREQTYPECODE is not null and T.DOC_TYPE = NREQTYPECODE))
-                     and (SREQPREFIX is null or (SREQPREFIX is not null and trim(T.DOC_PREF) = SREQPREFIX))
-                     and (SREQNUMBER is null or (SREQNUMBER is not null and trim(T.DOC_NUMB) = SREQNUMBER))
-                     and (DREQDATE is null or (DREQDATE is not null and T.DOC_DATE = DREQDATE)))
+                     and (NREQ_TYPECODE is null or (NREQ_TYPECODE is not null and T.DOC_TYPE = NREQ_TYPECODE))
+                     and (SREQ_PREFIX is null or (SREQ_PREFIX is not null and trim(T.DOC_PREF) = SREQ_PREFIX))
+                     and (SREQ_NUMBER is null or (SREQ_NUMBER is not null and trim(T.DOC_NUMB) = SREQ_NUMBER))
+                     and (DREQ_DATE is null or (DREQ_DATE is not null and T.DOC_DATE = DREQ_DATE)))
       loop
         /* Собираем информацию по ведомости в ответ */
         XITEM     := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_ITEM, SNS => SNS_TSD);
@@ -674,7 +758,7 @@ create or replace package body UDO_PKG_EXS_INV as
     XGETSHEETITEMSRESPONSE  DBMS_XMLDOM.DOMNODE;     -- Корневой элемент ответа
     XNODE                   DBMS_XMLDOM.DOMNODE;     -- Буфер для ветки ответа
     XITEM                   DBMS_XMLDOM.DOMNODE;     -- Элемент ответного списка
-    XSTORAGEMNEMOCODE       DBMS_XMLDOM.DOMNODE;     -- Мнемокод местоположения для элемента ответного списка
+    XSTORAGEMNEMOCODE       DBMS_XMLDOM.DOMNODE;     -- Мнемокод местонахождения для элемента ответного списка
     XUSERCODE               DBMS_XMLDOM.DOMNODE;     -- МОЛ для элемента ответного списка
     XITEMCODE               DBMS_XMLDOM.DOMNODE;     -- Идентификатор ОС для элемента ответного списка
     XITEMNAME               DBMS_XMLDOM.DOMNODE;     -- Наименование ОС для элемента ответного списка
@@ -684,18 +768,18 @@ create or replace package body UDO_PKG_EXS_INV as
     XDOC                    DBMS_XMLDOM.DOMDOCUMENT; -- Документ
     XNODE_ROOT              DBMS_XMLDOM.DOMNODE;     -- Корневой элемент первой ветки тела документа
     CRESPONSE               clob;                    -- Буфер для ответа
-    SREQDEVICEID            PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
-    NREQSHEETCODE           PKG_STD.TREF;            -- Ведомость из запроса (параметр отбора)
+    SREQ_DEVICEID           PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
+    NREQ_SHEET_CODE         PKG_STD.TREF;            -- Ведомость из запроса (параметр отбора)
   begin
     begin
       /* Считываем корневой элемент тела посылки */
       UTL_EXSQUEUE_MSG_GET_BODY_ROOT(NEXSQUEUE => NEXSQUEUE, XNODE_ROOT => XNODE_ROOT);
       /* Считываем идентификатор устройства */
-      SREQDEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
+      SREQ_DEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
       /* Считываем "Регистрационный номер ведомости" (параметр отбора) */
-      NREQSHEETCODE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_SHEETCODE));
+      NREQ_SHEET_CODE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_SHEETCODE));
       /* Контроль индетификатора устройства по лицензии */
-      UTL_CHECK_DEVICEID(SDEVICEID => SREQDEVICEID);
+      UTL_CHECK_DEVICEID(SDEVICEID => SREQ_DEVICEID);
       /* Подготавливаем документ для ответа */
       UTL_CREATERESPONSEDOC(XDOC => XDOC);
       /* Создаём пространство имён для ответа */
@@ -705,13 +789,10 @@ create or replace package body UDO_PKG_EXS_INV as
                          T.COMPANY NCOMPANY,
                          T.BARCODE SBARCODE,
                          T.IS_LOADED NIS_LOADED,
-                         DECODE(T.INVPACK, null, O.PLACE_MNEMO, OP.PLACE_MNEMO) SSTORAGEMNEMOCODE,
-                         DECODE(T.INVPACK, null, O.BARCODE, OP.BARCODE) SOBARCODE,
+                         UTL_ELINVOBJECT_DICPLACE_GET(T.RN, SRESULT_TYPE_MNEMO) SSTORAGEMNEMOCODE,
+                         UTL_ELINVOBJECT_DICPLACE_GET(T.RN, SRESULT_TYPE_BARCODE) SOBARCODE,
                          T.INVPERSONS NINVPERSONS,
-                         DECODE(PS.RN,
-                                null,
-                                DECODE(T.INVPACK, null, DECODE(T.INVSUBST, null, I.BARCODE, U.BARCODE), P.BARCODE),
-                                PS.BARCODE) SIBARCODE,
+                         UTL_ELINVOBJECT_BARCODE_GET(T.RN) SIBARCODE,
                          N1.NOMEN_CODE SNOM_CODE,
                          N1.NOMEN_NAME SNOM_NAME,
                          I.INV_NUMBER SINV_NUMBER,
@@ -725,7 +806,7 @@ create or replace package body UDO_PKG_EXS_INV as
                          INVSUBST    U,
                          DICNOMNS    N1
                    where T.COMPANY = 136018
-                     and T.PRN = NREQSHEETCODE
+                     and T.PRN = NREQ_SHEET_CODE
                      and T.INVENTORY = I.RN
                      and I.OBJECT_PLACE = O.RN(+)
                      and T.INVPACK = P.RN(+)
@@ -761,10 +842,7 @@ create or replace package body UDO_PKG_EXS_INV as
                                             STAG => STAG_ITEMNUMBER,
                                             SNS  => SNS_TSD,
                                             SVAL => trim(REC.SINV_NUMBER));
-        XQUANTITY         := UTL_CREATENODE(XDOC => XDOC,
-                                            STAG => STAG_QUANTITY,
-                                            SNS  => SNS_TSD,
-                                            SVAL => REC.SQUANTITY);
+        XQUANTITY         := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_QUANTITY, SNS => SNS_TSD, SVAL => REC.SQUANTITY);
         XNODE             := DBMS_XMLDOM.APPENDCHILD(N => XITEM, NEWCHILD => XSTORAGEMNEMOCODE);
         XNODE             := DBMS_XMLDOM.APPENDCHILD(N => XITEM, NEWCHILD => XUSERCODE);
         XNODE             := DBMS_XMLDOM.APPENDCHILD(N => XITEM, NEWCHILD => XITEMCODE);
@@ -799,7 +877,7 @@ create or replace package body UDO_PKG_EXS_INV as
       PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end GETSHEETITEMS;
   
-  /* Электронная инвентаризация - считывание мест хранения */
+  /* Электронная инвентаризация - считывание местонахождений */
   procedure GETSTORAGES
   (
     NIDENT                  in number,               -- Идентификатор процесса
@@ -811,35 +889,35 @@ create or replace package body UDO_PKG_EXS_INV as
     XITEM                   DBMS_XMLDOM.DOMNODE;     -- Элемент ответного списка
     XCODE                   DBMS_XMLDOM.DOMNODE;     -- Код элемента ответного списка
     XNAME                   DBMS_XMLDOM.DOMNODE;     -- Нименование элемента ответного списка
-    XMNEMOCODE              DBMS_XMLDOM.DOMNODE;     -- Мнемокод местоположения для элемента ответного списка
-    XLATITUDE               DBMS_XMLDOM.DOMNODE;     -- Широта местоположения для элемента ответного списка
-    XLONGITUDE              DBMS_XMLDOM.DOMNODE;     -- Долгота местоположения для элемента ответного списка
-    XPOSTCODE               DBMS_XMLDOM.DOMNODE;     -- Почтовый индекс местоположения для элемента ответного списка
-    XCOUNTRY                DBMS_XMLDOM.DOMNODE;     -- Страна местоположения для элемента ответного списка
-    XREGION                 DBMS_XMLDOM.DOMNODE;     -- Регион местоположения для элемента ответного списка
-    XLOCALITY               DBMS_XMLDOM.DOMNODE;     -- Населённый пункт местоположения для элемента ответного списка
-    XSTREET                 DBMS_XMLDOM.DOMNODE;     -- Улица местоположения для элемента ответного списка
-    XHOUSENUMBER            DBMS_XMLDOM.DOMNODE;     -- Номер дома местоположения для элемента ответного списка
+    XMNEMOCODE              DBMS_XMLDOM.DOMNODE;     -- Мнемокод местонахождения для элемента ответного списка
+    XLATITUDE               DBMS_XMLDOM.DOMNODE;     -- Широта местонахождения для элемента ответного списка
+    XLONGITUDE              DBMS_XMLDOM.DOMNODE;     -- Долгота местонахождения для элемента ответного списка
+    XPOSTCODE               DBMS_XMLDOM.DOMNODE;     -- Почтовый индекс местонахождения для элемента ответного списка
+    XCOUNTRY                DBMS_XMLDOM.DOMNODE;     -- Страна местонахождения для элемента ответного списка
+    XREGION                 DBMS_XMLDOM.DOMNODE;     -- Регион местонахождения для элемента ответного списка
+    XLOCALITY               DBMS_XMLDOM.DOMNODE;     -- Населённый пункт местонахождения для элемента ответного списка
+    XSTREET                 DBMS_XMLDOM.DOMNODE;     -- Улица местонахождения для элемента ответного списка
+    XHOUSENUMBER            DBMS_XMLDOM.DOMNODE;     -- Номер дома местонахождения для элемента ответного списка
     XDOC                    DBMS_XMLDOM.DOMDOCUMENT; -- Документ
     XNODE_ROOT              DBMS_XMLDOM.DOMNODE;     -- Корневой элемент первой ветки тела документа
     CRESPONSE               clob;                    -- Буфер для ответа
-    SREQDEVICEID            PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
-    NREQSHEETCODE           PKG_STD.TREF;            -- Ведомость из запроса (параметр отбора)
+    SREQ_DEVICEID           PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
+    NREQ_SHEET_CODE         PKG_STD.TREF;            -- Ведомость из запроса (параметр отбора)
   begin
     begin
       /* Считываем корневой элемент тела посылки */
       UTL_EXSQUEUE_MSG_GET_BODY_ROOT(NEXSQUEUE => NEXSQUEUE, XNODE_ROOT => XNODE_ROOT);
       /* Считываем идентификатор устройства */
-      SREQDEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
+      SREQ_DEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
       /* Считываем "Регистрационный номер ведомости" (параметр отбора) */
-      NREQSHEETCODE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_SHEETCODE));
+      NREQ_SHEET_CODE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_SHEETCODE));
       /* Контроль индетификатора устройства по лицензии */
-      UTL_CHECK_DEVICEID(SDEVICEID => SREQDEVICEID);
+      UTL_CHECK_DEVICEID(SDEVICEID => SREQ_DEVICEID);
       /* Подготавливаем документ для ответа */
       UTL_CREATERESPONSEDOC(XDOC => XDOC);
       /* Создаём пространство имён для ответа */
       XGETSTORAGESRESPONSE := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_GETSTORAGESRSPNS, SNS => SNS_TSD);
-      /* Обходим места хранения */
+      /* Обходим местонахождения */
       for REC in (select T.RN NRN,
                          T.PLACE_MNEMO SMNEMOCODE,
                          T.PLACE_NAME SNAME,
@@ -858,17 +936,17 @@ create or replace package body UDO_PKG_EXS_INV as
                          GEOGRAFY G
                    where T.COMPANY = 136018
                      and T.GEOGRAFY = G.RN(+)
-                     and ((NREQSHEETCODE is null) or
-                         ((NREQSHEETCODE is not null) and
+                     and ((NREQ_SHEET_CODE is null) or
+                         ((NREQ_SHEET_CODE is not null) and
                          (T.RN in (select DECODE(EO.INVPACK, null, INV.OBJECT_PLACE, P.OBJECT_PLACE)
                                        from ELINVOBJECT EO,
                                             INVENTORY   INV,
                                             INVPACK     P
-                                      where EO.PRN = NREQSHEETCODE
+                                      where EO.PRN = NREQ_SHEET_CODE
                                         and EO.INVENTORY = INV.RN
                                         and EO.INVPACK = P.RN(+))))))
       loop
-        /* Собираем информацию по месту хранения в ответ */
+        /* Собираем информацию по местонахождению в ответ */
         XITEM        := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_ITEM, SNS => SNS_TSD);
         XCODE        := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_CODE, SNS => SNS_TSD, SVAL => REC.SBARCODE);
         XNAME        := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_NAME, SNS => SNS_TSD, SVAL => REC.SNAME);
@@ -914,7 +992,7 @@ create or replace package body UDO_PKG_EXS_INV as
       PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end GETSTORAGES;
 
-  /* Электронная инвентаризация - сохранение результатов инвентаризации */
+  /* Электронная инвентаризация - сохранение результатов инвентаризации элемента хранения */
   procedure SAVESHEETITEM
   (
     NIDENT                  in number,               -- Идентификатор процесса
@@ -927,205 +1005,448 @@ create or replace package body UDO_PKG_EXS_INV as
     XDOC                    DBMS_XMLDOM.DOMDOCUMENT; -- Документ
     XNODE_ROOT              DBMS_XMLDOM.DOMNODE;     -- Корневой элемент первой ветки тела документа
     CRESPONSE               clob;                    -- Буфер для ответа
-    SREQDEVICEID            PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
-    NREQSHEETCODE           PKG_STD.TREF;            -- Ведомость из запроса (параметр сохранения)
-    NREQUSERCODE            PKG_STD.TREF;            -- Регистрационный номер МОЛ из запроса (параметр сохранения)
-    SREQSTORAGEMNEMOCODE    PKG_STD.TSTRING;         -- Мнемокод места хранения из запроса (параметр сохранения)
-    NREQSTORAGEISNEW        PKG_STD.TNUMBER;         -- Признак нового места хранения из запроса (параметр сохранения)    
-    SREQSTORAGECODE         PKG_STD.TSTRING;         -- Штрих-код места хранения из запроса (параметр сохранения)
-    SREQSTORAGENAME         PKG_STD.TSTRING;         -- Наименование места хранения из запроса (параметр сохранения)
-    SREQSTORAGEPOSTCODE     PKG_STD.TSTRING;         -- Почтовый индекс места хранения из запроса (параметр сохранения)    
-    SREQSTORAGECOUNTRY      PKG_STD.TSTRING;         -- Страна места хранения из запроса (параметр сохранения)    
-    SREQSTORAGEREGION       PKG_STD.TSTRING;         -- Регион места хранения из запроса (параметр сохранения)    
-    SREQSTORAGELOCALITY     PKG_STD.TSTRING;         -- Населенный пункт места хранения из запроса (параметр сохранения)    
-    SREQSTORAGESTREET       PKG_STD.TSTRING;         -- Улица места хранения из запроса (параметр сохранения)    
-    SREQSTORAGEHOUSENUMBER  PKG_STD.TSTRING;         -- Номер дома места хранения из запроса (параметр сохранения)    
-    NREQSTORAGELATITUDE     PKG_STD.TLNUMBER;        -- Широта места хранения из запроса (параметр сохранения)    
-    NREQSTORAGELONGITUDE    PKG_STD.TLNUMBER;        -- Долгота места хранения из запроса (параметр сохранения) 
-    SREQITEMCODE            PKG_STD.TSTRING;         -- Штрих-код ОС из запроса (параметр сохранения)  
-    SREQITEMNAME            PKG_STD.TSTRING;         -- Наименование номенклатуры ОС из запроса (параметр сохранения)
-    SREQITEMMNEMOCODE       PKG_STD.TSTRING;         -- Мнемокод номенклатуры ОС из запроса (параметр сохранения)
-    SREQITEMNUMBER          PKG_STD.TSTRING;         -- Инвентарный номер ОС из запроса (параметр сохранения)
-    NREQQUANTITY            PKG_STD.TQUANT;          -- Количество ОС из запроса (параметр сохранения)    
-    DREQCHECKDATE           PKG_STD.TLDATE;          -- Дата проведения инвентаризации ОС из запроса (параметр сохранения)  
-    SREQCOMMENT             PKG_STD.TLSTRING;        -- Комментарий МОЛ ОС из запроса (параметр сохранения)
-    NREQLATITUDE            PKG_STD.TLNUMBER;        -- Широта ОС из запроса (параметр сохранения) 
-    NREQLONGITUDE           PKG_STD.TLNUMBER;        -- Долгота ОС из запроса (параметр сохранения)    
-    NREQDISTANCETOSTORAGE   PKG_STD.TLNUMBER;        -- Расстояние до места хранения ОС из запроса (параметр сохранения)    
-    SREQFLOOR               PKG_STD.TSTRING;         -- Этаж расположения ОС из запроса (параметр сохранения)
-    SREQROOM                PKG_STD.TSTRING;         -- Помещение расположения ОС из запроса (параметр сохранения)
-    SREQRACK                PKG_STD.TSTRING;         -- Стеллаж расположения ОС из запроса (параметр сохранения)
+    SREQ_DEVICEID           PKG_STD.TSTRING;         -- Идентификатор устройства из запроса
+    NREQ_SHEET_CODE         PKG_STD.TREF;            -- Ведомость из запроса (параметр сохранения)
+    NREQ_USER_CODE          PKG_STD.TREF;            -- Регистрационный номер МОЛ из запроса (параметр сохранения)
+    SREQ_STORAGE_MNEMOCODE  PKG_STD.TSTRING;         -- Мнемокод местонахождения из запроса (параметр сохранения)
+    NREQ_STORAGE_ISNEW      PKG_STD.TNUMBER;         -- Признак нового местонахождения из запроса (параметр сохранения)    
+    SREQ_STORAGE_CODE       PKG_STD.TSTRING;         -- Штрих-код местонахождения из запроса (параметр сохранения)
+    SREQ_STORAGE_NAME       PKG_STD.TSTRING;         -- Наименование местонахождения из запроса (параметр сохранения)
+    SREQ_STORAGE_POSTCODE   PKG_STD.TSTRING;         -- Почтовый индекс местонахождения из запроса (параметр сохранения)    
+    SREQ_STORAGE_COUNTRY    PKG_STD.TSTRING;         -- Страна местонахождения из запроса (параметр сохранения)    
+    SREQ_STORAGE_REGION     PKG_STD.TSTRING;         -- Регион местонахождения из запроса (параметр сохранения)    
+    SREQ_STORAGE_LOCALITY   PKG_STD.TSTRING;         -- Населенный пункт местонахождения из запроса (параметр сохранения)    
+    SREQ_STORAGE_STREET     PKG_STD.TSTRING;         -- Улица местонахождения из запроса (параметр сохранения)    
+    SREQ_STORAGE_HOUSE      PKG_STD.TSTRING;         -- Номер дома местонахождения из запроса (параметр сохранения)    
+    SREQ_STORAGE_LATITUDE   PKG_STD.TSTRING;         -- Широта местонахождения из запроса (параметр сохранения)    
+    SREQ_STORAGE_LONGITUDE  PKG_STD.TSTRING;         -- Долгота местонахождения из запроса (параметр сохранения) 
+    SREQ_ITEM_CODE          PKG_STD.TSTRING;         -- Штрих-код ОС из запроса (параметр сохранения)  
+    SREQ_ITEM_NAME          PKG_STD.TSTRING;         -- Наименование номенклатуры ОС из запроса (параметр сохранения)
+    SREQ_ITEM_MNEMOCODE     PKG_STD.TSTRING;         -- Мнемокод номенклатуры ОС из запроса (параметр сохранения)
+    SREQ_ITEM_NUMBER        PKG_STD.TSTRING;         -- Инвентарный номер ОС из запроса (параметр сохранения)
+    NREQ_ITEM_QUANTITY      PKG_STD.TQUANT;          -- Количество ОС из запроса (параметр сохранения)    
+    DREQ_ITEM_CHECKDATE     PKG_STD.TLDATE;          -- Дата проведения инвентаризации ОС из запроса (параметр сохранения)  
+    SREQ_ITEM_COMMENT       PKG_STD.TLSTRING;        -- Комментарий МОЛ ОС из запроса (параметр сохранения)
+    SREQ_ITEM_LATITUDE      PKG_STD.TSTRING;         -- Широта ОС из запроса (параметр сохранения) 
+    SREQ_ITEM_LONGITUDE     PKG_STD.TSTRING;         -- Долгота ОС из запроса (параметр сохранения)    
+    NREQ_ITEM_DISTANCE      PKG_STD.TLNUMBER;        -- Расстояние до местонахождения ОС из запроса (параметр сохранения)    
+    RELINVENTORY            ELINVENTORY%rowtype;     -- Запись модифицируемой ведомости инвентаризации
     NELINVOBJECT            PKG_STD.TREF;            -- Рег. номер позиции ведомости инвентаризации
-    SDICPLACEBARCODE        PKG_STD.TSTRING;         -- Штрих-код места хранения gсогласно ведомости
-    NINVENTORY              PKG_STD.TREF;            -- Рег. номер ОС (карточки "Инвентарной картотеки")
-    NCOMPANY                PKG_STD.TREF;            -- Рег. номер организации
-    NPROPERTY               PKG_STD.TREF;            -- Рег. номер ДС позиции ведомости инвентаризации для хранения комментария
-    NTMP                    PKG_STD.TREF;            -- Буфер для рег. номеров
-  begin
+    SDICPLACE_BARCODE       PKG_STD.TSTRING;         -- Штрих-код местонахождения ОС (для позиции ведомости инвентаризации)
+
+    /* Поиск географического понятия по параметрам */
+    function FIND_GEOGRAFY
+    (
+      NCOMPANY              in number,    -- Рег. номер организации
+      SADDR_COUNTRY         in varchar2,  -- Страна местонахождения
+      SADDR_REGION          in varchar2,  -- Регион местонахождения
+      SADDR_LOCALITY        in varchar2,  -- Населённый пункт местонахождения
+      SADDR_STREET          in varchar2   -- Улица местонахождения
+    ) return                number        -- Географическое понятие
+    is
+      NRES                  PKG_STD.TREF; -- Рег. номер найденного географического понятия
+      NVERSION              PKG_STD.TREF; -- Рег. номер версии словаря географических понятий
     begin
-      /* Инициализируем организацию */
-      NCOMPANY := 136018;
-      /* Инициализируем ДС для хранения примечания */
-      FIND_DOCS_PROPS_CODE(NFLAG_SMART => 0, NCOMPANY => NCOMPANY, SCODE => 'COMMENT', NRN => NPROPERTY);
-      /* Считываем корневой элемент тела посылки */
-      UTL_EXSQUEUE_MSG_GET_BODY_ROOT(NEXSQUEUE => NEXSQUEUE, XNODE_ROOT => XNODE_ROOT);
-      /* Считываем идентификатор устройства */
-      SREQDEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
-      /* Считываем "Регистрационный номер ведомости" (параметр сохранения) */
-      NREQSHEETCODE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_SHEETCODE));
-      /* Считываем "Регистрационный номер МОЛ" (параметр сохранения) */
-      NREQUSERCODE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_USERCODE));
-      /* Считываем "Мнемокод места хранения" (параметр сохранения) */
-      SREQSTORAGEMNEMOCODE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGEMNEMOCODE);
-      /* Считываем "Признак нового места хранения" (параметр сохранения) */
-      NREQSTORAGEISNEW := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGEISNEW));
-      /* Считываем "Штрих-код места хранения" (параметр сохранения) */
-      SREQSTORAGECODE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGECODE);
-      /* Считываем "Наименование места хранения" (параметр сохранения) */
-      SREQSTORAGENAME := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGENAME);
-      /* Считываем "Почтовый индекс места хранения" (параметр сохранения) */
-      SREQSTORAGEPOSTCODE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGEPOSTCODE);
-      /* Считываем "Страна места хранения" (параметр сохранения) */
-      SREQSTORAGECOUNTRY := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGECOUNTRY);
-      /* Считываем "Регион места хранения" (параметр сохранения) */
-      SREQSTORAGEREGION := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGEREGION);
-      /* Считываем "Населенный пункт места хранения" (параметр сохранения) */
-      SREQSTORAGELOCALITY := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGELOCALITY);
-      /* Считываем "Улица места хранения" (параметр сохранения) */
-      SREQSTORAGESTREET := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGESTREET);
-      /* Считываем "Номер дома места хранения" (параметр сохранения) */
-      SREQSTORAGEHOUSENUMBER := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGEHOUSENUMBER);
-      /* Считываем "Широта места хранения" (параметр сохранения) */
-      NREQSTORAGELATITUDE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGELATITUDE));
-      /* Считываем "Долгота места хранения" (параметр сохранения) */
-      NREQSTORAGELONGITUDE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGELONGITUDE));
-      /* Считываем "Штрих-код ОС" (параметр сохранения) */
-      SREQITEMCODE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_ITEMCODE);
-      /* Считываем "Наименование номенклатуры ОС" (параметр сохранения) */
-      SREQITEMNAME := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_ITEMNAME);
-      /* Считываем "Мнемокод номенклатуры ОС" (параметр сохранения) */
-      SREQITEMMNEMOCODE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_ITEMMNEMOCODE);
-      /* Считываем "Инвентарный номер ОС" (параметр сохранения) */
-      SREQITEMNUMBER := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_ITEMNUMBER);
-      /* Считываем "Количество ОС" (параметр сохранения) */
-      NREQQUANTITY := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_QUANTITY));
-      /* Считываем "Дата проведения инвентаризации ОС" (параметр сохранения) */
-      DREQCHECKDATE := TO_DATE(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_CHECKDATE),
-                               'YYYY-MM-DD"T"HH24:MI:SS');
-      /* Считываем "Комментарий МОЛ ОС" (параметр сохранения) */
-      SREQCOMMENT := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_COMMENT);
-      /* Считываем "Широта ОС" (параметр сохранения) */
-      NREQLATITUDE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_LATITUDE));
-      /* Считываем "Долгота ОС" (параметр сохранения) */
-      NREQLONGITUDE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_LONGITUDE));
-      /* Считываем "Расстояние до места хранения ОС" (параметр сохранения) */
-      NREQDISTANCETOSTORAGE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DISTANCETOSTORAGE));
-      /* Считываем "Этаж расположения ОС" (параметр сохранения) */
-      SREQFLOOR := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_FLOOR);
-      /* Считываем "Помещение расположения ОС" (параметр сохранения) */
-      SREQROOM := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_ROOM);
-      /* Считываем "Стеллаж расположения ОС" (параметр сохранения) */
-      SREQRACK := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_RACK);
-      /* Контроль индетификатора устройства по лицензии */
-      UTL_CHECK_DEVICEID(SDEVICEID => SREQDEVICEID);
-      /* Подготавливаем документ для ответа */
-      UTL_CREATERESPONSEDOC(XDOC => XDOC);
-      /* Работаем только если указан регистрационный номер ведомости */
-      if (NREQSHEETCODE is not null) then
-        /*
-        TODO: owner="root" created="14.01.2019"
-        text="Понять зачем мы это делаем (дальше результаты проверки не идут).
-              Надо реализовать добавление нового местонахождения + смену текущего"
-        */
-        /* Если задан штрих-код местанхождения ОС */
-        if (SREQSTORAGECODE is not null) then
-          /* Проверяем наличие местонахохждения */
+      /* Определим версию словаря географических понятий */
+      FIND_VERSION_BY_COMPANY(NCOMPANY => NCOMPANY, SUNITCODE => 'GEOGRAFY', NVERSION => NVERSION);
+      /* Подберем географическое понятие */
+      begin
+        select G.RN
+          into NRES
+          from GEOGRAFY G
+         where G.VERSION = NVERSION
+           and G.FULLNAME like SADDR_COUNTRY || '%' || SADDR_REGION || '%' || SADDR_LOCALITY || '%' || SADDR_STREET
+           and ROWNUM <= 1;
+      exception
+        when NO_DATA_FOUND then
+          NRES := null;
+      end;
+      /* Вернём результат */
+      return NRES;
+    end FIND_GEOGRAFY;
+    
+    /* Обработка местонахождения - поиск и при необходимости добавление местонахождения ОС */
+    procedure PROCESS_DICPLACE
+    (
+      NCOMPANY              in number,    -- Рег. номер организации
+      NIS_NEW               in number,    -- Признак нового метонахождения (0 - старое, 1 - новое)
+      SMNEMO                in varchar2,  -- Мнемокод местонахождения
+      SNAME                 in varchar2,  -- Наименование местонахождения
+      SBARCODE              in varchar2,  -- Штарих-код местонахождения
+      SADDR_POSTCODE        in varchar2,  -- Почтовый индекс местонахождения
+      SADDR_COUNTRY         in varchar2,  -- Страна местонахождения
+      SADDR_REGION          in varchar2,  -- Регион местонахождения
+      SADDR_LOCALITY        in varchar2,  -- Населённый пункт местонахождения
+      SADDR_STREET          in varchar2,  -- Улица местонахождения
+      SADDR_HOUSE           in varchar2,  -- Дом местонахождения
+      SLATITUDE             in varchar2,  -- Широта местонахождения
+      SLONGITUDE            in varchar2,  -- Долгота местонахождения
+      SDICPLACE_BARCODE     out varchar2  -- Штрихкод обработанного мемстонахождения
+    )
+    is
+      NPROP_LATITUDE        PKG_STD.TREF; -- Рег. номер ДС для хранения широты местонахождения
+      NPROP_LONGITUDE       PKG_STD.TREF; -- Рег. номер ДС для хранения долготы местонахождения      
+      NDICPLACE             PKG_STD.TREF; -- Рег. номер местонахождения
+      NDICPLACE_CRN         PKG_STD.TREF; -- Рег. номер каталога местонахождения
+      NTMP                  PKG_STD.TREF; -- Буфер для рег. номеров      
+    begin
+      /* Инициализируем ДС для хранения широты */
+      FIND_DOCS_PROPS_CODE(NFLAG_SMART => 0, NCOMPANY => NCOMPANY, SCODE => 'LATITUDE', NRN => NPROP_LATITUDE);
+      /* Инициализируем ДС для хранения долготы */
+      FIND_DOCS_PROPS_CODE(NFLAG_SMART => 0, NCOMPANY => NCOMPANY, SCODE => 'LONGITUDE', NRN => NPROP_LONGITUDE);
+      /* Проверяем наличие местонахождения по переданному штрихкоду */
+      begin
+        select T.RN
+          into NDICPLACE
+          from DICPLACE T
+         where T.COMPANY = NCOMPANY
+           and T.BARCODE = SBARCODE;
+      exception
+        when NO_DATA_FOUND then
+          /* Пробуем найти по мнемокоду */
           begin
-            select T.BARCODE
-              into SDICPLACEBARCODE
+            select T.RN
+              into NDICPLACE
               from DICPLACE T
              where T.COMPANY = NCOMPANY
-               and T.BARCODE = SREQSTORAGECODE;
+               and T.PLACE_MNEMO = SMNEMO;
           exception
             when NO_DATA_FOUND then
-              P_EXCEPTION(0,
-                          'Местонахождение инвентарных объектов с штрих-кодом "%s" не найдено',
-                          SREQSTORAGECODE);
+              /* Нашли, но если это новое - добавляем */
+              if (NIS_NEW = 1) then
+                /* Определим каталог размещения */
+                FIND_ROOT_CATALOG(NCOMPANY => NCOMPANY, SCODE => 'ObjPlace', NCRN => NDICPLACE_CRN);
+                /* Добавим запись */
+                P_DICPLACE_BASE_INSERT(NCOMPANY        => NCOMPANY,
+                                       NCRN            => NDICPLACE_CRN,
+                                       SMNEMO          => SMNEMO,
+                                       SNAME           => SNAME,
+                                       SBARCODE        => NVL(SBARCODE, GEN_BARCODE_EX()),
+                                       DLABEL_DATE     => sysdate,
+                                       SCAD_NUMB       => null,
+                                       NGEOGRAFY       => null,
+                                       SADDR_HOUSE     => SADDR_HOUSE,
+                                       SADDR_BLOCK     => null,
+                                       SADDR_BUILDING  => null,
+                                       SADDR_FLAT      => null,
+                                       SADDR_POST      => SADDR_POSTCODE,
+                                       SPLACE_DESCRIPT => null,
+                                       NRN             => NDICPLACE);
+              else
+                P_EXCEPTION(0,
+                            'Местонахождение инвентарных объектов с штрих-кодом "%s" или мнемокодом "%s" не найдено.',
+                            NVL(SBARCODE, '<НЕ УКАЗАН>'),
+                            NVL(SMNEMO, '<НЕ УКАЗАН>'));
+              end if;
           end;
-        end if;
-        /* Пробуем найти позицию ведомости инвентаризации по штрих-коду (если передан рег. номер ведомости и пока нет ошибок) */
-        if (NREQSHEETCODE is not null) then
+        when TOO_MANY_ROWS then
+          P_EXCEPTION(0,
+                      'Местонахождение инвентарных объектов с штрих-кодом "%s" определено неоднозначно.',
+                      SBARCODE);
+      end;
+      /* Проверим что нашли местонахождение */
+      if (NDICPLACE is null) then
+        P_EXCEPTION(0,
+                    'Не удалось определить фактическое местонахождение по штрихкоду "%s" и мнемокоду "%s".',
+                    NVL(SBARCODE, '<НЕ УКАЗАН>'),
+                    NVL(SMNEMO, '<НЕ УКАЗАН>'));
+      end if;
+      /* Актуализируем его */
+      for C in (select T.* from DICPLACE T where T.RN = NDICPLACE)
+      loop
+        /* Актуализируем запись */
+        P_DICPLACE_BASE_UPDATE(NCOMPANY        => C.COMPANY,
+                               NRN             => C.RN,
+                               SMNEMO          => NVL(SMNEMO, C.PLACE_MNEMO),
+                               SNAME           => NVL(SNAME, C.PLACE_NAME),
+                               SBARCODE        => NVL(SBARCODE, C.BARCODE),
+                               DLABEL_DATE     => NVL(C.LABEL_DATE, sysdate),
+                               SCAD_NUMB       => C.CAD_NUMB,
+                               NGEOGRAFY       => FIND_GEOGRAFY(NCOMPANY       => C.COMPANY,
+                                                                SADDR_COUNTRY  => SADDR_COUNTRY,
+                                                                SADDR_REGION   => SADDR_REGION,
+                                                                SADDR_LOCALITY => SADDR_LOCALITY,
+                                                                SADDR_STREET   => SADDR_STREET),
+                               SADDR_HOUSE     => SADDR_HOUSE,
+                               SADDR_BLOCK     => C.ADDR_BLOCK,
+                               SADDR_BUILDING  => C.ADDR_BUILDING,
+                               SADDR_FLAT      => C.ADDR_FLAT,
+                               SADDR_POST      => SADDR_POSTCODE,
+                               SPLACE_DESCRIPT => C.PLACE_DESCRIPT);
+        /* Выставим ДС с широтой */
+        P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => C.RN,
+                                      SUNITCODE   => 'ObjPlace',
+                                      NPROPERTY   => NPROP_LATITUDE,
+                                      SSTR_VALUE  => SLATITUDE,
+                                      NNUM_VALUE  => null,
+                                      DDATE_VALUE => null,
+                                      NRN         => NTMP);
+        /* Выставим ДС с долготой */
+        P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => C.RN,
+                                      SUNITCODE   => 'ObjPlace',
+                                      NPROPERTY   => NPROP_LONGITUDE,
+                                      SSTR_VALUE  => SLONGITUDE,
+                                      NNUM_VALUE  => null,
+                                      DDATE_VALUE => null,
+                                      NRN         => NTMP);
+      end loop;
+      /* Аккуратно считываем штрих-код местонахождения */
+      begin
+        select T.BARCODE into SDICPLACE_BARCODE from DICPLACE T where T.RN = NDICPLACE;
+      exception
+        when NO_DATA_FOUND then
+          PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NDICPLACE, SUNIT_TABLE => 'DICPLACE');
+      end;
+    end PROCESS_DICPLACE;
+    
+    /* Обрабатываем ОС - поиск и при необходимости добавление позиции ведомости инвентаризации с импортируемым ОС */
+    procedure PROCESS_INVENTORY
+    (
+      RELINVENTORY          in ELINVENTORY%rowtype, -- Запись обрабатываемой ведомости
+      SBARCODE              in varchar2,            -- Штрих-код ОС
+      NELINVOBJECT          out number              -- Рег. номер позиции ведомости инвентаризации
+    )
+    is
+      NINVENTORY            PKG_STD.TREF;           -- Рег. номер ОС (карточки "Инвентарной картотеки")    
+    begin
+      /* Ищем позицию ведомости по штрих-коду ОС */
+      begin
+        select T.RN
+          into NELINVOBJECT
+          from ELINVOBJECT T
+         where T.COMPANY = RELINVENTORY.COMPANY
+           and T.PRN = RELINVENTORY.RN
+           and UTL_ELINVOBJECT_BARCODE_GET(T.RN) = SBARCODE;
+      exception
+        when NO_DATA_FOUND then
+          /* Не нашли позицию ведомости инвентаризации */
           begin
-            select T.NRN
-              into NELINVOBJECT
-              from V_ELINVOBJECT T
-             where T.NCOMPANY = NCOMPANY
-               and T.NPRN = NREQSHEETCODE
-               and T.SIBARCODE = SREQITEMCODE;
-          exception
-            when NO_DATA_FOUND then
-              /* Ищем рег. номер ИК по штрихкоду, если не нашли позицию ведомости инвентаризации */
-              begin
-                select T.RN
-                  into NINVENTORY
-                  from INVENTORY T
-                 where T.BARCODE = SREQITEMCODE
-                   and T.COMPANY = NCOMPANY;
-              exception
-                when NO_DATA_FOUND then
-                  P_EXCEPTION(0,
-                              'Инвентарная карточка с штрих-кодом "%s" не найдена',
-                              SREQITEMCODE);
-              end;
-          end;
-        end if;
-        /* И у нас есть штрихкод фактического местонахождения */
-        if (SDICPLACEBARCODE is not null) then
-          /* Если позиция ведомости инвентаризации найдена */
-          if (NELINVOBJECT is not null) then
-            /* Обновим её */
-            for C in (select T.* from ELINVOBJECT T where T.RN = NELINVOBJECT)
-            loop
-              P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => C.RN,
-                                            SUNITCODE   => 'ElectronicInventoriesObjects',
-                                            NPROPERTY   => NPROPERTY,
-                                            SSTR_VALUE  => SREQCOMMENT,
-                                            NNUM_VALUE  => null,
-                                            DDATE_VALUE => null,
-                                            NRN         => NTMP);
-              P_ELINVOBJECT_BASE_UPDATE(NCOMPANY     => C.COMPANY,
-                                        NRN          => C.RN,
-                                        DUNLOAD_DATE => C.UNLOAD_DATE,
-                                        DINV_DATE    => NVL(DREQCHECKDATE, sysdate),
-                                        NINVPERSONS  => NREQUSERCODE,
-                                        SBARCODE     => SDICPLACEBARCODE,
-                                        NIS_LOADED   => C.IS_LOADED);
-            end loop;
-          else
-            /* Или добавим в ведомость найденную ИК если не нашли позицию ведомости по штрих-коду */
-            P_ELINVOBJECT_BASE_INSERT(NCOMPANY     => NCOMPANY,
-                                      NPRN         => NREQSHEETCODE,
+            /* Ищем рег. номер ИК по штрих-коду */
+            select T.RN
+              into NINVENTORY
+              from INVENTORY T
+             where T.BARCODE = SBARCODE
+               and T.COMPANY = RELINVENTORY.COMPANY;
+            /* Добавляем её в ведомость инвентаризации */
+            P_ELINVOBJECT_BASE_INSERT(NCOMPANY     => RELINVENTORY.COMPANY,
+                                      NPRN         => RELINVENTORY.RN,
                                       NINVENTORY   => NINVENTORY,
                                       NINVSUBST    => null,
                                       NINVPACK     => null,
                                       DUNLOAD_DATE => null,
-                                      DINV_DATE    => DREQCHECKDATE,
-                                      NINVPERSONS  => NREQUSERCODE,
-                                      SBARCODE     => SDICPLACEBARCODE,
+                                      DINV_DATE    => null,
+                                      NINVPERSONS  => null,
+                                      SBARCODE     => null,
                                       NIS_LOADED   => 1,
                                       NRN          => NELINVOBJECT);
-            P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => NELINVOBJECT,
-                                          SUNITCODE   => 'ElectronicInventoriesObjects',
-                                          NPROPERTY   => NPROPERTY,
-                                          SSTR_VALUE  => SREQCOMMENT,
-                                          NNUM_VALUE  => null,
-                                          DDATE_VALUE => null,
-                                          NRN         => NTMP);
-          end if;
-        else
-          P_EXCEPTION(0,
-                      'Не удалось определить фактическое местонахождение');
-        end if;
+          exception
+            when NO_DATA_FOUND then
+              P_EXCEPTION(0,
+                          'Инвентарная карточка с штрих-кодом "%s" не найдена.',
+                          SBARCODE);
+          end;
+      end;
+    end PROCESS_INVENTORY;
+    
+    /* Обрабатываем элемент ведомости */
+    procedure PROCESS_ELINVOBJECT
+    (
+      RELINVENTORY          in ELINVENTORY%rowtype, -- Запись обрабатываемой ведомости
+      NELINVOBJECT          in number,              -- Рег. номер элемента ведомости инвентаризации
+      NINVPERSONS           in number,              -- Рег. номер инвентаризирующего лица
+      DINV_DATE             in date,                -- Дата проведения инвентаризации
+      SBARCODE              in varchar2,            -- Штрих-код местонахождения
+      SITEM_COMMENT         in varchar2,            -- Комментарий инвентаризирующего лица
+      NITEM_DISTANCE        in number,              -- Расстояние ОС до местонахождения
+      SITEM_LATITUDE        in varchar2,            -- Широта ОС
+      SITEM_LONGITUDE       in varchar2,            -- Долгота ОС
+      NITEM_QUANTITY        in number               -- Количество ОС
+    )
+    is
+      NPROP_COMMENT         PKG_STD.TREF;           -- Рег. номер ДС для хранения комментария
+      NPROP_DISTANCE        PKG_STD.TREF;           -- Рег. номер ДС для хранения расстояния до местонахождения (метров)
+      NPROP_LATITUDE        PKG_STD.TREF;           -- Рег. номер ДС для хранения широты
+      NPROP_LONGITUDE       PKG_STD.TREF;           -- Рег. номер ДС для хранения долготы
+      NPROP_QUANTITY        PKG_STD.TREF;           -- Рег. номер ДС для хранения количества
+      NTMP                  PKG_STD.TREF;           -- Буфер для рег. номеров
+    begin
+      /* Инициализируем ДС для хранения примечания */
+      FIND_DOCS_PROPS_CODE(NFLAG_SMART => 0,
+                           NCOMPANY    => RELINVENTORY.COMPANY,
+                           SCODE       => 'COMMENT',
+                           NRN         => NPROP_COMMENT);
+      /* Инициализируем ДС для хранения расстояния до местонахождения */
+      FIND_DOCS_PROPS_CODE(NFLAG_SMART => 0,
+                           NCOMPANY    => RELINVENTORY.COMPANY,
+                           SCODE       => 'DISTANCE',
+                           NRN         => NPROP_DISTANCE);
+      /* Инициализируем ДС для хранения широты */
+      FIND_DOCS_PROPS_CODE(NFLAG_SMART => 0,
+                           NCOMPANY    => RELINVENTORY.COMPANY,
+                           SCODE       => 'LATITUDE',
+                           NRN         => NPROP_LATITUDE);
+      /* Инициализируем ДС для хранения долготы */
+      FIND_DOCS_PROPS_CODE(NFLAG_SMART => 0,
+                           NCOMPANY    => RELINVENTORY.COMPANY,
+                           SCODE       => 'LONGITUDE',
+                           NRN         => NPROP_LONGITUDE);
+      /* Инициализируем ДС для хранения количества */
+      FIND_DOCS_PROPS_CODE(NFLAG_SMART => 0,
+                           NCOMPANY    => RELINVENTORY.COMPANY,
+                           SCODE       => 'QUANTITY',
+                           NRN         => NPROP_QUANTITY);
+      /* Обратимся к обрабатываемой позиции ведомости инвентаризации */
+      for C in (select T.* from ELINVOBJECT T where T.RN = NELINVOBJECT)
+      loop
+        /* Обновим позицию ведомости инвентаризации */        
+        P_ELINVOBJECT_BASE_UPDATE(NCOMPANY     => C.COMPANY,
+                                  NRN          => C.RN,
+                                  DUNLOAD_DATE => C.UNLOAD_DATE,
+                                  DINV_DATE    => NVL(DINV_DATE, sysdate),
+                                  NINVPERSONS  => NINVPERSONS,
+                                  SBARCODE     => SBARCODE,
+                                  NIS_LOADED   => C.IS_LOADED);
+        /* Выставим ДС с примечанием */
+        P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => C.RN,
+                                      SUNITCODE   => 'ElectronicInventoriesObjects',
+                                      NPROPERTY   => NPROP_COMMENT,
+                                      SSTR_VALUE  => SITEM_COMMENT,
+                                      NNUM_VALUE  => null,
+                                      DDATE_VALUE => null,
+                                      NRN         => NTMP);
+        /* Выставим ДС с дистанцией */
+        P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => C.RN,
+                                      SUNITCODE   => 'ElectronicInventoriesObjects',
+                                      NPROPERTY   => NPROP_DISTANCE,
+                                      SSTR_VALUE  => null,
+                                      NNUM_VALUE  => NITEM_DISTANCE,
+                                      DDATE_VALUE => null,
+                                      NRN         => NTMP);
+        /* Выставим ДС с широтой */
+        P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => C.RN,
+                                      SUNITCODE   => 'ElectronicInventoriesObjects',
+                                      NPROPERTY   => NPROP_LATITUDE,
+                                      SSTR_VALUE  => SITEM_LATITUDE,
+                                      NNUM_VALUE  => null,
+                                      DDATE_VALUE => null,
+                                      NRN         => NTMP);
+        /* Выставим ДС с долготой */
+        P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => C.RN,
+                                      SUNITCODE   => 'ElectronicInventoriesObjects',
+                                      NPROPERTY   => NPROP_LONGITUDE,
+                                      SSTR_VALUE  => SITEM_LONGITUDE,
+                                      NNUM_VALUE  => null,
+                                      DDATE_VALUE => null,
+                                      NRN         => NTMP);
+        /* Выставим ДС с количеством */
+        P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => C.RN,
+                                      SUNITCODE   => 'ElectronicInventoriesObjects',
+                                      NPROPERTY   => NPROP_QUANTITY,
+                                      SSTR_VALUE  => null,
+                                      NNUM_VALUE  => NITEM_QUANTITY,
+                                      DDATE_VALUE => null,
+                                      NRN         => NTMP);
+      end loop;
+    end PROCESS_ELINVOBJECT;
+
+  begin
+    begin
+      /* Считываем корневой элемент тела посылки */
+      UTL_EXSQUEUE_MSG_GET_BODY_ROOT(NEXSQUEUE => NEXSQUEUE, XNODE_ROOT => XNODE_ROOT);
+      /* Считываем идентификатор устройства */
+      SREQ_DEVICEID := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DEVICEID);
+      /* Считываем "Регистрационный номер ведомости" (параметр сохранения) */
+      NREQ_SHEET_CODE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_SHEETCODE));
+      /* Считываем "Регистрационный номер МОЛ" (параметр сохранения) */
+      NREQ_USER_CODE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_USERCODE));
+      /* Считываем "Мнемокод местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_MNEMOCODE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGEMNEMOCODE);
+      /* Считываем "Признак нового местонахождения" (параметр сохранения) */
+      NREQ_STORAGE_ISNEW := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGEISNEW));
+      /* Считываем "Штрих-код местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_CODE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGECODE);
+      /* Считываем "Наименование местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_NAME := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGENAME);
+      /* Считываем "Почтовый индекс местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_POSTCODE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGEPOSTCODE);
+      /* Считываем "Страна местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_COUNTRY := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGECOUNTRY);
+      /* Считываем "Регион местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_REGION := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGEREGION);
+      /* Считываем "Населенный пункт местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_LOCALITY := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGELOCALITY);
+      /* Считываем "Улица местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_STREET := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGESTREET);
+      /* Считываем "Номер дома местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_HOUSE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGEHOUSENUMBER);
+      /* Считываем "Широта местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_LATITUDE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGELATITUDE);
+      /* Считываем "Долгота местонахождения" (параметр сохранения) */
+      SREQ_STORAGE_LONGITUDE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_STORAGELONGITUDE);
+      /* Считываем "Штрих-код ОС" (параметр сохранения) */
+      SREQ_ITEM_CODE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_ITEMCODE);
+      /* Считываем "Наименование номенклатуры ОС" (параметр сохранения) */
+      SREQ_ITEM_NAME := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_ITEMNAME);
+      /* Считываем "Мнемокод номенклатуры ОС" (параметр сохранения) */
+      SREQ_ITEM_MNEMOCODE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_ITEMMNEMOCODE);
+      /* Считываем "Инвентарный номер ОС" (параметр сохранения) */
+      SREQ_ITEM_NUMBER := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_ITEMNUMBER);
+      /* Считываем "Количество ОС" (параметр сохранения) */
+      NREQ_ITEM_QUANTITY := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_QUANTITY));
+      /* Считываем "Дата проведения инвентаризации ОС" (параметр сохранения) */
+      DREQ_ITEM_CHECKDATE := TO_DATE(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_CHECKDATE),
+                                     'YYYY-MM-DD"T"HH24:MI:SS');
+      /* Считываем "Комментарий МОЛ ОС" (параметр сохранения) */
+      SREQ_ITEM_COMMENT := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_COMMENT);
+      /* Считываем "Широта ОС" (параметр сохранения) */
+      SREQ_ITEM_LATITUDE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_LATITUDE);
+      /* Считываем "Долгота ОС" (параметр сохранения) */
+      SREQ_ITEM_LONGITUDE := UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_LONGITUDE);
+      /* Считываем "Расстояние до местонахождения ОС" (параметр сохранения) */
+      NREQ_ITEM_DISTANCE := TO_NUMBER(UTL_GETNODEVAL(XROOTNODE => XNODE_ROOT, SPATTERN => STAG_DISTANCETOSTORAGE));
+      /* Контроль индетификатора устройства по лицензии */
+      UTL_CHECK_DEVICEID(SDEVICEID => SREQ_DEVICEID);
+      /* Подготавливаем документ для ответа */
+      UTL_CREATERESPONSEDOC(XDOC => XDOC);
+      /* Работаем только если указан регистрационный номер ведомости */
+      if (NREQ_SHEET_CODE is not null) then
+        /* Считаем запись ведомости инвентаризации */
+        begin
+          select T.* into RELINVENTORY from ELINVENTORY T where T.RN = NREQ_SHEET_CODE;
+        exception
+          when NO_DATA_FOUND then
+            PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NREQ_SHEET_CODE, SUNIT_TABLE => 'ELINVENTORY');
+        end;
+        /* Обрабатываем местонахождение */
+        PROCESS_DICPLACE(NCOMPANY          => RELINVENTORY.COMPANY,
+                         NIS_NEW           => NREQ_STORAGE_ISNEW,
+                         SMNEMO            => SREQ_STORAGE_MNEMOCODE,
+                         SNAME             => SREQ_STORAGE_NAME,
+                         SBARCODE          => SREQ_STORAGE_CODE,
+                         SADDR_POSTCODE    => SREQ_STORAGE_POSTCODE,
+                         SADDR_COUNTRY     => SREQ_STORAGE_COUNTRY,
+                         SADDR_REGION      => SREQ_STORAGE_REGION,
+                         SADDR_LOCALITY    => SREQ_STORAGE_LOCALITY,
+                         SADDR_STREET      => SREQ_STORAGE_STREET,
+                         SADDR_HOUSE       => SREQ_STORAGE_HOUSE,
+                         SLATITUDE         => SREQ_STORAGE_LATITUDE,
+                         SLONGITUDE        => SREQ_STORAGE_LONGITUDE,
+                         SDICPLACE_BARCODE => SDICPLACE_BARCODE);
+        /* Обрабатываем ОС */
+        PROCESS_INVENTORY(RELINVENTORY => RELINVENTORY, SBARCODE => SREQ_ITEM_CODE, NELINVOBJECT => NELINVOBJECT);
+        /* Обрабатываем элемент ведомости */
+        PROCESS_ELINVOBJECT(RELINVENTORY    => RELINVENTORY,
+                            NELINVOBJECT    => NELINVOBJECT,
+                            NINVPERSONS     => NREQ_USER_CODE,
+                            DINV_DATE       => DREQ_ITEM_CHECKDATE,
+                            SBARCODE        => SDICPLACE_BARCODE,
+                            SITEM_COMMENT   => SREQ_ITEM_COMMENT,
+                            NITEM_DISTANCE  => NREQ_ITEM_DISTANCE,
+                            SITEM_LATITUDE  => SREQ_ITEM_LATITUDE,
+                            SITEM_LONGITUDE => SREQ_ITEM_LONGITUDE,
+                            NITEM_QUANTITY  => NREQ_ITEM_QUANTITY);
+      else
+        P_EXCEPTION(0, 'В запросе не указан идентификатор ведомости.');
       end if;
       /* Создаём пространство имён для ответа */
       XSAVESHEETITEMRESPONSE := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_SAVESHEETITEMRSPNS, SNS => SNS_TSD);
