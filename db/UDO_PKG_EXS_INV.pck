@@ -7,6 +7,16 @@ create or replace package UDO_PKG_EXS_INV as
     NGEOGRTYPE              in number   -- Тип искомого структурного элемента адреса (1 - страна, 2 - регион, 3 - район, 4 - населенный пункт, 5 - улица, 6 - административный округ, 7 - муниципальный округ, 8 - город, 9 - уровень внутригородской территории, 10 - уровень дополнительных территорий, 11 - уровень подчиненных дополнительным территориям объектов)
   ) return                  varchar2;   -- Наименование найденного стуктурного элемента адреса
   
+  /* Поиск геопонятия по стуктурным элементам */
+  function UTL_GEOGRAFY_FIND_BY_HIER_ITEM
+  (
+    NCOMPANY              in number,    -- Рег. номер организации
+    SADDR_COUNTRY         in varchar2,  -- Страна местонахождения
+    SADDR_REGION          in varchar2,  -- Регион местонахождения
+    SADDR_LOCALITY        in varchar2,  -- Населённый пункт местонахождения
+    SADDR_STREET          in varchar2   -- Улица местонахождения
+  ) return                number;       -- Географическое понятие
+  
   /* Получение данных о местонахождении позиции ведомости инвентаризации */
   function UTL_ELINVOBJECT_DICPLACE_GET
   (
@@ -338,6 +348,89 @@ create or replace package body UDO_PKG_EXS_INV as
     return SRES;
   end UTL_GEOGRAFY_GET_HIER_ITEM;
   
+  /* Поиск геопонятия по стуктурным элементам */
+  function UTL_GEOGRAFY_FIND_BY_HIER_ITEM
+  (
+    NCOMPANY              in number,    -- Рег. номер организации
+    SADDR_COUNTRY         in varchar2,  -- Страна местонахождения
+    SADDR_REGION          in varchar2,  -- Регион местонахождения
+    SADDR_LOCALITY        in varchar2,  -- Населённый пункт местонахождения
+    SADDR_STREET          in varchar2   -- Улица местонахождения
+  ) return                number        -- Географическое понятие
+  is
+    NRES                  PKG_STD.TREF; -- Рег. номер найденного географического понятия
+    NVERSION              PKG_STD.TREF; -- Рег. номер версии словаря географических понятий
+  begin
+    /* Проверим параметры */
+    if (NCOMPANY is null) then
+      return null;
+    end if;
+    if ((SADDR_COUNTRY is null) and (SADDR_REGION is null) and (SADDR_LOCALITY is null) and (SADDR_STREET is null)) then
+      return null;
+    end if;
+    /* Определим версию словаря географических понятий */
+    FIND_VERSION_BY_COMPANY(NCOMPANY => NCOMPANY, SUNITCODE => 'GEOGRAFY', NVERSION => NVERSION);
+    /* Подберем географическое понятие - сначала страны */
+    for C in (select G.RN
+                from GEOGRAFY G
+               where G.VERSION = NVERSION
+                 and ((SADDR_COUNTRY is null) or
+                     ((SADDR_COUNTRY is not null) and (LOWER(G.GEOGRNAME) like LOWER('%' || SADDR_COUNTRY || '%'))))
+                 and G.GEOGRTYPE = 1)
+    loop
+      /* Теперь регионы страны */
+      for R in (select G.RN
+                  from GEOGRAFY G
+                 where G.VERSION = NVERSION
+                   and ((SADDR_REGION is null) or
+                       ((SADDR_REGION is not null) and (LOWER(G.GEOGRNAME) like LOWER('%' || SADDR_REGION || '%'))))
+                   and G.GEOGRTYPE = 2
+                   and G.RN in (select GG.RN
+                                  from GEOGRAFY GG
+                                 where GG.GEOGRTYPE = 2
+                                connect by prior GG.RN = GG.PRN
+                                 start with GG.RN = C.RN))
+      loop
+        /* Спускаемся в населенные пункты */
+        for L in (select G.RN
+                    from GEOGRAFY G
+                   where G.VERSION = NVERSION
+                     and ((SADDR_LOCALITY is null) or ((SADDR_LOCALITY is not null) and
+                         (LOWER(G.GEOGRNAME) like LOWER('%' || SADDR_LOCALITY || '%'))))
+                     and G.GEOGRTYPE in (8, 4, 3, 2)
+                     and G.RN in (select GG.RN
+                                    from GEOGRAFY GG
+                                   where GG.GEOGRTYPE in (8, 4, 3, 2)
+                                  connect by prior GG.RN = GG.PRN
+                                   start with GG.RN = R.RN)
+                  
+                  )
+        loop
+          /* Теперь - улицы */
+          for S in (select G.RN
+                      from GEOGRAFY G
+                     where G.VERSION = NVERSION
+                       and ((SADDR_STREET is null) or
+                           ((SADDR_STREET is not null) and (LOWER(G.GEOGRNAME) like LOWER('%' || SADDR_STREET || '%'))))
+                       and G.GEOGRTYPE = 5
+                       and G.RN in (select GG.RN
+                                      from GEOGRAFY GG
+                                     where GG.GEOGRTYPE = 5
+                                    connect by prior GG.RN = GG.PRN
+                                     start with GG.RN = L.RN)
+                    
+                    )
+          loop
+            /* Возврат результата */
+            return S.RN;
+          end loop;
+        end loop;
+      end loop;
+    end loop;
+    /* Вернём пустой результат - сюда приходим только если ничего не нашли */
+    return NRES;
+  end UTL_GEOGRAFY_FIND_BY_HIER_ITEM;
+  
   /* Проверка идентификатора устройства */
   procedure UTL_CHECK_DEVICEID
   (
@@ -392,7 +485,7 @@ create or replace package body UDO_PKG_EXS_INV as
     /* Считаем запись очереди */
     REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
     /* Возьмем текст запроса */
-    CREQ := BLOB2CLOB(LBDATA => REXSQUEUE.MSG);
+    CREQ := BLOB2CLOB(LBDATA => REXSQUEUE.MSG, SCHARSET => 'UTF8');
     /* Создаем инстанс XML парсера */
     XMLPARCER := DBMS_XMLPARSER.NEWPARSER;
     /* Разбираем XML из запроса */
@@ -1044,25 +1137,12 @@ create or replace package body UDO_PKG_EXS_INV as
       SADDR_STREET          in varchar2   -- Улица местонахождения
     ) return                number        -- Географическое понятие
     is
-      NRES                  PKG_STD.TREF; -- Рег. номер найденного географического понятия
-      NVERSION              PKG_STD.TREF; -- Рег. номер версии словаря географических понятий
     begin
-      /* Определим версию словаря географических понятий */
-      FIND_VERSION_BY_COMPANY(NCOMPANY => NCOMPANY, SUNITCODE => 'GEOGRAFY', NVERSION => NVERSION);
-      /* Подберем географическое понятие */
-      begin
-        select G.RN
-          into NRES
-          from GEOGRAFY G
-         where G.VERSION = NVERSION
-           and G.FULLNAME like SADDR_COUNTRY || '%' || SADDR_REGION || '%' || SADDR_LOCALITY || '%' || SADDR_STREET
-           and ROWNUM <= 1;
-      exception
-        when NO_DATA_FOUND then
-          NRES := null;
-      end;
-      /* Вернём результат */
-      return NRES;
+      return UTL_GEOGRAFY_FIND_BY_HIER_ITEM(NCOMPANY       => NCOMPANY,
+                                            SADDR_COUNTRY  => SADDR_COUNTRY,
+                                            SADDR_REGION   => SADDR_REGION,
+                                            SADDR_LOCALITY => SADDR_LOCALITY,
+                                            SADDR_STREET   => SADDR_STREET);
     end FIND_GEOGRAFY;
     
     /* Обработка местонахождения - поиск и при необходимости добавление местонахождения ОС */
@@ -1130,13 +1210,14 @@ create or replace package body UDO_PKG_EXS_INV as
                                        SADDR_BUILDING  => null,
                                        SADDR_FLAT      => null,
                                        SADDR_POST      => SADDR_POSTCODE,
-                                       SPLACE_DESCRIPT => null,
+                                       SPLACE_DESCRIPT => SADDR_COUNTRY || '/' || SADDR_REGION || '/' || SADDR_LOCALITY || '/' ||
+                                                          SADDR_STREET,
                                        NRN             => NDICPLACE);
               else
                 P_EXCEPTION(0,
                             'Местонахождение инвентарных объектов с штрих-кодом "%s" или мнемокодом "%s" не найдено.',
                             NVL(SBARCODE, '<НЕ УКАЗАН>'),
-                            NVL(SMNEMO, '<НЕ УКАЗАН>'));
+                            NVL(SMNEMO, '<НЕ УКАЗАНО>'));
               end if;
           end;
         when TOO_MANY_ROWS then
@@ -1154,19 +1235,30 @@ create or replace package body UDO_PKG_EXS_INV as
       /* Актуализируем его */
       for C in (select T.* from DICPLACE T where T.RN = NDICPLACE)
       loop
+        /* Подберем дату штрих-кода */
+        if (NVL(SBARCODE, C.BARCODE) is not null) then
+          if (SBARCODE = C.BARCODE) then
+            C.LABEL_DATE := NVL(C.LABEL_DATE, sysdate);
+          else
+            C.LABEL_DATE := sysdate;
+          end if;
+        else
+          C.LABEL_DATE := null;
+        end if;
         /* Актуализируем запись */
         P_DICPLACE_BASE_UPDATE(NCOMPANY        => C.COMPANY,
                                NRN             => C.RN,
                                SMNEMO          => NVL(SMNEMO, C.PLACE_MNEMO),
                                SNAME           => NVL(SNAME, C.PLACE_NAME),
                                SBARCODE        => NVL(SBARCODE, C.BARCODE),
-                               DLABEL_DATE     => NVL(C.LABEL_DATE, sysdate),
+                               DLABEL_DATE     => C.LABEL_DATE,
                                SCAD_NUMB       => C.CAD_NUMB,
-                               NGEOGRAFY       => FIND_GEOGRAFY(NCOMPANY       => C.COMPANY,
-                                                                SADDR_COUNTRY  => SADDR_COUNTRY,
-                                                                SADDR_REGION   => SADDR_REGION,
-                                                                SADDR_LOCALITY => SADDR_LOCALITY,
-                                                                SADDR_STREET   => SADDR_STREET),
+                               NGEOGRAFY       => NVL(FIND_GEOGRAFY(NCOMPANY       => C.COMPANY,
+                                                                    SADDR_COUNTRY  => SADDR_COUNTRY,
+                                                                    SADDR_REGION   => SADDR_REGION,
+                                                                    SADDR_LOCALITY => SADDR_LOCALITY,
+                                                                    SADDR_STREET   => SADDR_STREET),
+                                                      C.GEOGRAFY),
                                SADDR_HOUSE     => SADDR_HOUSE,
                                SADDR_BLOCK     => C.ADDR_BLOCK,
                                SADDR_BUILDING  => C.ADDR_BUILDING,
@@ -1204,6 +1296,7 @@ create or replace package body UDO_PKG_EXS_INV as
     (
       RELINVENTORY          in ELINVENTORY%rowtype, -- Запись обрабатываемой ведомости
       SBARCODE              in varchar2,            -- Штрих-код ОС
+      SINV_NUMBER           in varchar2,            -- Инвентарный номер ОС
       NELINVOBJECT          out number              -- Рег. номер позиции ведомости инвентаризации
     )
     is
@@ -1241,9 +1334,31 @@ create or replace package body UDO_PKG_EXS_INV as
                                       NRN          => NELINVOBJECT);
           exception
             when NO_DATA_FOUND then
-              P_EXCEPTION(0,
-                          'Инвентарная карточка с штрих-кодом "%s" не найдена.',
-                          SBARCODE);
+              begin
+                /* Ищем рег. номер ИК по инвентарному номеру */
+                select T.RN
+                  into NINVENTORY
+                  from INVENTORY T
+                 where trim(T.INV_NUMBER) = trim(SINV_NUMBER)
+                   and T.COMPANY = RELINVENTORY.COMPANY;
+                /* Добавляем её в ведомость инвентаризации */
+                P_ELINVOBJECT_BASE_INSERT(NCOMPANY     => RELINVENTORY.COMPANY,
+                                          NPRN         => RELINVENTORY.RN,
+                                          NINVENTORY   => NINVENTORY,
+                                          NINVSUBST    => null,
+                                          NINVPACK     => null,
+                                          DUNLOAD_DATE => null,
+                                          DINV_DATE    => null,
+                                          NINVPERSONS  => null,
+                                          SBARCODE     => null,
+                                          NIS_LOADED   => 1,
+                                          NRN          => NELINVOBJECT);
+              exception
+                when NO_DATA_FOUND then
+                  P_EXCEPTION(0,
+                              'Инвентарная карточка с штрих-кодом "%s" не найдена.',
+                              SBARCODE);
+              end;
           end;
       end;
     end PROCESS_INVENTORY;
@@ -1433,7 +1548,10 @@ create or replace package body UDO_PKG_EXS_INV as
                          SLONGITUDE        => SREQ_STORAGE_LONGITUDE,
                          SDICPLACE_BARCODE => SDICPLACE_BARCODE);
         /* Обрабатываем ОС */
-        PROCESS_INVENTORY(RELINVENTORY => RELINVENTORY, SBARCODE => SREQ_ITEM_CODE, NELINVOBJECT => NELINVOBJECT);
+        PROCESS_INVENTORY(RELINVENTORY => RELINVENTORY,
+                          SBARCODE     => SREQ_ITEM_CODE,
+                          SINV_NUMBER  => SREQ_ITEM_NUMBER,
+                          NELINVOBJECT => NELINVOBJECT);
         /* Обрабатываем элемент ведомости */
         PROCESS_ELINVOBJECT(RELINVENTORY    => RELINVENTORY,
                             NELINVOBJECT    => NELINVOBJECT,
