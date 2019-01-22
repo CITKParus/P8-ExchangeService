@@ -28,7 +28,7 @@ const beforeAgentInfo = async prms => {
 
 //Обработка ответа тестового стенда на запрос сведений о контрагенте
 const afterAgentInfo = async prms => {
-    let r = JSON.parse(prms.serverResp);
+    let r = JSON.parse(prms.queue.blResp.toString());
     if (r.STATE === 0) {
         throw Error(r.MSG);
     } else {
