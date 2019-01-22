@@ -202,11 +202,13 @@ const paymensOperation = {
     sName: "Тип операции",
     vals: {
         "3_1": "sell", //Тэг 1000 = 3 (чек), тэг 1054 = 1 (приход)
-        "31_2": "sell_refund", //Тэг 1000 = 31 (коррекция), тэг 1054 = 2 (возврат прихода)
-        "31_1": "sell_correction", //Тэг 1000 = 31 (коррекция), тэг 1054 = 1 (приход)
+        "3_2": "sell_refund", //Тэг 1000 = 3 (чек), тэг 1054 = 2 (возврат прихода)
         "3_3": "buy", //Тэг 1000 = 3 (чек), тэг 1054 = 3 (расход)
-        "31_4": "buy_refund", //Тэг 1000 = 31 (коррекция), тэг 1054 = 4 (возврат расхода)
-        "31_3": "buy_correction" //Тэг 1000 = 31 (коррекция), тэг 1054 = 3 (расход)
+        "3_4": "buy_refund", //Тэг 1000 = 3 (чек), тэг 1054 = 4 (возврат расхода)
+        "31_1": "sell_correction", //Тэг 1000 = 31 (коррекция), тэг 1054 = 1 (приход)
+        "31_2": "sell_refund", //Тэг 1000 = 31 (коррекция), тэг 1054 = 2 (возврат прихода)
+        "31_3": "buy_correction", //Тэг 1000 = 31 (коррекция), тэг 1054 = 3 (расход)
+        "31_4": "buy_refund" //Тэг 1000 = 31 (коррекция), тэг 1054 = 4 (возврат расхода)
     }
 };
 
@@ -327,6 +329,41 @@ const strDDMMYYYYHHMISStoDate = sDate => {
             res = null;
         }
     }
+    return res;
+};
+
+//Разбор строки с контактными данными покупателя
+let parseClientContacts = (sContacts, sDelim) => {
+    //Считывание E-Mail (выбор одного из двух значений)
+    const getMail = (sVal1, sVal2) => {
+        //E-Mail там, где есть @
+        if (sVal1 && sVal1.indexOf("@") != -1) return sVal1.trim();
+        if (sVal2 && sVal2.indexOf("@") != -1) return sVal2.trim();
+        //Нет вообще ничего нужного
+        return "";
+    };
+    //Считывание телефона (выбор одного из двух значений)
+    const getPhone = (sVal1, sVal2) => {
+        //Телефон там, где нет @
+        if (sVal1 && sVal1.indexOf("@") == -1) return sVal1.trim();
+        if (sVal2 && sVal2.indexOf("@") == -1) return sVal2.trim();
+        //Нет вообще ничего нужного
+        return "";
+    };
+    //Результат работы
+    let res = {
+        sMail: "",
+        sPhone: ""
+    };
+    //Прбуем разобрать
+    try {
+        //Разбиваем строку с учётом разделителя
+        const tmp = sContacts.split(sDelim, 2);
+        //Забираем нужные данные
+        res.sMail = getMail(tmp[0], tmp[1]);
+        res.sPhone = getPhone(tmp[0], tmp[1]);
+    } catch (e) {}
+    //Возвращаем результат
     return res;
 };
 
@@ -488,14 +525,14 @@ const beforeRegBillSIR = async prms => {
         //Собираем тело запроса в JSON из XML-данных документа
         let reqBody = {};
         if (getPropValueByCode(docProps, "1000") === SDOCTYPE_TAG100_CHECK) {
-            //Собираем чека
+            //Собираем чек
             reqBody = {
                 timestamp: doc.SDDOC_DATE,
                 external_id: doc.NRN,
                 receipt: {
                     client: {
-                        email: getPropValueByCode(docProps, "1008"),
-                        phone: ""
+                        email: parseClientContacts(getPropValueByCode(docProps, "1008")).sMail,
+                        phone: parseClientContacts(getPropValueByCode(docProps, "1008")).sPhone
                     },
                     company: {
                         email: getPropValueByCode(docProps, "1117"),
