@@ -64,16 +64,16 @@ class DBConnector extends EventEmitter {
                 } catch (e) {
                     throw new ServerError(
                         SERR_MODULES_BAD_INTERFACE,
-                        "Ошибка подключения пользовательского модуля: " +
-                            e.message +
-                            ". Проверьте модуль на отсутствие синтаксических ошибок."
+                        `Ошибка подключения пользовательского модуля: ${
+                            e.message
+                        }. Проверьте модуль на отсутствие синтаксических ошибок.`
                     );
                 }
                 //Проверим его интерфейс
                 let sCheckResult = validateObject(
                     this.connector,
                     intfDBConnectorModuleSchema.dbConnectorModule,
-                    "Модуль " + prms.connectSettings.sConnectorModule
+                    `Модуль ${prms.connectSettings.sConnectorModule}`
                 );
                 if (sCheckResult) {
                     throw new ServerError(SERR_MODULES_BAD_INTERFACE, sCheckResult);

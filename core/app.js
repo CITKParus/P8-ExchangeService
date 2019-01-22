@@ -177,7 +177,7 @@ class ParusAppServer {
                     await this.dbConn.disconnect();
                     process.exit(0);
                 } catch (e) {
-                    await this.logger.error("Ошибка отключения от БД: " + e.sCode + ": " + e.sMessage);
+                    await this.logger.error(`Ошибка отключения от БД: ${e.sCode}: ${e.sMessage}`);
                     process.exit(1);
                 }
             } else {

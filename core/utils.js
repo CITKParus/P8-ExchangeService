@@ -44,11 +44,9 @@ const validateObject = (obj, schema, sObjName) => {
                     let a = errors.map(e => {
                         return e.message;
                     });
-                    sRes =
-                        "Объект" +
-                        (sObjName ? " '" + sObjName + "' " : " ") +
-                        "имеет некорректный формат: " +
-                        _.uniq(a).join("; ");
+                    sRes = `Объект${sObjName ? ` "${sObjName}" ` : " "}имеет некорректный формат: ${_.uniq(a).join(
+                        "; "
+                    )}`;
                 }
             } else {
                 //Валидатор вернул не то, что мы ожидали
@@ -56,7 +54,7 @@ const validateObject = (obj, schema, sObjName) => {
             }
         } else {
             //Нам не передали объект на проверку
-            sRes = "Объект" + (sObjName ? " '" + sObjName + "' " : " ") + "не указан";
+            sRes = `Объект${sObjName ? ` "${sObjName}" ` : " "}не указан`;
         }
     } else {
         //Пришла не схема валидации а непонятно что
@@ -71,7 +69,7 @@ const makeModuleFullPath = sModuleName => {
     //Если имя модуля передано
     if (sModuleName) {
         //Объединим его с шаблоном пути до библиотеки модулей
-        return SMODULES_PATH_MODULES + "/" + sModuleName;
+        return `${SMODULES_PATH_MODULES}/${sModuleName}`;
     } else {
         //Нет имени модуля - нет полного пути
         return "";
@@ -230,7 +228,7 @@ const buildURL = prms => {
     //Если структура объекта в норме
     if (!sCheckResult) {
         //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! КОНТРОЛЬ КОРРЕКТНОСТИ
-        return `${prms.sSrvRoot}/${prms.sFnURL}${prms.sQuery ? "?" + prms.sQuery : ""}`;
+        return `${prms.sSrvRoot}/${prms.sFnURL}${prms.sQuery ? `?${prms.sQuery}` : ""}`;
     } else {
         throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
     }
