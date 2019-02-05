@@ -674,8 +674,6 @@ const beforeGetBillInfo = async prms => {
 
 //Обработчик "После" отправки запроса на получение информации о чеке серверу "АТОЛ-Онлайн"
 const afterGetBillInfo = async prms => {
-    //if (prms.queue.blResp) console.log(prms.queue.blResp.toString());
-    //else console.log("Сервер не вернул ответ");
     //Буфер для результата работы обработчика
     let res = null;
     //Буфер для данных ответа сервера
@@ -781,6 +779,32 @@ const afterGetBillInfo = async prms => {
     };
 };
 
+//Обработчик "До" отправки запроса на получение чека серверу "ОФД"
+const beforeGetOFDBillDoc = async prms => {
+    //Разберем данные для получения чека
+    let sDocPath = null;
+    if (prms.queue.blMsg) {
+        sDocPath = prms.queue.blMsg.toString();
+    } else {
+        throw new Error("В теле сообщения отсутствуют данные для получения чека фискального документа");
+    }
+    //Собираем общий результат работы
+    let res = {
+        options: {
+            url: buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL }).replace(
+                "<doc_path>",
+                sDocPath
+            ),
+            simple: true
+        }
+    };
+    //Возврат резульатата
+    return res;
+};
+
+//Обработчик "После" отправки запроса на получение чека серверу "ОФД"
+const afterGetOFDBillDoc = async prms => {};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -791,3 +815,5 @@ exports.beforeRegBillSIR = beforeRegBillSIR;
 exports.afterRegBillSIR = afterRegBillSIR;
 exports.beforeGetBillInfo = beforeGetBillInfo;
 exports.afterGetBillInfo = afterGetBillInfo;
+exports.beforeGetOFDBillDoc = beforeGetOFDBillDoc;
+exports.afterGetOFDBillDoc = afterGetOFDBillDoc;

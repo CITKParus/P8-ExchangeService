@@ -49,6 +49,13 @@ create or replace package UDO_PKG_EXS_ATOL as
     NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
   );
 
+  /* Отработка ответов ОФД на запрос чека */
+  procedure OFD_PROCESS_GET_BILL_DOC
+  (
+    NIDENT                  in number,  -- Идентификатор процесса
+    NEXSQUEUE               in number   -- Регистрационный номер обрабатываемой позиции очереди обмена
+  );
+
 end;
 /
 create or replace package body UDO_PKG_EXS_ATOL as
@@ -264,6 +271,7 @@ create or replace package body UDO_PKG_EXS_ATOL as
     STAG1077                PKG_STD.TSTRING;      -- Буфер для значения "Фискальный признак документа" (тэг 1077)
     SERR_CODE               PKG_STD.TSTRING;      -- Буфер для значения "Код ошибки"
     SERR_TEXT               PKG_STD.TSTRING;      -- Буфер для значения "Текст ошибки"
+    NNEW_EXSQUEUE           PKG_STD.TREF;         -- Рег. номер записи очереди обмена (для скачивания готового чека)
   begin
     /* Считаем запись очереди */
     REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
@@ -326,12 +334,12 @@ create or replace package body UDO_PKG_EXS_ATOL as
             P_EXCEPTION(0,
                         'Документ в статусе "%s", но не указано значение "Дата и время документа из ФН" (тэг 1012).',
                         SSTATUS);
-          end if;          
+          end if;
           if (STAG1038 is null) then
             P_EXCEPTION(0,
                         'Документ в статусе "%s", но не указано значение "Номер смены" (тэг 1038).',
                         SSTATUS);
-          end if;          
+          end if;
           if (STAG1040 is null) then
             P_EXCEPTION(0,
                         'Документ в статусе "%s", но не указано значение "Фискальный номер документа" (тэг 1040).',
@@ -389,7 +397,7 @@ create or replace package body UDO_PKG_EXS_ATOL as
             UDO_P_FISCDOCSPROP_SET_VAL(NPRN       => RFISCDOC.RN,
                                        NCOMPANY   => RFISCDOC.COMPANY,
                                        SATTRIBUTE => '1042',
-                                       NVAL_NUMB   => TO_NUMBER(STAG1042));            
+                                       NVAL_NUMB  => TO_NUMBER(STAG1042));
             UDO_P_FISCDOCSPROP_SET_VAL(NPRN       => RFISCDOC.RN,
                                        NCOMPANY   => RFISCDOC.COMPANY,
                                        SATTRIBUTE => '1077',
@@ -400,6 +408,15 @@ create or replace package body UDO_PKG_EXS_ATOL as
                           'Ошибка установки значения атрибута фискального документа: %s',
                           sqlerrm);
           end;
+          /* Ставим задачу на получение чека от ОФД */
+          PKG_EXS.QUEUE_PUT(SEXSSERVICE   => 'ОФД_ПолучЧека',
+                            SEXSSERVICEFN => 'ПолучЧека',
+                            BMSG          => CLOB2BLOB(LCDATA   => STAG1041 || '/' || STAG1040 || '/' || STAG1077,
+                                                       SCHARSET => 'UTF8'),
+                            NLNK_COMPANY  => RFISCDOC.COMPANY,
+                            NLNK_DOCUMENT => RFISCDOC.RN,
+                            SLNK_UNITCODE => 'UDO_FiscalDocuments',
+                            NNEW_EXSQUEUE => NNEW_EXSQUEUE);
         end;
       /* Ошибка обработки */
       when SSTATUS_FAIL then
@@ -430,5 +447,28 @@ create or replace package body UDO_PKG_EXS_ATOL as
       PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
   end V4_FFD105_PROCESS_GET_BILL_INF;
   
+  /* Отработка ответов ОФД на запрос чека */
+  procedure OFD_PROCESS_GET_BILL_DOC
+  (
+    NIDENT                  in number,        -- Идентификатор процесса
+    NEXSQUEUE               in number         -- Регистрационный номер обрабатываемой позиции очереди обмена
+  )
+  is
+    REXSQUEUE               EXSQUEUE%rowtype; -- Запись позиции очереди
+  begin
+    /* Считаем запись очереди */
+    REXSQUEUE := GET_EXSQUEUE_ID(NFLAG_SMART => 0, NRN => NEXSQUEUE);
+    /* Проверим что позиция очереди корректна */
+    UTL_EXSQUEUE_CHECK_ATTRS(REXSQUEUE => REXSQUEUE);
+    /* Сохраним полученный чек в ФД */
+    UDO_P_FISCDOCS_PUT_BILL(NRN => REXSQUEUE.LNK_DOCUMENT, NCOMPANY => REXSQUEUE.LNK_COMPANY, BDATA => REXSQUEUE.RESP);
+    /* Всё прошло успешно */
+    PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT);
+  exception
+    when others then
+      /* Вернём ошибку */
+      PKG_EXS.PRC_RESP_RESULT_SET(NIDENT => NIDENT, SRESULT => PKG_EXS.SPRC_RESP_RESULT_ERR, SMSG => sqlerrm);
+  end OFD_PROCESS_GET_BILL_DOC;
+      
 end;
 /
