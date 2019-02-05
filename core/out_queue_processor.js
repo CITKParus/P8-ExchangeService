@@ -24,6 +24,7 @@ const {
     SERR_APP_SERVER_BEFORE,
     SERR_APP_SERVER_AFTER,
     SERR_DB_SERVER,
+    SERR_WEB_SERVER,
     SERR_UNAUTH
 } = require("./constants"); //Глобальные константы
 const {
@@ -205,14 +206,20 @@ const appProcess = async prms => {
                     nQueueId: prms.queue.nId
                 });
                 //Отправляем сообщение удалённому серверу
-                let serverResp = await rqp(options);
-                //Сохраняем полученный ответ
-                prms.queue.blResp = new Buffer(serverResp);
-                await dbConn.setQueueResp({
-                    nQueueId: prms.queue.nId,
-                    blResp: prms.queue.blResp,
-                    nIsOriginal: NIS_ORIGINAL_YES
-                });
+                try {
+                    //Ждем ответ от удалённого сервера
+                    let serverResp = await rqp(options);
+                    //Сохраняем полученный ответ
+                    prms.queue.blResp = new Buffer(serverResp || "");
+                    await dbConn.setQueueResp({
+                        nQueueId: prms.queue.nId,
+                        blResp: prms.queue.blResp,
+                        nIsOriginal: NIS_ORIGINAL_YES
+                    });
+                } catch (e) {
+                    //Прекращаем исполнение если были ошибки
+                    throw new ServerError(SERR_WEB_SERVER, `${e.response.statusCode} - ${e.response.statusMessage}`);
+                }
                 //Выполняем обработчик "После" (если он есть)
                 if (prms.function.sAppSrvAfter) {
                     const fnAfter = getAppSrvFunction(prms.function.sAppSrvAfter);
