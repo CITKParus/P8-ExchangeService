@@ -140,8 +140,11 @@ create or replace package body UDO_PKG_EXS_INV as
   STAG_DISTANCETOSTORAGE    constant varchar2(40) := 'DistanceToStorage';
   STAG_FAULT                constant varchar2(40) := 'Fault';
   STAG_DETAIL               constant varchar2(40) := 'detail';
-  STAG_MESSAGE              constant varchar2(40) := 'Message';
+  STAG_MESSAGE              constant varchar2(40) := 'Message';  
+  STAG_STORAGEMESSAGE       constant varchar2(40) := 'StorageMessage';
+  STAG_ITEMMESSAGE          constant varchar2(40) := 'ItemMessage';
   STAG_ERRORMESSAGE         constant varchar2(40) := 'ErrorMessage';
+  STAG_ERRORMESSAGE_SSITEM  constant varchar2(40) := 'ErrorSaveSheetItemMessage';  
   
   /* Константы - типы возвращаемых значений */
   SRESULT_TYPE_MNEMO        constant varchar2(40):='MNEMO';   -- Мнемокод
@@ -322,6 +325,39 @@ create or replace package body UDO_PKG_EXS_INV as
     /* Возвращаем результат */
     return CDATA;
   end UTL_CREATEERRORRESPONSE;
+  
+  /* Формирование ответа с ошибкой для процедуры импорта результатов инвентаризации */
+  function UTL_CREATEERRORRESPONSE_SSITEM
+  (
+    SMSG_ELINVOBJECT        in varchar2,             -- Сообщение об ошибке (для инвентарного объекта)
+    SMSG_DICPLACE           in varchar2              -- Сообщение об ошибке (для местонахождения)
+  ) return                  clob                     -- Результат работы     
+  is
+    XDOC                    DBMS_XMLDOM.DOMDOCUMENT; -- Документ
+    XFAULT                  DBMS_XMLDOM.DOMNODE;     -- Корневой узел
+    XDETAIL                 DBMS_XMLDOM.DOMNODE;     -- Узел для детализации ошибки
+    XERRMSG                 DBMS_XMLDOM.DOMNODE;     -- Узел с сообщением об ошибке
+    XMSG_ELINVOBJECT        DBMS_XMLDOM.DOMNODE;     -- Узел текстом сообщения (для инвентарного объекта)
+    XMSG_DICPLACE           DBMS_XMLDOM.DOMNODE;     -- Узел текстом сообщения (для местонахождения)
+    XNODE                   DBMS_XMLDOM.DOMNODE;     -- Буфер для узла
+    CDATA                   clob;                    -- Буфер для результата
+  begin
+    /* Создаём документ для ответа */
+    UTL_CREATERESPONSEDOC(XDOC => XDOC);
+    /* Собираем ошибку в ответ */
+    XFAULT           := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_FAULT, SNS => SNS_SOAPENV);
+    XDETAIL          := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_DETAIL);
+    XERRMSG          := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_ERRORMESSAGE_SSITEM, SNS => SNS_TSD);
+    XMSG_ELINVOBJECT := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_ITEMMESSAGE, SNS => SNS_TSD, SVAL => SMSG_ELINVOBJECT);
+    XMSG_DICPLACE    := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_STORAGEMESSAGE, SNS => SNS_TSD, SVAL => SMSG_DICPLACE);
+    XNODE            := DBMS_XMLDOM.APPENDCHILD(N => XERRMSG, NEWCHILD => XMSG_ELINVOBJECT);
+    XNODE            := DBMS_XMLDOM.APPENDCHILD(N => XERRMSG, NEWCHILD => XMSG_DICPLACE);
+    XNODE            := DBMS_XMLDOM.APPENDCHILD(N => XDETAIL, NEWCHILD => XERRMSG);
+    XNODE            := DBMS_XMLDOM.APPENDCHILD(N => XFAULT, NEWCHILD => XDETAIL);
+    CDATA            := UTL_CREATERESPONSE(XDOC => XDOC, XCONTENT => XFAULT);
+    /* Возвращаем результат */
+    return CDATA;
+  end UTL_CREATEERRORRESPONSE_SSITEM;
   
   /* Считывание значения структурного элемента из иерархии адреса географического понятия */
   function UTL_GEOGRAFY_GET_HIER_ITEM
@@ -1126,6 +1162,8 @@ create or replace package body UDO_PKG_EXS_INV as
     RELINVENTORY            ELINVENTORY%rowtype;     -- Запись модифицируемой ведомости инвентаризации
     NELINVOBJECT            PKG_STD.TREF;            -- Рег. номер позиции ведомости инвентаризации
     SDICPLACE_BARCODE       PKG_STD.TSTRING;         -- Штрих-код местонахождения ОС (для позиции ведомости инвентаризации)
+    SERR_ELINVOBJECT        PKG_STD.TSTRING;         -- Буфер для ошибки обработки инвентарной карточки
+    SERR_DICPLACE           PKG_STD.TSTRING;         -- Буфер для ошибки обработки местонахождения
 
     /* Поиск географического понятия по параметрам */
     function FIND_GEOGRAFY
@@ -1533,48 +1571,70 @@ create or replace package body UDO_PKG_EXS_INV as
             PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NREQ_SHEET_CODE, SUNIT_TABLE => 'ELINVENTORY');
         end;
         /* Обрабатываем местонахождение */
-        PROCESS_DICPLACE(NCOMPANY          => RELINVENTORY.COMPANY,
-                         NIS_NEW           => NREQ_STORAGE_ISNEW,
-                         SMNEMO            => SREQ_STORAGE_MNEMOCODE,
-                         SNAME             => SREQ_STORAGE_NAME,
-                         SBARCODE          => SREQ_STORAGE_CODE,
-                         SADDR_POSTCODE    => SREQ_STORAGE_POSTCODE,
-                         SADDR_COUNTRY     => SREQ_STORAGE_COUNTRY,
-                         SADDR_REGION      => SREQ_STORAGE_REGION,
-                         SADDR_LOCALITY    => SREQ_STORAGE_LOCALITY,
-                         SADDR_STREET      => SREQ_STORAGE_STREET,
-                         SADDR_HOUSE       => SREQ_STORAGE_HOUSE,
-                         SLATITUDE         => SREQ_STORAGE_LATITUDE,
-                         SLONGITUDE        => SREQ_STORAGE_LONGITUDE,
-                         SDICPLACE_BARCODE => SDICPLACE_BARCODE);
-        /* Обрабатываем ОС */
-        PROCESS_INVENTORY(RELINVENTORY => RELINVENTORY,
-                          SBARCODE     => SREQ_ITEM_CODE,
-                          SINV_NUMBER  => SREQ_ITEM_NUMBER,
-                          NELINVOBJECT => NELINVOBJECT);
-        /* Обрабатываем элемент ведомости */
-        PROCESS_ELINVOBJECT(RELINVENTORY    => RELINVENTORY,
-                            NELINVOBJECT    => NELINVOBJECT,
-                            NINVPERSONS     => NREQ_USER_CODE,
-                            DINV_DATE       => DREQ_ITEM_CHECKDATE,
-                            SBARCODE        => SDICPLACE_BARCODE,
-                            SITEM_COMMENT   => SREQ_ITEM_COMMENT,
-                            NITEM_DISTANCE  => NREQ_ITEM_DISTANCE,
-                            SITEM_LATITUDE  => SREQ_ITEM_LATITUDE,
-                            SITEM_LONGITUDE => SREQ_ITEM_LONGITUDE,
-                            NITEM_QUANTITY  => NREQ_ITEM_QUANTITY);
+        begin
+          PROCESS_DICPLACE(NCOMPANY          => RELINVENTORY.COMPANY,
+                           NIS_NEW           => NREQ_STORAGE_ISNEW,
+                           SMNEMO            => SREQ_STORAGE_MNEMOCODE,
+                           SNAME             => SREQ_STORAGE_NAME,
+                           SBARCODE          => SREQ_STORAGE_CODE,
+                           SADDR_POSTCODE    => SREQ_STORAGE_POSTCODE,
+                           SADDR_COUNTRY     => SREQ_STORAGE_COUNTRY,
+                           SADDR_REGION      => SREQ_STORAGE_REGION,
+                           SADDR_LOCALITY    => SREQ_STORAGE_LOCALITY,
+                           SADDR_STREET      => SREQ_STORAGE_STREET,
+                           SADDR_HOUSE       => SREQ_STORAGE_HOUSE,
+                           SLATITUDE         => SREQ_STORAGE_LATITUDE,
+                           SLONGITUDE        => SREQ_STORAGE_LONGITUDE,
+                           SDICPLACE_BARCODE => SDICPLACE_BARCODE);
+        exception
+          when others then
+            SERR_DICPLACE := sqlerrm;
+        end;
+        /* Если метонахождение обработано успешно */
+        if (SERR_DICPLACE is null) then
+          begin
+            /* Обрабатываем ОС */
+            PROCESS_INVENTORY(RELINVENTORY => RELINVENTORY,
+                              SBARCODE     => SREQ_ITEM_CODE,
+                              SINV_NUMBER  => SREQ_ITEM_NUMBER,
+                              NELINVOBJECT => NELINVOBJECT);
+            /* Обрабатываем элемент ведомости */
+            PROCESS_ELINVOBJECT(RELINVENTORY    => RELINVENTORY,
+                                NELINVOBJECT    => NELINVOBJECT,
+                                NINVPERSONS     => NREQ_USER_CODE,
+                                DINV_DATE       => DREQ_ITEM_CHECKDATE,
+                                SBARCODE        => SDICPLACE_BARCODE,
+                                SITEM_COMMENT   => SREQ_ITEM_COMMENT,
+                                NITEM_DISTANCE  => NREQ_ITEM_DISTANCE,
+                                SITEM_LATITUDE  => SREQ_ITEM_LATITUDE,
+                                SITEM_LONGITUDE => SREQ_ITEM_LONGITUDE,
+                                NITEM_QUANTITY  => NREQ_ITEM_QUANTITY);
+          exception
+            when others then
+              SERR_ELINVOBJECT := sqlerrm;
+          end;
+        else
+          SERR_ELINVOBJECT := 'Возникли ошибки при обработке места хранения';
+        end if;
       else
         P_EXCEPTION(0, 'В запросе не указан идентификатор ведомости.');
       end if;
-      /* Создаём пространство имён для ответа */
-      XSAVESHEETITEMRESPONSE := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_SAVESHEETITEMRSPNS, SNS => SNS_TSD);
-      /* Формируем результат */
-      XITEM := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_RESULT, SNS => SNS_TSD, SVAL => 'true');
-      XNODE := DBMS_XMLDOM.APPENDCHILD(N => XSAVESHEETITEMRESPONSE, NEWCHILD => XITEM);
-      /* Оборачиваем ответ в конверт */
-      CRESPONSE := UTL_CREATERESPONSE(XDOC => XDOC, XCONTENT => XSAVESHEETITEMRESPONSE);
+      /* Если ошибок нет - возвращаем положительный ответ */
+      if ((SERR_ELINVOBJECT is null) and (SERR_DICPLACE is null)) then
+        /* Создаём пространство имён для ответа */
+        XSAVESHEETITEMRESPONSE := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_SAVESHEETITEMRSPNS, SNS => SNS_TSD);
+        /* Формируем результат */
+        XITEM := UTL_CREATENODE(XDOC => XDOC, STAG => STAG_RESULT, SNS => SNS_TSD, SVAL => 'true');
+        XNODE := DBMS_XMLDOM.APPENDCHILD(N => XSAVESHEETITEMRESPONSE, NEWCHILD => XITEM);
+        /* Оборачиваем ответ в конверт */
+        CRESPONSE := UTL_CREATERESPONSE(XDOC => XDOC, XCONTENT => XSAVESHEETITEMRESPONSE);
+      else
+        /* Были ошибки - вернём их */
+        CRESPONSE := UTL_CREATEERRORRESPONSE_SSITEM(SMSG_ELINVOBJECT => UTL_CORRECT_ERR(SERR => SERR_ELINVOBJECT),
+                                                    SMSG_DICPLACE    => UTL_CORRECT_ERR(SERR => SERR_DICPLACE));
+      end if;
     exception
-      /* Перехватываем возможные ошибки */
+      /* Перехватываем возможные необработанные ранее ошибки */
       when others then
         CRESPONSE := UTL_CREATEERRORRESPONSE(SMSG => UTL_CORRECT_ERR(SERR => sqlerrm));
     end;
