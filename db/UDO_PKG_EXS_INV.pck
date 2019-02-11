@@ -1455,7 +1455,7 @@ create or replace package body UDO_PKG_EXS_INV as
         P_ELINVOBJECT_BASE_UPDATE(NCOMPANY     => C.COMPANY,
                                   NRN          => C.RN,
                                   DUNLOAD_DATE => C.UNLOAD_DATE,
-                                  DINV_DATE    => NVL(DINV_DATE, sysdate),
+                                  DINV_DATE    => DINV_DATE,
                                   NINVPERSONS  => NINVPERSONS,
                                   SBARCODE     => SBARCODE,
                                   NIS_LOADED   => C.IS_LOADED);
