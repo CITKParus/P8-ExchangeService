@@ -332,8 +332,15 @@ class InQueue extends EventEmitter {
                         }</h3></center></body></html>`
                     );
                 });
-                //Для всех функций сервиса...
-                _.forEach(srvs.functions, fn => {
+                //Для всех статических функций сервиса...
+                _.forEach(_.filter(srvs.functions, fn => fn.sFnURL.startsWith("@")), fn => {
+                    this.webApp.use(
+                        buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL.substr(1) }),
+                        express.static(`${this.inComing.sStaticDir}/${fn.sFnURL.substr(1)}`)
+                    );
+                });
+                //Для всех функций сервиса (кроме статических)...
+                _.forEach(_.filter(srvs.functions, fn => !fn.sFnURL.startsWith("@")), fn => {
                     //...собственный обработчик, в зависимости от указанного способа передачи параметров
                     this.webApp[fn.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST ? "post" : "get"](
                         buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL }),
@@ -380,6 +387,7 @@ class InQueue extends EventEmitter {
                 //Отправим ошибку клиенту
                 res.status(500).send(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)));
             });
+
             //Запускаем сервер
             this.srv = this.webApp.listen(this.inComing.nPort, () => {
                 //И оповещаем всех что запустились
