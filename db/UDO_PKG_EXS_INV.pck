@@ -1250,6 +1250,10 @@ create or replace package body UDO_PKG_EXS_INV as
                                        SADDR_POST      => SADDR_POSTCODE,
                                        SPLACE_DESCRIPT => SADDR_COUNTRY || '/' || SADDR_REGION || '/' || SADDR_LOCALITY || '/' ||
                                                           SADDR_STREET,
+                                       SAOID           => null,
+                                       SAOGUID         => null,
+                                       SHOUSEID        => null,
+                                       SHOUSEGUID      => null,
                                        NRN             => NDICPLACE);
               else
                 P_EXCEPTION(0,
@@ -1302,7 +1306,11 @@ create or replace package body UDO_PKG_EXS_INV as
                                SADDR_BUILDING  => C.ADDR_BUILDING,
                                SADDR_FLAT      => C.ADDR_FLAT,
                                SADDR_POST      => SADDR_POSTCODE,
-                               SPLACE_DESCRIPT => C.PLACE_DESCRIPT);
+                               SPLACE_DESCRIPT => C.PLACE_DESCRIPT,
+                               SAOID           => null,
+                               SAOGUID         => null,
+                               SHOUSEID        => null,
+                               SHOUSEGUID      => null);
         /* Выставим ДС с широтой */
         P_DOCS_PROPS_VALS_BASE_MODIFY(NDOCUMENT   => C.RN,
                                       SUNITCODE   => 'ObjPlace',
