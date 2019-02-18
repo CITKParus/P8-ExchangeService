@@ -45,6 +45,16 @@ const dbConnect = new Schema({
             required: path => `Не указан пароль пользователя БД (${path})`
         }
     },
+    //Схема размещения используемых объектов БД
+    sSchema: {
+        type: String,
+        required: true,
+        message: {
+            type: path =>
+                `Схема размещения используемых объектов БД (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указана схема размещения используемых объектов БД (${path})`
+        }
+    },
     //Строка подключения к БД
     sConnectString: {
         type: String,

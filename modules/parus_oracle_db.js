@@ -39,6 +39,7 @@ const connect = async prms => {
             connectString: prms.sConnectString
         });
         if (prms.sSessionAppName) conn.module = prms.sSessionAppName;
+        await conn.execute(`ALTER SESSION SET CURRENT_SCHEMA=${prms.sSchema}`);
         return conn;
     } catch (e) {
         throw new Error(e.message);
