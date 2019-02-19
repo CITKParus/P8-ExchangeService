@@ -491,15 +491,10 @@ create or replace package body UDO_PKG_EXS_INV as
     end;
     /* Если в составе лицензии нет переданного идентификатора */
     if (SLIC_DEVICEIDS like '%' || SDEVICEID || '%') then
-      /*
-      TODO: owner="mikha" created="16.01.2019"
-      text="Включить при отгрузке в релиз"
-      */
-      null;
       /* Скажем об этом */
-      /*P_EXCEPTION(0,
+      P_EXCEPTION(0,
                   'Идентификатор устровйства "%s" не определён в лицензии.',
-                  SDEVICEID);*/
+                  SDEVICEID);
     end if;
   end UTL_CHECK_DEVICEID;
   
