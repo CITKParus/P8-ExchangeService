@@ -112,6 +112,30 @@ create or replace package body UDO_PKG_EXS_ATOL as
       PKG_MSG.RECORD_NOT_FOUND(NFLAG_SMART => 0, NDOCUMENT => NFISCDOC, SUNIT_TABLE => 'UDO_FISCDOCS');
   end UTL_FISCDOC_GET;
   
+  /* Получение постфикса сервиса обмена для фискального документа по его принадлежности к организации */
+  function UTL_FISCDOC_GET_EXS_POSTFIX
+  (
+    NFISCDOC                in number            -- Рег. номер фискального документа
+  ) return                  varchar2             -- Постфикс сервиса обмена
+  is
+    SRES                    COMPANIES.NAME%type; -- Результат работы
+  begin
+    /* Считаем постфик сервиса обмена (это наименование организации фискального документа) */
+    select C.NAME
+      into SRES
+      from UDO_FISCDOCS  FD,
+           COMPANIES C
+     where FD.RN = NFISCDOC
+       and FD.COMPANY = C.RN;
+    /* Возвращаем результат */
+    return SRES;
+  exception
+    when others then
+      P_EXCEPTION(0, 
+                  'Для фискального документа (RN: %s) не определен постфикс сервиса обмена.',
+                  TO_CHAR(NFISCDOC));
+  end UTL_FISCDOC_GET_EXS_POSTFIX;
+  
   /* Получение мнемокода сервиса обмена и мнемокода его функции по типу функции обработки и версии ФФД */
   procedure UTL_FISCDOC_GET_EXSFN
   (
@@ -120,24 +144,39 @@ create or replace package body UDO_PKG_EXS_ATOL as
     NEXSSERVICEFN           out number   -- Рег. номер функции-обработчика    
   )
   is
+    SEXSRV                  EXSSERVICE.CODE%type;   -- Мнемокод эталонного сервиса обмена из настроек фискального документа
+    SEXSRVFN                EXSSERVICEFN.CODE%type; -- Мнемокод эталонной функции обмена из настроек фискального документа
   begin
     begin
-      select DECODE(SFN_TYPE, SFN_TYPE_REG_BILL, SFNREG.RN, SFN_TYPE_GET_BILL_INF, SFNINF.RN)
-        into NEXSSERVICEFN
+      /* Находим мнемокод эталонной функции и сервиса из настроек фискального документа */
+      select DECODE(SFN_TYPE, SFN_TYPE_REG_BILL, SREG.CODE, SFN_TYPE_GET_BILL_INF, SINF.CODE),
+             DECODE(SFN_TYPE, SFN_TYPE_REG_BILL, SFNREG.CODE, SFN_TYPE_GET_BILL_INF, SFNINF.CODE)
+        into SEXSRV,
+             SEXSRVFN
         from UDO_FISCDOCS  FD,
              UDO_FDKNDVERS TV,
              EXSSERVICEFN  SFNREG,
-             EXSSERVICEFN  SFNINF
+             EXSSERVICEFN  SFNINF,
+             EXSSERVICE    SREG,
+             EXSSERVICE    SINF
        where FD.RN = NFISCDOC
          and FD.TYPE_VERSION = TV.RN
          and TV.FUNCTION_SEND = SFNREG.RN(+)
-         and TV.FUNCTION_RESP = SFNINF.RN(+);
+         and SFNREG.PRN = SREG.RN(+)
+         and TV.FUNCTION_RESP = SFNINF.RN(+)
+         and SFNINF.PRN = SINF.RN(+);
     exception
       when others then
-        NEXSSERVICEFN := null;
+        SEXSRV   := null;
+        SEXSRVFN := null;
     end;
-    /* Проверим, что хоть что-то нашлось */
-    if (NEXSSERVICEFN is null) then
+    /* Если найдены эталонные сервис обмена и функция - подбираем то что нужно по принадлености фискального документа к организации */
+    if ((SEXSRV is not null) and (SEXSRVFN is not null)) then
+      NEXSSERVICEFN := PKG_EXS.SERVICEFN_FIND_BY_SRVCODE(NFLAG_SMART => 0,
+                                                         SEXSSERVICE => SEXSRV || '_' || UTL_FISCDOC_GET_EXS_POSTFIX(NFISCDOC => NFISCDOC),
+                                                         SEXSSERVICEFN => SEXSRVFN);
+    else
+      /* Эталоны не найдены - значит невозможен подбор реальной функции */
       P_EXCEPTION(0,
                   'Для фискального документа (RN: %s) не определеная типовая функция "%s".',
                   TO_CHAR(NFISCDOC),
