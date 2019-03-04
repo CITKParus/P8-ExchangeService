@@ -218,7 +218,13 @@ const appProcess = async prms => {
                     });
                 } catch (e) {
                     //Прекращаем исполнение если были ошибки
-                    throw new ServerError(SERR_WEB_SERVER, `${e.response.statusCode} - ${e.response.statusMessage}`);
+                    let sError = "Неожиданная ошибка удалённого сервиса";
+                    if (e.error) {
+                        let sSubError = e.error.code || e.error;
+                        sError = `Ошибка передачи данных: ${sSubError}`;
+                    }
+                    if (e.response) sError = `${e.response.statusCode} - ${e.response.statusMessage}`;
+                    throw new ServerError(SERR_WEB_SERVER, sError);
                 }
                 //Выполняем обработчик "После" (если он есть)
                 if (prms.function.sAppSrvAfter) {
