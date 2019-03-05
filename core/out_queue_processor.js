@@ -188,10 +188,12 @@ const appProcess = async prms => {
                             //Применим ответ "До" - контекст работы сервиса
                             if (!_.isUndefined(resBefore.sCtx))
                                 if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGIN) {
+                                    prms.service.sCtx = resBefore.sCtx;
+                                    prms.service.dCtxExp = resBefore.dCtxExp;
                                     await dbConn.setServiceContext({
                                         nServiceId: prms.service.nId,
-                                        sCtx: resBefore.sCtx,
-                                        dCtxExp: resBefore.dCtxExp
+                                        sCtx: prms.service.sCtx,
+                                        dCtxExp: prms.service.dCtxExp
                                     });
                                     bCtxIsSet = true;
                                 }
@@ -260,10 +262,12 @@ const appProcess = async prms => {
                             //Применим ответ "После" - контекст работы сервиса
                             if (!_.isUndefined(resAfter.sCtx))
                                 if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGIN) {
+                                    prms.service.sCtx = resAfter.sCtx;
+                                    prms.service.dCtxExp = resAfter.dCtxExp;
                                     await dbConn.setServiceContext({
                                         nServiceId: prms.service.nId,
-                                        sCtx: resAfter.sCtx,
-                                        dCtxExp: resAfter.dCtxExp
+                                        sCtx: prms.service.sCtx,
+                                        dCtxExp: prms.service.dCtxExp
                                     });
                                     bCtxIsSet = true;
                                 }
