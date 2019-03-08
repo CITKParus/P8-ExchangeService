@@ -10,6 +10,9 @@ const cfg = require("./config");
 const utl = require("./core/utils");
 const servSchema = require("./models/obj_service");
 const Schema = require("validate"); //Схемы валидации
+const js2xmlparser = require("js2xmlparser"); //Конвертация JSON в XML
+//const { xml } = require("./fisc_doc_xml");
+const parseString = require("xml2js").parseString; //Конвертация XML в JSON
 /*
 const NDETECTING_LOOP_INTERVAL = 10;
 let nTimeOut = null;
@@ -43,8 +46,7 @@ const notifyDetectingLoop = async () => {
 notifyDetectingLoop();
 */
 
-const errors = servSchema.ServiceExpiredQueueInfo.validate(
-    { nId: 123, nCnt: 0, sInfoList: "dsdfsdf" },
-    { strip: false }
-);
-console.log(errors);
+//let sObjName = "123";
+//console.log(utl.validateObject({}, servSchema.ServiceCtx));
+let b;
+let a = new Buffer(b || "");
