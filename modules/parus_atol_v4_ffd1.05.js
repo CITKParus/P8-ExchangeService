@@ -411,14 +411,14 @@ const getVats = props => {
     if (getPropValueByCode(props, "1105", "NUM") !== null) {
         vats.push({
             type: "none",
-            sum: getPropValueByCode(props, "1105", "NUM")
+            sum: null
         });
     }
     //Сумма расчета по чеку с НДС по ставке 0%;
     if (getPropValueByCode(props, "1104", "NUM") !== null) {
         vats.push({
             type: "vat0",
-            sum: getPropValueByCode(props, "1104", "NUM")
+            sum: 0
         });
     }
     //Сумма НДС чека по ставке 10%;
