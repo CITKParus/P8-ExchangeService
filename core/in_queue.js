@@ -327,7 +327,7 @@ class InQueue extends EventEmitter {
                 //Для любых запросов к корневому адресу сервиса - ответ о том, что это за сервис, и что он работает
                 this.webApp.all(srvs.sSrvRoot, (req, res) => {
                     res.status(200).send(
-                        `<html><body><center><br><h1>Сервер приложений ПП Пурс 8</h1><h3>Сервис: ${
+                        `<html><body><center><br><h1>Сервер приложений ПП Парус 8</h1><h3>Сервис: ${
                             srvs.sName
                         }</h3></center></body></html>`
                     );
@@ -377,7 +377,7 @@ class InQueue extends EventEmitter {
             //Запросы на адреса, не входящие в состав объявленных сервисов - 404 NOT FOUND
             this.webApp.use("*", (req, res) => {
                 res.status(404).send(
-                    "<html><body><center><br><h1>Сервер приложений ПП Пурс 8</h1><h3>Запрошенный адрес не найден</h3></center></body></html>"
+                    "<html><body><center><br><h1>Сервер приложений ПП Парус 8</h1><h3>Запрошенный адрес не найден</h3></center></body></html>"
                 );
             });
             //Ошибки, не отработанные индивидуальными обработчиками - 500 SERVER ERROR
