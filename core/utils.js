@@ -9,6 +9,7 @@
 
 const _ = require("lodash"); //Работа с массивами и объектами
 const os = require("os"); //Средства операционной системы
+const xml2js = require("xml2js"); //Конвертация XML в JSON
 const Schema = require("validate"); //Схемы валидации
 const nodemailer = require("nodemailer"); //Отправка E-Mail сообщений
 const {
@@ -252,6 +253,40 @@ const getIPs = () => {
     return ips;
 };
 
+//Разбор XML (обёртка для async/await)
+const parseXML = (sXML, options) => {
+    return new Promise((resolve, reject) => {
+        xml2js.parseString(sXML, options, (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+        });
+    });
+};
+
+//Разбор параметров сообщения/ответа (XML > JSON)
+const parseOptionsXML = async sOptions => {
+    try {
+        parseRes = await parseXML(sOptions, {
+            explicitArray: false,
+            mergeAttrs: true,
+            valueProcessors: [xml2js.processors.parseNumbers, xml2js.processors.parseBooleans]
+        });
+        return parseRes.options;
+    } catch (e) {
+        throw new Error("Ошибка рабора XML с параметрами сообщения/ответа: " + e);
+    }
+};
+
+//Сборка параметров сообщения/ответа (JSON > XML)
+const buildOptionsXML = options => {
+    try {
+        let builder = new xml2js.Builder();
+        return builder.buildObject(options);
+    } catch (e) {
+        throw new Error("Ошибка сборки XML с параметрами сообщения/ответа: " + e);
+    }
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -265,3 +300,6 @@ exports.getAppSrvFunction = getAppSrvFunction;
 exports.sendMail = sendMail;
 exports.buildURL = buildURL;
 exports.getIPs = getIPs;
+exports.parseXML = parseXML;
+exports.parseOptionsXML = parseOptionsXML;
+exports.buildOptionsXML = buildOptionsXML;
