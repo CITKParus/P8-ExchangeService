@@ -316,6 +316,25 @@ const setQueueMsg = async prms => {
     }
 };
 
+//Установка параметров сообщения очереди
+const setQueueOptions = async prms => {
+    try {
+        let res = await prms.connection.execute(
+            "BEGIN PKG_EXS.QUEUE_OPTIONS_SET(NEXSQUEUE => :NEXSQUEUE, SOPTIONS => :SOPTIONS, RCQUEUE => :RCQUEUE); END;",
+            {
+                NEXSQUEUE: prms.nQueueId,
+                SOPTIONS: prms.sOptions,
+                RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+            },
+            { outFormat: oracledb.OBJECT, autoCommit: true }
+        );
+        let rows = await readCursorData(res.outBinds.RCQUEUE);
+        return rows[0];
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
 //Считывание результата обработки сообщения очереди
 const getQueueResp = async prms => {
     try {
@@ -347,6 +366,25 @@ const setQueueResp = async prms => {
                 NEXSQUEUE: prms.nQueueId,
                 BRESP: prms.blResp,
                 NIS_ORIGINAL: prms.nIsOriginal,
+                RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+            },
+            { outFormat: oracledb.OBJECT, autoCommit: true }
+        );
+        let rows = await readCursorData(res.outBinds.RCQUEUE);
+        return rows[0];
+    } catch (e) {
+        throw new Error(e.message);
+    }
+};
+
+//Установка параметров результата обработки сообщения очереди
+const setQueueOptionsResp = async prms => {
+    try {
+        let res = await prms.connection.execute(
+            "BEGIN PKG_EXS.QUEUE_OPTIONS_RESP_SET(NEXSQUEUE => :NEXSQUEUE, SOPTIONS_RESP => :SOPTIONS_RESP, RCQUEUE => :RCQUEUE); END;",
+            {
+                NEXSQUEUE: prms.nQueueId,
+                SOPTIONS_RESP: prms.sOptionsResp,
                 RCQUEUE: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
             },
             { outFormat: oracledb.OBJECT, autoCommit: true }
@@ -397,6 +435,8 @@ exports.getQueueOutgoing = getQueueOutgoing;
 exports.setQueueState = setQueueState;
 exports.getQueueMsg = getQueueMsg;
 exports.setQueueMsg = setQueueMsg;
+exports.setQueueOptions = setQueueOptions;
 exports.getQueueResp = getQueueResp;
 exports.setQueueResp = setQueueResp;
+exports.setQueueOptionsResp = setQueueOptionsResp;
 exports.execQueuePrc = execQueuePrc;

@@ -455,6 +455,29 @@ exports.setQueueMsg = new Schema({
     }
 }).validator({ required: val => val === null || val });
 
+//Схема валидации параметров функции записи параметров сообщения в позицию очереди
+exports.setQueueOptions = new Schema({
+    //Идентификатор позиции очереди
+    nQueueId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор позиции очереди (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди (${path})`
+        }
+    },
+    //Параметры сообщения очереди обмена
+    sOptions: {
+        type: String,
+        required: true,
+        message: {
+            validateBuffer: path =>
+                `Парамметры сообщения очереди обмена (${path}) имеют некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указаны параметры сообщения очереди обмена (${path})`
+        }
+    }
+}).validator({ required: val => val === null || val === 0 || val });
+
 //Схема валидации параметров функции считывание ответа на сообщение из позиции очереди
 exports.getQueueResp = new Schema({
     //Идентификатор позиции очереди
@@ -499,6 +522,29 @@ exports.setQueueResp = new Schema({
                 `Признак передачи оригинала ответа (${path}) имеет некорректный тип данных (ожидалось - Number)`,
             enum: path => `Значение признака передачи оригинала ответа (${path}) не поддерживается`,
             required: path => `Не указан признак передачи оригинала ответа (${path})`
+        }
+    }
+}).validator({ required: val => val === null || val === 0 || val });
+
+//Схема валидации параметров функции записи параметров ответа на сообщение в позицию очереди
+exports.setQueueOptionsResp = new Schema({
+    //Идентификатор позиции очереди
+    nQueueId: {
+        type: Number,
+        required: true,
+        message: {
+            type: path => `Идентификатор позиции очереди (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан идентификатор позиции очереди (${path})`
+        }
+    },
+    //Параметры ответа на сообщение очереди обмена
+    sOptionsResp: {
+        type: String,
+        required: true,
+        message: {
+            validateBuffer: path =>
+                `Парамметры ответа на сообщение очереди обмена (${path}) имеют некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указаны параметры ответа на сообщение очереди обмена (${path})`
         }
     }
 }).validator({ required: val => val === null || val === 0 || val });

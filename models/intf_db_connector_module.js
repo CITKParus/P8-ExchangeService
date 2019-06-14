@@ -195,6 +195,16 @@ exports.dbConnectorModule = new Schema({
             required: path => `Не реализована функция установки данных сообщения очереди (${path})`
         }
     },
+    //Установка параметров сообщения очереди
+    setQueueOptions: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType: path =>
+                `Функция установки параметров сообщения очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path => `Не реализована функция установки параметров сообщения очереди (${path})`
+        }
+    },
     //Считывание результата обработки сообщения очереди
     getQueueResp: {
         use: { validateAsyncFunctionType },
@@ -213,6 +223,17 @@ exports.dbConnectorModule = new Schema({
             validateAsyncFunctionType: path =>
                 `Функция установки результата обработки сообщения очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
             required: path => `Не реализована функция установки результата обработки сообщения очереди (${path})`
+        }
+    },
+    //Установка параметров результата обработки сообщения очереди
+    setQueueOptionsResp: {
+        use: { validateAsyncFunctionType },
+        required: true,
+        message: {
+            validateAsyncFunctionType: path =>
+                `Функция установки параметров результата обработки сообщения очереди (${path}) имеет неверный формат (ожидалось - AsyncFunction)`,
+            required: path =>
+                `Не реализована функция установки параметров результата обработки сообщения очереди (${path})`
         }
     },
     //Исполнение обработчика со стороны БД для сообщения очереди
