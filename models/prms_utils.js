@@ -97,3 +97,53 @@ exports.buildURL = new Schema({
         }
     }
 });
+
+//Схема валидации параметров функции разбора XML
+exports.parseXML = new Schema({
+    //Разбираемый XML
+    sXML: {
+        type: String,
+        required: true,
+        message: {
+            type: path => `Разбираемый XML (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан разбираемый XML (${path})`
+        }
+    },
+    //Параметры парсера
+    options: {
+        type: Object,
+        required: true,
+        message: {
+            type: path =>
+                `Параметры парсера XML (${path}) имеют некорректный тип данных (ожидалось - Object, см. документацию к XML2JS - https://github.com/Leonidas-from-XIV/node-xml2js)`,
+            required: path => `Не указаны параметры парсера XML (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции разбора XML параметров сообщения/ответа (XML > JSON)
+exports.parseOptionsXML = new Schema({
+    //XML параметры сообщения/ответа
+    sOptions: {
+        type: String,
+        required: true,
+        message: {
+            type: path => `XML параметры сообщения/ответа (${path}) имеют некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указаны XML параметры сообщения/ответа (${path})`
+        }
+    }
+});
+
+//Схема валидации параметров функции сборки параметров сообщения/ответа (JSON > XML)
+exports.buildOptionsXML = new Schema({
+    //XML параметры сообщения/ответа
+    options: {
+        type: Object,
+        required: true,
+        message: {
+            type: path =>
+                `Объект параметров сообщения/ответа (${path}) имеет некорректный тип данных (ожидалось - Object)`,
+            required: path => `Не указан объект параметров сообщения/ответа (${path})`
+        }
+    }
+});

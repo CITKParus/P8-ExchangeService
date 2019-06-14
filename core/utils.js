@@ -174,7 +174,7 @@ const getAppSrvFunction = sAppSrv => {
 //Отправка E-Mail уведомления
 const sendMail = prms => {
     return new Promise((resolve, reject) => {
-        //Проверяем структуру переданного объекта для старта
+        //Проверяем структуру переданного объекта для отправки E-Mail уведомления
         let sCheckResult = validateObject(
             prms,
             prmsUtilsSchema.sendMail,
@@ -224,7 +224,7 @@ const sendMail = prms => {
 
 //Сборка URL по адресу сервиса и функции сервиса
 const buildURL = prms => {
-    //Проверяем структуру переданного объекта для старта
+    //Проверяем структуру переданного объекта для сборки URL
     let sCheckResult = validateObject(prms, prmsUtilsSchema.buildURL, "Параметры функции формирования URL");
     //Если структура объекта в норме
     if (!sCheckResult) {
@@ -254,36 +254,68 @@ const getIPs = () => {
 };
 
 //Разбор XML (обёртка для async/await)
-const parseXML = (sXML, options) => {
+const parseXML = prms => {
     return new Promise((resolve, reject) => {
-        xml2js.parseString(sXML, options, (err, result) => {
-            if (err) reject(err);
-            else resolve(result);
-        });
+        //Проверяем структуру переданного объекта для парсинша
+        let sCheckResult = validateObject(prms, prmsUtilsSchema.parseXML, "Параметры функции разбора XML");
+        //Если структура объекта в норме
+        if (!sCheckResult) {
+            xml2js.parseString(prms.sXML, prms.options, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        } else {
+            reject(new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult));
+        }
     });
 };
 
 //Разбор параметров сообщения/ответа (XML > JSON)
-const parseOptionsXML = async sOptions => {
-    try {
-        parseRes = await parseXML(sOptions, {
-            explicitArray: false,
-            mergeAttrs: true,
-            valueProcessors: [xml2js.processors.parseNumbers, xml2js.processors.parseBooleans]
-        });
-        return parseRes.options;
-    } catch (e) {
-        throw new Error("Ошибка рабора XML с параметрами сообщения/ответа: " + e);
+const parseOptionsXML = async prms => {
+    //Проверяем структуру переданных параметров
+    let sCheckResult = validateObject(
+        prms,
+        prmsUtilsSchema.parseOptionsXML,
+        "Параметры функции разбора XML параметров сообщения/ответа"
+    );
+    //Если структура объекта в норме
+    if (!sCheckResult) {
+        try {
+            parseRes = await parseXML({
+                sXML: prms.sOptions,
+                options: {
+                    explicitArray: false,
+                    mergeAttrs: true,
+                    valueProcessors: [xml2js.processors.parseNumbers, xml2js.processors.parseBooleans]
+                }
+            });
+            return parseRes.root;
+        } catch (e) {
+            throw new Error("Ошибка рабора XML с параметрами сообщения/ответа: " + e);
+        }
+    } else {
+        throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
     }
 };
 
 //Сборка параметров сообщения/ответа (JSON > XML)
-const buildOptionsXML = options => {
-    try {
-        let builder = new xml2js.Builder();
-        return builder.buildObject(options);
-    } catch (e) {
-        throw new Error("Ошибка сборки XML с параметрами сообщения/ответа: " + e);
+const buildOptionsXML = prms => {
+    //Проверяем структуру переданных параметров
+    let sCheckResult = validateObject(
+        prms,
+        prmsUtilsSchema.buildOptionsXML,
+        "Параметры функции сборки XML параметров сообщения/ответа"
+    );
+    //Если структура объекта в норме
+    if (!sCheckResult) {
+        try {
+            let builder = new xml2js.Builder();
+            return builder.buildObject({ root: prms.options });
+        } catch (e) {
+            throw new Error("Ошибка сборки XML с параметрами сообщения/ответа: " + e);
+        }
+    } else {
+        throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
     }
 };
 
