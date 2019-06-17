@@ -12,7 +12,14 @@ const EventEmitter = require("events"); //Обработчик пользова�
 const express = require("express"); //WEB-сервер Express
 const bodyParser = require("body-parser"); //Модуль для Express (разбор тела входящего запроса)
 const { ServerError } = require("./server_errors"); //Типовая ошибка
-const { makeErrorText, validateObject, buildURL, getAppSrvFunction } = require("./utils"); //Вспомогательные функции
+const {
+    makeErrorText,
+    validateObject,
+    buildURL,
+    getAppSrvFunction,
+    buildOptionsXML,
+    parseOptionsXML
+} = require("./utils"); //Вспомогательные функции
 const { NINC_EXEC_CNT_YES, NIS_ORIGINAL_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 const objInQueueSchema = require("../models/obj_in_queue"); //Схема валидации сообщений обмена с бработчиком очереди входящих сообщений
 const objServiceSchema = require("../models/obj_service"); //Схемы валидации сервиса
@@ -96,6 +103,9 @@ class InQueue extends EventEmitter {
                 //Тело сообщения и ответ на него
                 let blMsg = null;
                 let blResp = null;
+                //Параметры сообщения и ответа на него
+                let options = {};
+                let optionsResp = {};
                 //Определимся с телом сообщения - для POST сообщений - это тело запроса
                 if (prms.function.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
                     blMsg = prms.req.body && !_.isEmpty(prms.req.body) ? prms.req.body : null;
@@ -103,9 +113,15 @@ class InQueue extends EventEmitter {
                     //Для GET - параметры запроса
                     if (!_.isEmpty(prms.req.query)) blMsg = new Buffer(JSON.stringify(prms.req.query));
                 }
+                //Определимся с параметрами сообщения полученными от внешней системы
+                options = {
+                    method: prms.req.method,
+                    headers: _.cloneDeep(prms.req.headers)
+                };
                 //Кладём сообщение в очередь
                 q = await this.dbConn.putQueue({
                     nServiceFnId: prms.function.nId,
+                    sOptions: buildOptionsXML({ options }),
                     blMsg
                 });
                 //Скажем что пришло новое входящее сообщение
@@ -130,6 +146,7 @@ class InQueue extends EventEmitter {
                         resBeforePrms.queue = _.cloneDeep(q);
                         resBeforePrms.queue.blMsg = blMsg;
                         resBeforePrms.queue.blResp = blResp;
+                        resBeforePrms.options = _.cloneDeep(options);
                         resBefore = await fnBefore(resBeforePrms);
                     } catch (e) {
                         throw new ServerError(SERR_APP_SERVER_BEFORE, e.message);
@@ -148,7 +165,7 @@ class InQueue extends EventEmitter {
                                 nQueueId: q.nId,
                                 nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
                             });
-                            //Фиксируем результат исполнения
+                            //Фиксируем результат исполнения "До" - обработанный запрос внешней системы
                             if (!_.isUndefined(resBefore.blMsg)) {
                                 blMsg = resBefore.blMsg;
                                 q = await this.dbConn.setQueueMsg({
@@ -156,6 +173,7 @@ class InQueue extends EventEmitter {
                                     blMsg
                                 });
                             }
+                            //Фиксируем результат исполнения "До" - ответ на запрос
                             if (!_.isUndefined(resBefore.blResp)) {
                                 blResp = resBefore.blResp;
                                 q = await this.dbConn.setQueueResp({
@@ -163,6 +181,12 @@ class InQueue extends EventEmitter {
                                     blResp,
                                     nIsOriginal: NIS_ORIGINAL_NO
                                 });
+                            }
+                            //Фиксируем результат исполнения "До" - параметры ответа на запрос
+                            if (!_.isUndefined(resBefore.optionsResp)) {
+                                _.extend(optionsResp, resBefore.optionsResp);
+                                let sOptionsResp = buildOptionsXML({ options: optionsResp });
+                                q = await this.dbConn.setQueueOptionsResp({ nQueueId: q.nId, sOptionsResp });
                             }
                             //Если пришел флаг ошибочной аутентификации и он положительный - то это ошибка, дальше ничего не делаем
                             if (!_.isUndefined(resBefore.bUnAuth))
@@ -197,6 +221,20 @@ class InQueue extends EventEmitter {
                     //Считаем ответ полученный от системы
                     let qData = await this.dbConn.getQueueResp({ nQueueId: q.nId });
                     blResp = qData.blResp;
+                    //Запомним параметры ответа внешней системе, если обработчик их вернул
+                    if (prcRes.sOptionsResp) {
+                        try {
+                            let optionsRespTmp = await parseOptionsXML({ sOptions: prcRes.sOptionsResp });
+                            _.extend(optionsResp, optionsRespTmp);
+                        } catch (e) {
+                            await logger.warn(
+                                `Указанные для сообщения параметры ответа имеют некорректный формат - использую параметры по умолчанию. Ошибка парсера: ${makeErrorText(
+                                    e
+                                )}`,
+                                { nQueueId: prms.queue.nId }
+                            );
+                        }
+                    }
                 }
                 //Выполняем обработчик "После" (если он есть)
                 if (prms.function.sAppSrvAfter) {
@@ -213,6 +251,8 @@ class InQueue extends EventEmitter {
                         resAfterPrms.queue = _.cloneDeep(q);
                         resAfterPrms.queue.blMsg = blMsg;
                         resAfterPrms.queue.blResp = blResp;
+                        resAfterPrms.options = _.cloneDeep(options);
+                        resAfterPrms.optionsResp = _.cloneDeep(optionsResp);
                         resAfter = await fnAfter(resAfterPrms);
                     } catch (e) {
                         throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
@@ -231,7 +271,7 @@ class InQueue extends EventEmitter {
                                 nQueueId: q.nId,
                                 nExecState: objQueueSchema.NQUEUE_EXEC_STATE_APP_OK
                             });
-                            //Фиксируем результат исполнения
+                            //Фиксируем результат исполнения "После" - ответ системы
                             if (!_.isUndefined(resAfter.blResp)) {
                                 blResp = resAfter.blResp;
                                 q = await this.dbConn.setQueueResp({
@@ -239,6 +279,12 @@ class InQueue extends EventEmitter {
                                     blResp,
                                     nIsOriginal: NIS_ORIGINAL_NO
                                 });
+                            }
+                            //Фиксируем результат исполнения "После" - параметры ответа на запрос
+                            if (!_.isUndefined(resAfter.optionsResp)) {
+                                _.extend(optionsResp, resAfter.optionsResp);
+                                let sOptionsResp = buildOptionsXML({ options: optionsResp });
+                                q = await this.dbConn.setQueueOptionsResp({ nQueueId: q.nId, sOptionsResp });
                             }
                             //Если пришел флаг ошибочной аутентификации и он положительный - то это ошибка, дальше ничего не делаем
                             if (!_.isUndefined(resAfter.bUnAuth))
@@ -250,6 +296,7 @@ class InQueue extends EventEmitter {
                     }
                 }
                 //Всё успешно - отдаём результат клиенту
+                if (optionsResp.headers) prms.res.set(optionsResp.headers);
                 prms.res.status(200).send(blResp);
                 //Фиксируем успех обработки - в статусе сообщения
                 q = await this.dbConn.setQueueState({

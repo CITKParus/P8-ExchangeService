@@ -15,6 +15,16 @@ const Schema = require("validate"); //Схемы валидации
 
 //Схема валидации результата работы функции "предобработки" сообщения очереди сервером приложений
 exports.InQueueProcessorFnBefore = new Schema({
+    //Параметры ответа системы
+    optionsResp: {
+        type: Object,
+        required: false,
+        message: {
+            type: path =>
+                `Параметры ответа системы (${path}) имеют некорректный тип данных (ожидалось - Object, см. документацию к REQUEST - https://github.com/request/request)`,
+            required: path => `Не указаны параметры ответа системы (${path})`
+        }
+    },
     //Обработанный запрос внешней системы
     blMsg: {
         type: Buffer,
@@ -48,6 +58,16 @@ exports.InQueueProcessorFnBefore = new Schema({
 
 //Схема валидации результата работы функции "постобработки" сообщения очереди сервером приложений
 exports.InQueueProcessorFnAfter = new Schema({
+    //Параметры ответа системы
+    optionsResp: {
+        type: Object,
+        required: false,
+        message: {
+            type: path =>
+                `Параметры ответа системы (${path}) имеют некорректный тип данных (ожидалось - Object, см. документацию к REQUEST - https://github.com/request/request)`,
+            required: path => `Не указаны параметры ответа системы (${path})`
+        }
+    },
     //Обработанный ответ системы
     blResp: {
         type: Buffer,
