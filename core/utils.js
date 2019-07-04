@@ -81,6 +81,8 @@ const makeModuleFullPath = sModuleName => {
 const makeErrorText = e => {
     //Сообщение об ошибке по умолчанию
     let sErr = `${SERR_UNEXPECTED}: ${e.message}`;
+    //Если это простая строка
+    if (e instanceof String || typeof e === "string") sErr = `${SERR_UNEXPECTED}: ${e}`;
     //Если это наше внутреннее сообщение, с кодом, то сделаем ошибку более информативной
     if (e instanceof ServerError) sErr = `${e.sCode}: ${e.sMessage}`;
     //Вернем ответ
@@ -319,6 +321,16 @@ const buildOptionsXML = prms => {
     }
 };
 
+//Получение текущего времени в строковом формате
+const getNowString = () => {
+    //Создадим объект даты
+    const dNow = new Date();
+    //Возьмём его строковое представление
+    const sNow = dNow.toLocaleString();
+    //Вернем результат
+    return sNow;
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -335,3 +347,4 @@ exports.getIPs = getIPs;
 exports.parseXML = parseXML;
 exports.parseOptionsXML = parseOptionsXML;
 exports.buildOptionsXML = buildOptionsXML;
+exports.getNowString = getNowString;
