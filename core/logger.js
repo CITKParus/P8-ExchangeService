@@ -8,8 +8,13 @@
 //----------------------
 
 const _ = require("lodash"); //Работа с массивами и объектами
-const { validateObject } = require("./utils"); //Вспомогательные функции
+const { validateObject, getNowString } = require("./utils"); //Вспомогательные функции
 const db = require("./db_connector"); //Модуль взаимодействия с БД
+const {
+    SCONSOLE_LOG_COLOR_PATTERN_ERR,
+    SCONSOLE_LOG_COLOR_PATTERN_WRN,
+    SCONSOLE_LOG_COLOR_PATTERN_INF
+} = require("./constants"); //Общие константы
 const { NLOG_STATE_INF, NLOG_STATE_WRN, NLOG_STATE_ERR } = require("../models/obj_log"); //Схемы валидации записи журнала работы сервиса обмена
 const prmsLoggerSchema = require("../models/prms_logger"); //Схемы валидации параметров функций модуля
 
@@ -44,8 +49,7 @@ class Logger {
     //Протоколирование
     async log(prms) {
         //Фиксируем время
-        const dNow = new Date();
-        const sNow = dNow.toLocaleString();
+        const sNow = getNowString();
         //Проверяем структуру переданного объекта для подключения
         let sCheckResult = validateObject(prms, prmsLoggerSchema.log, "Параметры функции протоколирования");
         //Если структура объекта в норме
@@ -56,17 +60,17 @@ class Logger {
             switch (prms.nLogState) {
                 case NLOG_STATE_ERR: {
                     sPrefix = "ОШИБКА";
-                    sColorPattern = "\x1b[31m%s\x1b[0m%s";
+                    sColorPattern = SCONSOLE_LOG_COLOR_PATTERN_ERR;
                     break;
                 }
                 case NLOG_STATE_WRN: {
                     sPrefix = "ПРЕДУПРЕЖДЕНИЕ";
-                    sColorPattern = "\x1b[33m%s\x1b[0m%s";
+                    sColorPattern = SCONSOLE_LOG_COLOR_PATTERN_WRN;
                     break;
                 }
                 case NLOG_STATE_INF: {
                     sPrefix = "ИНФОРМАЦИЯ";
-                    sColorPattern = "\x1b[32m%s\x1b[0m%s";
+                    sColorPattern = SCONSOLE_LOG_COLOR_PATTERN_INF;
                     break;
                 }
                 default:
@@ -82,11 +86,11 @@ class Logger {
                         await this.dbConnector.putLog(prms);
                     }
                 } catch (e) {
-                    console.log("\x1b[31m%s\x1b[0m%s", `${sNow} ОШИБКА ПРОТОКОЛИРОВАНИЯ: `, e.sMessage);
+                    console.log(SCONSOLE_LOG_COLOR_PATTERN_ERR, `${sNow} ОШИБКА ПРОТОКОЛИРОВАНИЯ: `, e.sMessage);
                 }
             }
         } else {
-            console.log("\x1b[31m%s\x1b[0m%s", `${sNow} ОШИБКА ПРОТОКОЛИРОВАНИЯ: `, sCheckResult);
+            console.log(SCONSOLE_LOG_COLOR_PATTERN_ERR, `${sNow} ОШИБКА ПРОТОКОЛИРОВАНИЯ: `, sCheckResult);
             console.log(prms);
         }
     }
