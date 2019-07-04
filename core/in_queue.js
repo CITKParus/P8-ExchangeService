@@ -116,6 +116,7 @@ class InQueue extends EventEmitter {
                 //Определимся с параметрами сообщения полученными от внешней системы
                 options = {
                     method: prms.req.method,
+                    qs: _.cloneDeep(prms.req.query),
                     headers: _.cloneDeep(prms.req.headers)
                 };
                 //Кладём сообщение в очередь
@@ -434,7 +435,6 @@ class InQueue extends EventEmitter {
                 //Отправим ошибку клиенту
                 res.status(500).send(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)));
             });
-
             //Запускаем сервер
             this.srv = this.webApp.listen(this.inComing.nPort, () => {
                 //И оповещаем всех что запустились
