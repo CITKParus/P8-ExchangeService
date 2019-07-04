@@ -40,6 +40,8 @@ class ParusAppServer {
         this.notifier = null;
         //Флаг остановки сервера
         this.bStopping = false;
+        //Таймаут останова сервера
+        this.terminateTimeout = null;
         //Список обслуживаемых сервисов
         this.services = [];
         //Привяжем методы к указателю на себя для использования в обработчиках событий
@@ -175,16 +177,14 @@ class ParusAppServer {
                 await this.logger.warn("Отключение сервера приложений от БД...");
                 try {
                     await this.dbConn.disconnect();
-                    process.exit(0);
                 } catch (e) {
                     await this.logger.error(`Ошибка отключения от БД: ${e.sCode}: ${e.sMessage}`);
-                    process.exit(1);
                 }
-            } else {
-                process.exit(0);
+                //Мы закончили останов - сброс таймера аварийного останова, процесс завершится самостоятельно
+                if (this.terminateTimeout) {
+                    clearTimeout(this.terminateTimeout);
+                }
             }
-        } else {
-            process.exit(0);
         }
     }
     //Инициализация сервера
@@ -252,10 +252,12 @@ class ParusAppServer {
         await this.dbConn.connect();
     }
     //Останов сервера
-    async stop() {
+    async stop(terminateTimeout) {
         if (!this.bStopping) {
             //Установим флаг - остановка в процессе
             this.bStopping = true;
+            //Запомним таймер аварийного останова
+            this.terminateTimeout = terminateTimeout;
             //Сообщаем, что начался останов сервера
             await this.logger.warn("Останов сервера приложений...");
             //Останов обслуживания очереди исходящих

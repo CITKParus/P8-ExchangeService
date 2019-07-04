@@ -13,6 +13,9 @@ const Schema = require("validate"); //Схемы валидации
 //  Тело модуля
 //-------------
 
+//Функция проверки значения таймаута останова сервера
+const validateTerminateTimeout = val => val >= 1000 && val <= 120000 && Number.isInteger(val);
+
 //Функция проверки значения размера блока одновременно обрабатываемых исходящих сообщений
 const validateMaxWorkers = val => val >= 1 && val <= 100 && Number.isInteger(val);
 
@@ -24,6 +27,22 @@ const validateInComingPort = val => val >= 0 && val <= 65535 && Number.isInteger
 
 //Функция проверки значения порта сервера обслуживания входящих сообщений
 const validateMsgMaxSize = val => val >= 1 && val <= 1000 && Number.isInteger(val);
+
+//Схема валидации общих параметров сервера приложений
+const common = new Schema({
+    //Таймаут останова сервера (мс)
+    nTerminateTimeout: {
+        type: Number,
+        required: true,
+        use: { validateTerminateTimeout },
+        message: {
+            type: path => `Таймаут останова сервера (${path}) имеет некорректный тип данных (ожидалось - Number)`,
+            required: path => `Не указан таймаут останова сервера (${path})`,
+            validateTerminateTimeout: path =>
+                `Таймаут останова сервера (${path}) должен быть целым числом в диапазоне от 1000 до 120000`
+        }
+    }
+});
 
 //Схема валидации параметров подключения к БД
 const dbConnect = new Schema({
@@ -209,6 +228,14 @@ const mail = new Schema({
 
 //Схема валидации файла конфигурации
 const config = new Schema({
+    //Общие параметры
+    common: {
+        schema: common,
+        required: true,
+        message: {
+            required: path => `Не указаны общие параметры конфигурации сервера приложений (${path})`
+        }
+    },
     //Параметры подключения к БД
     dbConnect: {
         schema: dbConnect,
@@ -247,6 +274,8 @@ const config = new Schema({
 //  Интерфейс модуля
 //------------------
 
+//Схема валидации общих параметров сервера приложений
+exports.common = common;
 //Схема валидации записи журнала работы сервиса обмена
 exports.dbConnect = dbConnect;
 //Схема валидации параметров обработки очереди исходящих сообщений

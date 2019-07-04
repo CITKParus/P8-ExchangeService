@@ -7,6 +7,12 @@
 // Тело модуля
 //------------
 
+//Общие параметры
+let common = {
+    //Таймаут останова сервера (мс)
+    nTerminateTimeout: 60000
+};
+
 //Параметры подключения к БД
 let dbConnect = {
     //Пользователь БД
@@ -60,6 +66,7 @@ let mail = {
 //-----------------
 
 module.exports = {
+    common,
     dbConnect,
     outGoing,
     inComing,
