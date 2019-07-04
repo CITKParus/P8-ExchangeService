@@ -20,8 +20,7 @@ exports.InQueueProcessorFnBefore = new Schema({
         type: Object,
         required: false,
         message: {
-            type: path =>
-                `Параметры ответа системы (${path}) имеют некорректный тип данных (ожидалось - Object, см. документацию к REQUEST - https://github.com/request/request)`,
+            type: path => `Параметры ответа системы (${path}) имеют некорректный тип данных (ожидалось - Object)`,
             required: path => `Не указаны параметры ответа системы (${path})`
         }
     },
@@ -63,8 +62,7 @@ exports.InQueueProcessorFnAfter = new Schema({
         type: Object,
         required: false,
         message: {
-            type: path =>
-                `Параметры ответа системы (${path}) имеют некорректный тип данных (ожидалось - Object, см. документацию к REQUEST - https://github.com/request/request)`,
+            type: path => `Параметры ответа системы (${path}) имеют некорректный тип данных (ожидалось - Object)`,
             required: path => `Не указаны параметры ответа системы (${path})`
         }
     },
