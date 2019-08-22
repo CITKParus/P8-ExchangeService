@@ -137,17 +137,14 @@ const appProcess = async prms => {
                 //Кладём данные контекста в сервис
                 _.extend(prms.service, serviceCtx);
                 //Собираем параметры для передачи серверу
-                let options = {
-                    method: prms.function.sFnPrmsType,
-                    encoding: null,
-                    headers: { "content-type": "application/octet-stream" }
-                };
+                let options = { method: prms.function.sFnPrmsType, encoding: null };
                 //Инициализируем параметры ответа сервера
                 let optionsResp = {};
                 //Определимся с URL и телом сообщения в зависимости от способа передачи параметров
                 if (prms.function.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
                     options.url = buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL });
                     options.body = prms.queue.blMsg;
+                    options.headers = { "content-type": "application/octet-stream" };
                 } else {
                     options.url = buildURL({
                         sSrvRoot: prms.service.sSrvRoot,
