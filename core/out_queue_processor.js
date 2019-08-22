@@ -137,7 +137,11 @@ const appProcess = async prms => {
                 //Кладём данные контекста в сервис
                 _.extend(prms.service, serviceCtx);
                 //Собираем параметры для передачи серверу
-                let options = { method: prms.function.sFnPrmsType, encoding: null };
+                let options = {
+                    method: prms.function.sFnPrmsType,
+                    encoding: null,
+                    headers: { "content-type": "application/octet-stream" }
+                };
                 //Инициализируем параметры ответа сервера
                 let optionsResp = {};
                 //Определимся с URL и телом сообщения в зависимости от способа передачи параметров
