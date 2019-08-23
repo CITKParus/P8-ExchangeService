@@ -236,7 +236,9 @@ const appProcess = async prms => {
                 try {
                     //Сохраняем параметры с которыми уходило сообщение
                     try {
-                        let sOptions = buildOptionsXML({ options });
+                        let tmpOptions = _.cloneDeep(options);
+                        tmpOptions.body = null;
+                        let sOptions = buildOptionsXML({ tmpOptions });
                         await dbConn.setQueueOptions({ nQueueId: prms.queue.nId, sOptions });
                     } catch (e) {
                         await logger.warn(`Не удалось сохранить параметры отправки сообщения: ${makeErrorText(e)}`, {
