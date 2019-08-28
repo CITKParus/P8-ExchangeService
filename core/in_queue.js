@@ -127,7 +127,7 @@ class InQueue extends EventEmitter {
                 });
                 //Скажем что пришло новое входящее сообщение
                 await this.logger.info(
-                    `Новое входящее сообщение от ${prms.req.connection.address().address} для фукнции ${
+                    `Новое входящее сообщение от ${prms.req.connection.address().address} для функции ${
                         prms.function.sCode
                     } (${buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL })})`,
                     { nQueueId: q.nId }
