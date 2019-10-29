@@ -255,8 +255,9 @@ const appProcess = async prms => {
                         blResp: prms.queue.blResp,
                         nIsOriginal: NIS_ORIGINAL_YES
                     });
-                    //Сохраняем заголовки ответа
+                    //Сохраняем заголовки ответа и HTTP-статус
                     optionsResp.headers = _.cloneDeep(serverResp.headers);
+                    optionsResp.statusCode = serverResp.statusCode;
                     try {
                         let sOptionsResp = buildOptionsXML({ options: optionsResp });
                         await dbConn.setQueueOptionsResp({ nQueueId: prms.queue.nId, sOptionsResp });
