@@ -16,9 +16,9 @@ let common = {
 //Параметры подключения к БД
 let dbConnect = {
     //Пользователь БД
-    sUser: "parus",
+    sUser: "exs",
     //Пароль пользователя БД
-    sPassword: "parus",
+    sPassword: "exs",
     //Схема размещения используемых объектов БД
     sSchema: "PARUS",
     //Строка подключения к БД
