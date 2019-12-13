@@ -54,11 +54,11 @@ let mail = {
     //Порт сервера SMTP
     nPort: 465,
     //Имя пользователя SMTP-сервера
-    sUser: "some-service@some-servive",
+    sUser: "some-user",
     //Пароль пользователя SMTP-сервера
     sPass: "some-password",
     //Наименование отправителя для исходящих сообщений
-    sFrom: "'Сервис интеграции с WEB-API' <some-service@some-servive.ru>"
+    sFrom: "'Сервис интеграции с WEB-API' <some-user@some-servive.ru>"
 };
 
 //-----------------
