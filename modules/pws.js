@@ -14,7 +14,7 @@ const js2xmlparser = require("js2xmlparser"); //Конвертация JSON в X
 //---------------------
 
 //Наименования XML-элементов
-const SREQEST_ROOT = "XREQEST"; //Корневой элемент XML-представления входящего запроса
+const SREQUEST_ROOT = "XREQUEST"; //Корневой элемент XML-представления входящего запроса
 
 //Поля заголовка сообщения
 const SHEADER_CONTENT_TYPE_JSON = "application/json"; //Значение "content-type" для JSON
@@ -42,7 +42,7 @@ const before = async prms => {
         let requestXML = "";
         try {
             request = JSON.parse(prms.queue.blMsg.toString());
-            requestXML = js2xmlparser.parse(SREQEST_ROOT, request);
+            requestXML = js2xmlparser.parse(SREQUEST_ROOT, request[SREQUEST_ROOT]);
         } catch (e) {
             requestXML = "";
         }
