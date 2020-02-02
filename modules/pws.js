@@ -62,6 +62,9 @@ const after = async prms => {
         parseRes = await parseXML(prms.queue.blResp.toString());
         //Выставим в заголовке верный тип отправляемых данных
         let tmpOptionsResp = _.cloneDeep(prms.optionsResp);
+        //Инициализируем заголовок если надо
+        if (!tmpOptionsResp.headers) tmpOptionsResp.headers = {};
+        //Выставим ключ для JSON-данных
         tmpOptionsResp.headers["content-type"] = SHEADER_CONTENT_TYPE_JSON;
         //Вернём его клиенту в таком виде
         return {
