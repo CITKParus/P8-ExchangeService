@@ -19,9 +19,10 @@
     "homepage": "https://github.com/CITKParus/ExchangeService#readme",
     "dependencies": {
         "body-parser": "^1.18.3",
+        "cors": "^2.8.5",
         "express": "^4.16.4",
         "js2xmlparser": "^3.0.0",
-        "lodash": "^4.17.11",
+        "lodash": "^4.17.15",
         "module-alias": "^2.1.0",
         "nodemailer": "^4.7.0",
         "oracledb": "^2.3.0",

@@ -10,6 +10,7 @@
 const _ = require("lodash"); //Работа с массивами и коллекциями
 const EventEmitter = require("events"); //Обработчик пользовательских событий
 const express = require("express"); //WEB-сервер Express
+const cors = require("cors"); //Управление заголовками безопасности для WEB-сервера Express
 const bodyParser = require("body-parser"); //Модуль для Express (разбор тела входящего запроса)
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const {
@@ -71,6 +72,8 @@ class InQueue extends EventEmitter {
             this.notifier = prms.notifier;
             //WEB-приложение
             this.webApp = express();
+            this.webApp.use(cors());
+            this.webApp.options("*", cors());
             //WEB-сервер
             this.srv = null;
         } else {
@@ -309,9 +312,7 @@ class InQueue extends EventEmitter {
                 await this.logger.info(`Входящее сообщение ${q.nId} успешно отработано`, { nQueueId: q.nId });
             } catch (e) {
                 //Тема и текст уведомления об ошибке
-                let sSubject = `Ошибка обработки входящего сообщения сервером приложений для функции "${
-                    prms.function.sCode
-                }" сервиса "${prms.service.sCode}"`;
+                let sSubject = `Ошибка обработки входящего сообщения сервером приложений для функции "${prms.function.sCode}" сервиса "${prms.service.sCode}"`;
                 let sMessage = makeErrorText(e);
                 //Если сообщение очереди успели создать
                 if (q) {
@@ -328,9 +329,7 @@ class InQueue extends EventEmitter {
                         { nQueueId: q.nId }
                     );
                     //Добавим чуть больше информации в тему сообщения
-                    sSubject = `Ошибка обработки входящего сообщения ${q.nId} сервером приложений для функции "${
-                        prms.function.sCode
-                    }" сервиса "${prms.service.sCode}"`;
+                    sSubject = `Ошибка обработки входящего сообщения ${q.nId} сервером приложений для функции "${prms.function.sCode}" сервиса "${prms.service.sCode}"`;
                 } else {
                     //Ограничимся общей ошибкой
                     await this.logger.error(sMessage, {
@@ -375,52 +374,56 @@ class InQueue extends EventEmitter {
                 //Для любых запросов к корневому адресу сервиса - ответ о том, что это за сервис, и что он работает
                 this.webApp.all(srvs.sSrvRoot, (req, res) => {
                     res.status(200).send(
-                        `<html><body><center><br><h1>Сервер приложений ПП Парус 8</h1><h3>Сервис: ${
-                            srvs.sName
-                        }</h3></center></body></html>`
+                        `<html><body><center><br><h1>Сервер приложений ПП Парус 8</h1><h3>Сервис: ${srvs.sName}</h3></center></body></html>`
                     );
                 });
                 //Для всех статических функций сервиса...
-                _.forEach(_.filter(srvs.functions, fn => fn.sFnURL.startsWith("@")), fn => {
-                    this.webApp.use(
-                        buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL.substr(1) }),
-                        express.static(`${this.inComing.sStaticDir}/${fn.sFnURL.substr(1)}`)
-                    );
-                });
+                _.forEach(
+                    _.filter(srvs.functions, fn => fn.sFnURL.startsWith("@")),
+                    fn => {
+                        this.webApp.use(
+                            buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL.substr(1) }),
+                            express.static(`${this.inComing.sStaticDir}/${fn.sFnURL.substr(1)}`)
+                        );
+                    }
+                );
                 //Для всех функций сервиса (кроме статических)...
-                _.forEach(_.filter(srvs.functions, fn => !fn.sFnURL.startsWith("@")), fn => {
-                    //...собственный обработчик, в зависимости от указанного способа передачи параметров
-                    this.webApp[fn.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST ? "post" : "get"](
-                        buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL }),
-                        async (req, res) => {
-                            try {
-                                //Вызываем обработчик
-                                await this.processMessage({ req, res, service: srvs, function: fn });
-                            } catch (e) {
+                _.forEach(
+                    _.filter(srvs.functions, fn => !fn.sFnURL.startsWith("@")),
+                    fn => {
+                        //...собственный обработчик, в зависимости от указанного способа передачи параметров
+                        this.webApp[fn.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST ? "post" : "get"](
+                            buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL }),
+                            async (req, res) => {
+                                try {
+                                    //Вызываем обработчик
+                                    await this.processMessage({ req, res, service: srvs, function: fn });
+                                } catch (e) {
+                                    //Протоколируем в журнал работы сервера
+                                    await this.logger.error(makeErrorText(e), {
+                                        nServiceId: srvs.nId,
+                                        nServiceFnId: fn.nId
+                                    });
+                                    //Отправим ошибку клиенту
+                                    res.status(500).send(makeErrorText(e));
+                                }
+                            }
+                        );
+                        //...и собственный обработчик ошибок
+                        this.webApp.use(
+                            buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL }),
+                            async (err, req, res, next) => {
                                 //Протоколируем в журнал работы сервера
-                                await this.logger.error(makeErrorText(e), {
+                                await this.logger.error(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)), {
                                     nServiceId: srvs.nId,
                                     nServiceFnId: fn.nId
                                 });
                                 //Отправим ошибку клиенту
-                                res.status(500).send(makeErrorText(e));
+                                res.status(500).send(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)));
                             }
-                        }
-                    );
-                    //...и собственный обработчик ошибок
-                    this.webApp.use(
-                        buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL }),
-                        async (err, req, res, next) => {
-                            //Протоколируем в журнал работы сервера
-                            await this.logger.error(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)), {
-                                nServiceId: srvs.nId,
-                                nServiceFnId: fn.nId
-                            });
-                            //Отправим ошибку клиенту
-                            res.status(500).send(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)));
-                        }
-                    );
-                });
+                        );
+                    }
+                );
             });
             //Запросы на адреса, не входящие в состав объявленных сервисов - 404 NOT FOUND
             this.webApp.use("*", (req, res) => {
