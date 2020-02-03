@@ -158,9 +158,7 @@ const getAppSrvFunction = sAppSrv => {
             mdl = require(makeModuleFullPath(moduleName));
         } catch (e) {
             throw Error(
-                `Не удалось подключить модуль ${moduleName}, проверье что он существует и не имеет синтаксических ошибок. Ошибка подключения: ${
-                    e.message
-                }`
+                `Не удалось подключить модуль ${moduleName}, проверье что он существует и не имеет синтаксических ошибок. Ошибка подключения: ${e.message}`
             );
         }
         //Проверяем, что в нём есть эта функция
@@ -331,6 +329,13 @@ const getNowString = () => {
     return sNow;
 };
 
+//Глубокое слияние объектов
+const deepMerge = (...args) => {
+    let res = {};
+    for (let i = 0; i < args.length; i++) _.merge(res, args[i]);
+    return res;
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -348,3 +353,4 @@ exports.parseXML = parseXML;
 exports.parseOptionsXML = parseOptionsXML;
 exports.buildOptionsXML = buildOptionsXML;
 exports.getNowString = getNowString;
+exports.deepMerge = deepMerge;

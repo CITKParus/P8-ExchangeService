@@ -19,7 +19,8 @@ const {
     buildURL,
     getAppSrvFunction,
     buildOptionsXML,
-    parseOptionsXML
+    parseOptionsXML,
+    deepMerge
 } = require("./utils"); //Вспомогательные функции
 const { NINC_EXEC_CNT_YES, NIS_ORIGINAL_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 const objInQueueSchema = require("../models/obj_in_queue"); //Схема валидации сообщений обмена с бработчиком очереди входящих сообщений
@@ -188,7 +189,7 @@ class InQueue extends EventEmitter {
                             }
                             //Фиксируем результат исполнения "До" - параметры ответа на запрос
                             if (!_.isUndefined(resBefore.optionsResp)) {
-                                _.extend(optionsResp, resBefore.optionsResp);
+                                optionsResp = deepMerge(optionsResp, resBefore.optionsResp);
                                 let sOptionsResp = buildOptionsXML({ options: optionsResp });
                                 q = await this.dbConn.setQueueOptionsResp({ nQueueId: q.nId, sOptionsResp });
                             }
@@ -229,7 +230,7 @@ class InQueue extends EventEmitter {
                     if (prcRes.sOptionsResp) {
                         try {
                             let optionsRespTmp = await parseOptionsXML({ sOptions: prcRes.sOptionsResp });
-                            _.extend(optionsResp, optionsRespTmp);
+                            optionsResp = deepMerge(optionsResp, optionsRespTmp);
                         } catch (e) {
                             await logger.warn(
                                 `Указанные для сообщения параметры ответа имеют некорректный формат - использую параметры по умолчанию. Ошибка парсера: ${makeErrorText(
@@ -286,7 +287,7 @@ class InQueue extends EventEmitter {
                             }
                             //Фиксируем результат исполнения "После" - параметры ответа на запрос
                             if (!_.isUndefined(resAfter.optionsResp)) {
-                                _.extend(optionsResp, resAfter.optionsResp);
+                                optionsResp = deepMerge(optionsResp, resAfter.optionsResp);
                                 let sOptionsResp = buildOptionsXML({ options: optionsResp });
                                 q = await this.dbConn.setQueueOptionsResp({ nQueueId: q.nId, sOptionsResp });
                             }

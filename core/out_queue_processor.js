@@ -18,7 +18,8 @@ const {
     getAppSrvFunction,
     buildURL,
     parseOptionsXML,
-    buildOptionsXML
+    buildOptionsXML,
+    deepMerge
 } = require("./utils"); //Вспомогательные функции
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const objOutQueueProcessorSchema = require("../models/obj_out_queue_processor"); //Схема валидации сообщений обмена с бработчиком очереди исходящих сообщений
@@ -156,7 +157,7 @@ const appProcess = async prms => {
                 if (prms.queue.sOptions) {
                     try {
                         let optionsTmp = await parseOptionsXML({ sOptions: prms.queue.sOptions });
-                        _.extend(options, optionsTmp);
+                        options = deepMerge(options, optionsTmp);
                     } catch (e) {
                         await logger.warn(
                             `Указанные для сообщения параметры имеют некорректный формат - использую параметры по умолчанию. Ошибка парсера: ${makeErrorText(
@@ -204,7 +205,7 @@ const appProcess = async prms => {
                                 }
                             }
                             //Применим ответ "До" - параметры отправки сообщения удаленному серверу
-                            if (!_.isUndefined(resBefore.options)) _.extend(options, resBefore.options);
+                            if (!_.isUndefined(resBefore.options)) options = deepMerge(options, resBefore.options);
                             //Применим ответ "До" - флаг отсуствия аутентификации
                             if (!_.isUndefined(resBefore.bUnAuth))
                                 if (resBefore.bUnAuth === true) {

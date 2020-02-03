@@ -6,7 +6,6 @@
 //----------------------
 // Подключение библиотек
 //----------------------
-const _ = require("lodash"); //Работа с массивами и коллекциями
 const xmlParser = require("xml2js").parseString; //Конвертация XML в JSON
 const js2xmlparser = require("js2xmlparser"); //Конвертация JSON в XML
 
@@ -60,15 +59,13 @@ const after = async prms => {
     if (prms.options.headers["content-type"] == SHEADER_CONTENT_TYPE_JSON) {
         //Конвертируем ответ, подготовленный сервером, в JSON
         parseRes = await parseXML(prms.queue.blResp.toString());
-        //Выставим в заголовке верный тип отправляемых данных
-        let tmpOptionsResp = _.cloneDeep(prms.optionsResp);
-        //Инициализируем заголовок если надо
-        if (!tmpOptionsResp.headers) tmpOptionsResp.headers = {};
-        //Выставим ключ для JSON-данных
-        tmpOptionsResp.headers["content-type"] = SHEADER_CONTENT_TYPE_JSON;
         //Вернём его клиенту в таком виде
         return {
-            optionsResp: tmpOptionsResp,
+            optionsResp: {
+                headers: {
+                    "content-type": SHEADER_CONTENT_TYPE_JSON
+                }
+            },
             blResp: new Buffer(JSON.stringify(parseRes))
         };
     }
