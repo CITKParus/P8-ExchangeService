@@ -6,15 +6,15 @@
 //----------------------
 // Подключение библиотек
 //----------------------
-const xmlParser = require("xml2js").parseString; //Конвертация XML в JSON
-const js2xmlparser = require("js2xmlparser"); //Конвертация JSON в XML
+const xml2js = require("xml2js"); //Конвертация XML в JSON и JSON в XML
+const _ = require("lodash"); //Работа с коллекциями и объектами
 
 //---------------------
 // Глобальные константы
 //---------------------
 
-//Наименования XML-элементов
-const SREQUEST_ROOT = "XREQUEST"; //Корневой элемент XML-представления входящего запроса
+//Наименования специальных управляющих атрибутов XML
+const SJSON_CONTROL_ATTR_ARRAY = "___array___"; //Управляющий атрибут для указания параметров конвертации массива
 
 //Поля заголовка сообщения
 const SHEADER_CONTENT_TYPE_JSON = "application/json"; //Значение "content-type" для JSON
@@ -26,11 +26,40 @@ const SHEADER_CONTENT_TYPE_JSON = "application/json"; //Значение "conten
 //Разбор XML
 const parseXML = xmlDoc => {
     return new Promise((resolve, reject) => {
-        xmlParser(xmlDoc, { explicitArray: false, mergeAttrs: true }, (err, result) => {
+        xml2js.parseString(xmlDoc, { explicitArray: false, mergeAttrs: true }, (err, result) => {
             if (err) reject(err);
             else resolve(result);
         });
     });
+};
+
+//Дополнительная конвертация выходного JSON - корректное преобразование массивов
+const converXMLArraysToJSON = (obj, arrayKey) => {
+    for (key in obj) {
+        if (obj[key][arrayKey]) {
+            let tmp = [];
+            let itemKey = obj[key][arrayKey];
+            if (obj[key][itemKey]) {
+                if (_.isArray(obj[key][itemKey])) {
+                    for (let i = 0; i < obj[key][itemKey].length; i++) {
+                        let buf = {};
+                        buf[itemKey] = _.cloneDeep(obj[key][itemKey][i]);
+                        tmp.push(buf);
+                    }
+                } else {
+                    let buf = {};
+                    buf[itemKey] = _.cloneDeep(obj[key][itemKey]);
+                    tmp.push(buf);
+                }
+            }
+            obj[key] = tmp;
+            converXMLArraysToJSON(obj[key], arrayKey);
+        } else {
+            if (_.isObject(obj[key])) converXMLArraysToJSON(obj[key], arrayKey);
+            if (_.isArray(obj[key]))
+                for (let i = 0; i < obj[key].length; i++) converXMLArraysToJSON(obj[key][i], arrayKey);
+        }
+    }
 };
 
 //Обработчик "До" для полученного сообщения
@@ -38,11 +67,11 @@ const before = async prms => {
     //Если пришел запрос в JSON
     if (prms.options.headers["content-type"] == SHEADER_CONTENT_TYPE_JSON) {
         //Конвертируем полученный в JSON-запрос в XML, понятный серверной части
-        let request = {};
         let requestXML = "";
         try {
-            request = JSON.parse(prms.queue.blMsg.toString());
-            requestXML = js2xmlparser.parse(SREQUEST_ROOT, request[SREQUEST_ROOT]);
+            let request = JSON.parse(prms.queue.blMsg.toString());
+            let builder = new xml2js.Builder();
+            requestXML = builder.buildObject(request);
         } catch (e) {
             requestXML = "";
         }
@@ -59,6 +88,8 @@ const after = async prms => {
     if (prms.options.headers["content-type"] == SHEADER_CONTENT_TYPE_JSON) {
         //Конвертируем ответ, подготовленный сервером, в JSON
         parseRes = await parseXML(prms.queue.blResp.toString());
+        //Доработаем полученный JSON - корректно конвертируем массивы
+        converXMLArraysToJSON(parseRes, SJSON_CONTROL_ATTR_ARRAY);
         //Вернём его клиенту в таком виде
         return {
             optionsResp: {
