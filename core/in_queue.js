@@ -22,7 +22,7 @@ const {
     parseOptionsXML,
     deepMerge
 } = require("./utils"); //Вспомогательные функции
-const { NINC_EXEC_CNT_YES, NIS_ORIGINAL_NO } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
+const { NINC_EXEC_CNT_YES, NIS_ORIGINAL_NO, NIS_ORIGINAL_YES } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 const objInQueueSchema = require("../models/obj_in_queue"); //Схема валидации сообщений обмена с бработчиком очереди входящих сообщений
 const objServiceSchema = require("../models/obj_service"); //Схемы валидации сервиса
 const objServiceFnSchema = require("../models/obj_service_function"); //Схемы валидации функции сервиса
@@ -184,7 +184,7 @@ class InQueue extends EventEmitter {
                                 q = await this.dbConn.setQueueResp({
                                     nQueueId: q.nId,
                                     blResp,
-                                    nIsOriginal: NIS_ORIGINAL_NO
+                                    nIsOriginal: NIS_ORIGINAL_YES
                                 });
                             }
                             //Фиксируем результат исполнения "До" - параметры ответа на запрос
