@@ -17,7 +17,8 @@ const _ = require("lodash"); //Работа с коллекциями и объ�
 const SJSON_CONTROL_ATTR_ARRAY = "___array___"; //Управляющий атрибут для указания параметров конвертации массива
 
 //Поля заголовка сообщения
-const SHEADER_CONTENT_TYPE_JSON = "application/json"; //Значение "content-type" для JSON
+const SHEADER_REQ_CONTENT_TYPE_JSON = "application/json"; //Значение "content-type" для JSON
+const SHEADER_RESP_CONTENT_TYPE_JSON = "application/json;charset=utf-8"; //Значение "content-type" для JSON
 
 //------------
 // Тело модуля
@@ -65,7 +66,10 @@ const converXMLArraysToJSON = (obj, arrayKey) => {
 //Обработчик "До" для полученного сообщения
 const before = async prms => {
     //Если пришел запрос в JSON
-    if (prms.options.headers["content-type"] == SHEADER_CONTENT_TYPE_JSON) {
+    if (
+        prms.options.headers["content-type"] &&
+        prms.options.headers["content-type"].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON)
+    ) {
         //Конвертируем полученный в JSON-запрос в XML, понятный серверной части
         let requestXML = "";
         try {
@@ -85,7 +89,10 @@ const before = async prms => {
 //Обработчик "После" для полученного сообщения
 const after = async prms => {
     //Если пришел запрос в JSON
-    if (prms.options.headers["content-type"] == SHEADER_CONTENT_TYPE_JSON) {
+    if (
+        prms.options.headers["content-type"] &&
+        prms.options.headers["content-type"].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON)
+    ) {
         //Конвертируем ответ, подготовленный сервером, в JSON
         parseRes = await parseXML(prms.queue.blResp.toString());
         //Доработаем полученный JSON - корректно конвертируем массивы
@@ -94,7 +101,7 @@ const after = async prms => {
         return {
             optionsResp: {
                 headers: {
-                    "content-type": SHEADER_CONTENT_TYPE_JSON
+                    "content-type": SHEADER_RESP_CONTENT_TYPE_JSON
                 }
             },
             blResp: new Buffer(JSON.stringify(parseRes))
