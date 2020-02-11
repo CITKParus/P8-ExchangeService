@@ -17,8 +17,8 @@ const _ = require("lodash"); //Работа с коллекциями и объ�
 const SJSON_CONTROL_ATTR_ARRAY = "___array___"; //Управляющий атрибут для указания параметров конвертации массива
 
 //Поля заголовка сообщения
-const SHEADER_REQ_CONTENT_TYPE_JSON = "application/json"; //Значение "content-type" для JSON
-const SHEADER_RESP_CONTENT_TYPE_JSON = "application/json;charset=utf-8"; //Значение "content-type" для JSON
+const SHEADER_REQ_CONTENT_TYPE_JSON = "application/json"; //Значение "content-type" для JSON-запроса
+const SHEADER_RESP_CONTENT_TYPE_JSON = "application/json;charset=utf-8"; //Значение "content-type" для JSON-ответа
 
 //------------
 // Тело модуля
