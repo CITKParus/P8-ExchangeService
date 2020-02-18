@@ -368,6 +368,12 @@ class InQueue extends EventEmitter {
             this.bWorking = true;
             //запоминаем список обслуживаемых сервисов
             this.services = prms.services;
+            //Конфигурируем сервер - установка MIME-типа входного сообщения по умолчанию
+            this.webApp.use((req, res, next) => {
+                req.headers["content-type"] = req.headers["content-type"] || "application/octet-stream";
+                if (req.headers["content-type"] === "false") req.headers["content-type"] = "application/octet-stream";
+                next();
+            });
             //Конфигурируем сервер - обработка тела сообщения
             this.webApp.use(bodyParser.raw({ limit: `${this.inComing.nMsgMaxSize}mb`, type: "*/*" }));
             //Конфигурируем сервер - обходим все сервисы, работающие на приём сообщений
