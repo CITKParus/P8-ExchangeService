@@ -20,6 +20,9 @@ const SJSON_CONTROL_ATTR_ARRAY = "___array___"; //Управляющий атр�
 const SHEADER_REQ_CONTENT_TYPE_JSON = "application/json"; //Значение "content-type" для JSON-запроса
 const SHEADER_RESP_CONTENT_TYPE_JSON = "application/json;charset=utf-8"; //Значение "content-type" для JSON-ответа
 
+//Поля запроса
+const SQUERY_RESP_CT = "SRESP_CT"; //Параметр URL-запроса для принудительного указания типа возвращаемых данных
+
 //------------
 // Тело модуля
 //------------
@@ -88,10 +91,13 @@ const before = async prms => {
 
 //Обработчик "После" для полученного сообщения
 const after = async prms => {
-    //Если пришел запрос в JSON
+    //Если пришел запрос в JSON или просили ответ в JSON
     if (
-        prms.options.headers["content-type"] &&
-        prms.options.headers["content-type"].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON)
+        (prms.options.headers["content-type"] &&
+            prms.options.headers["content-type"].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON)) ||
+        (prms.options.qs &&
+            prms.options.qs[SQUERY_RESP_CT] &&
+            prms.options.qs[SQUERY_RESP_CT].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON))
     ) {
         //Конвертируем ответ, подготовленный сервером, в JSON
         parseRes = await parseXML(prms.queue.blResp.toString());
