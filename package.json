@@ -18,18 +18,17 @@
     },
     "homepage": "https://github.com/CITKParus/ExchangeService#readme",
     "dependencies": {
-        "body-parser": "^1.18.3",
+        "body-parser": "^1.19.0",
         "cors": "^2.8.5",
-        "express": "^4.16.4",
-        "js2xmlparser": "^3.0.0",
+        "express": "^4.17.1",
         "lodash": "^4.17.15",
-        "module-alias": "^2.1.0",
+        "module-alias": "^2.2.2",
         "nodemailer": "^4.7.0",
         "oracledb": "^2.3.0",
-        "request": "^2.88.0",
-        "request-promise": "^4.2.2",
+        "request": "^2.88.2",
+        "request-promise": "^4.2.5",
         "validate": "^4.5.1",
-        "xml2js": "^0.4.19"
+        "xml2js": "^0.4.23"
     },
     "_moduleAliases": {
         "@core": "core",
