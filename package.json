@@ -24,7 +24,7 @@
         "lodash": "^4.17.15",
         "module-alias": "^2.2.2",
         "nodemailer": "^4.7.0",
-        "oracledb": "^2.3.0",
+        "oracledb": "^3.1.2",
         "request": "^2.88.2",
         "request-promise": "^4.2.5",
         "validate": "^4.5.1",
