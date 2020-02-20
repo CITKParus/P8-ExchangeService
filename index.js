@@ -37,7 +37,7 @@ process.on("exit", code => {
 });
 
 ["SIGINT", "SIGQUIT", "SIGTERM"].forEach(sSig => {
-    process.on(sSig, async () => {
+    process.once(sSig, async () => {
         await appSrv.logger.warn(`Получен сигнал на останов сервера приложений: ${sSig}`);
         const terminateTimeout = setTimeout(() => {
             console.log(
