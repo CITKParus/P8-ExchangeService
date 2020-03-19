@@ -100,10 +100,16 @@ const after = async prms => {
             prms.options.qs[SQUERY_RESP_CT] &&
             prms.options.qs[SQUERY_RESP_CT].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON))
     ) {
-        //Конвертируем ответ, подготовленный сервером, в JSON
-        parseRes = await parseXML(prms.queue.blResp.toString());
-        //Доработаем полученный JSON - корректно конвертируем массивы
-        converXMLArraysToJSON(parseRes, SJSON_CONTROL_ATTR_ARRAY);
+        //Буфер для конвертации
+        let parseRes = "";
+        try {
+            //Конвертируем ответ, подготовленный сервером, в JSON
+            parseRes = await parseXML(prms.queue.blResp.toString());
+            //Доработаем полученный JSON - корректно конвертируем массивы
+            converXMLArraysToJSON(parseRes, SJSON_CONTROL_ATTR_ARRAY);
+        } catch (e) {
+            //Любые ошибки - игнорируем (если не смогли конвертировать будем отдавать данные "как есть")
+        }
         //Вернём его клиенту в таком виде
         return {
             optionsResp: {
@@ -111,7 +117,7 @@ const after = async prms => {
                     "content-type": SHEADER_RESP_CONTENT_TYPE_JSON
                 }
             },
-            blResp: new Buffer(JSON.stringify(parseRes))
+            blResp: new Buffer(parseRes ? JSON.stringify(parseRes) : prms.queue.blResp)
         };
     }
 };
