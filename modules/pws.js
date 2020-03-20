@@ -24,6 +24,9 @@ const SHEADER_RESP_CONTENT_TYPE_JSON = "application/json;charset=utf-8"; //Зн�
 //Поля запроса
 const SQUERY_RESP_CT = "SRESP_CT"; //Параметр URL-запроса для принудительного указания типа возвращаемых данных
 
+//Коды функций-обработчиков (согласно настройкам "Сервисов обмена")
+const SFNC_UPLOAD = "Upload"; //Функция загрузки
+
 //------------
 // Тело модуля
 //------------
@@ -94,11 +97,16 @@ const before = async prms => {
 const after = async prms => {
     //Если пришел запрос в JSON или просили ответ в JSON
     if (
-        (prms.options.headers["content-type"] &&
-            prms.options.headers["content-type"].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON)) ||
-        (prms.options.qs &&
+        (prms.function.sCode === SFNC_UPLOAD &&
+            prms.options.qs &&
             prms.options.qs[SQUERY_RESP_CT] &&
-            prms.options.qs[SQUERY_RESP_CT].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON))
+            prms.options.qs[SQUERY_RESP_CT].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON)) ||
+        (prms.function.sCode != SFNC_UPLOAD &&
+            ((prms.options.headers["content-type"] &&
+                prms.options.headers["content-type"].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON)) ||
+                (prms.options.qs &&
+                    prms.options.qs[SQUERY_RESP_CT] &&
+                    prms.options.qs[SQUERY_RESP_CT].startsWith(SHEADER_REQ_CONTENT_TYPE_JSON))))
     ) {
         //Буфер для конвертации
         let parseRes = "";
