@@ -9,7 +9,7 @@
 
 const Schema = require("validate"); //Схемы валидации
 const { IncomingMessage, ServerResponse } = require("http"); //Работа с HTTP протоколом
-const { inComing } = require("./obj_config"); //Схемы валидации конфигурации сервера приложений
+const { common, inComing } = require("./obj_config"); //Схемы валидации конфигурации сервера приложений
 const { defServices } = require("./obj_services"); //Схема валидации списка сервисов
 const { DBConnector } = require("../core/db_connector"); //Класс взаимодействия в БД
 const { Logger } = require("../core/logger"); //Класс для протоколирования работы
@@ -23,6 +23,14 @@ const { Notifier } = require("../core/notifier"); //Класс рассылки 
 
 //Схема валидации параметров конструктора
 exports.InQueue = new Schema({
+    //Общие параметры сервера приложений
+    common: {
+        schema: common,
+        required: true,
+        message: {
+            required: path => `Не указаны общие параметры сервера приложений (${path})`
+        }
+    },
     //Параметры обработки очереди входящих сообщений
     inComing: {
         schema: inComing,

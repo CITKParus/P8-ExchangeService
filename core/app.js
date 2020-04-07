@@ -194,6 +194,10 @@ class ParusAppServer {
         let sCheckResult = validateObject(prms, prmsAppSchema.init, "Параметры инициализации");
         //Если настройки верны - будем стартовать
         if (!sCheckResult) {
+            //Протоколируем версию и релиз
+            await this.logger.info(
+                `Версия сервера приложений: ${prms.config.common.sVersion}, релиз: ${prms.config.common.sRelease}`
+            );
             //Создаём подключение к БД
             this.dbConn = new db.DBConnector({ connectSettings: prms.config.dbConnect });
             //Создаём модуль рассылки уведомлений
@@ -207,6 +211,7 @@ class ParusAppServer {
             });
             //Создаём обработчик очереди входящих
             this.inQ = new iq.InQueue({
+                common: prms.config.common,
                 inComing: prms.config.inComing,
                 dbConn: this.dbConn,
                 logger: this.logger,

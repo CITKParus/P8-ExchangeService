@@ -30,6 +30,24 @@ const validateMsgMaxSize = val => val >= 1 && val <= 1000 && Number.isInteger(va
 
 //Схема валидации общих параметров сервера приложений
 const common = new Schema({
+    //Версия сервера приложений
+    sVersion: {
+        type: String,
+        required: true,
+        message: {
+            type: path => `Версия сервера приложений (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указана версия сервера приложений (${path})`
+        }
+    },
+    //Релиз сервера приложений
+    sRelease: {
+        type: String,
+        required: true,
+        message: {
+            type: path => `Релиз сервера приложений (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан релиз сервера приложений (${path})`
+        }
+    },
     //Таймаут останова сервера (мс)
     nTerminateTimeout: {
         type: Number,

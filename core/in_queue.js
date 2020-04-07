@@ -59,6 +59,8 @@ class InQueue extends EventEmitter {
         let sCheckResult = validateObject(prms, prmsInQueueSchema.InQueue, "Параметры конструктора класса InQueue");
         //Если структура объекта в норме
         if (!sCheckResult) {
+            //Общие параметры сервера приложений
+            this.common = _.cloneDeep(prms.common);
             //Список обслуживаемых сервисов
             this.services = null;
             //Признак функционирования обработчика
@@ -381,7 +383,7 @@ class InQueue extends EventEmitter {
                 //Для любых запросов к корневому адресу сервиса - ответ о том, что это за сервис, и что он работает
                 this.webApp.all(srvs.sSrvRoot, (req, res) => {
                     res.status(200).send(
-                        `<html><body><center><br><h1>Сервер приложений ПП Парус 8</h1><h3>Сервис: ${srvs.sName}</h3></center></body></html>`
+                        `<html><body><center><br><h1>Сервер приложений ПП Парус 8<br>(${this.common.sVersion} релиз ${this.common.sRelease})</h1><h3>Сервис: ${srvs.sName}</h3></center></body></html>`
                     );
                 });
                 //Для всех статических функций сервиса...
@@ -435,7 +437,7 @@ class InQueue extends EventEmitter {
             //Запросы на адреса, не входящие в состав объявленных сервисов - 404 NOT FOUND
             this.webApp.use("*", (req, res) => {
                 res.status(404).send(
-                    "<html><body><center><br><h1>Сервер приложений ПП Парус 8</h1><h3>Запрошенный адрес не найден</h3></center></body></html>"
+                    `<html><body><center><br><h1>Сервер приложений ПП Парус 8<br>(${this.common.sVersion} релиз ${this.common.sRelease})</h1><h3>Запрошенный адрес не найден</h3></center></body></html>`
                 );
             });
             //Ошибки, не отработанные индивидуальными обработчиками - 500 SERVER ERROR
