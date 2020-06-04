@@ -12,7 +12,7 @@ let common = {
     //Версия сервера приложений
     sVersion: "8.5.6.1",
     //Релиз сервера приложений
-    sRelease: "2020.04.29",
+    sRelease: "2020.05.28",
     //Таймаут останова сервера (мс)
     nTerminateTimeout: 60000
 };
@@ -26,7 +26,7 @@ let dbConnect = {
     //Схема размещения используемых объектов БД
     sSchema: "PARUS",
     //Строка подключения к БД
-    sConnectString: "DEMOP_CITKSERV",
+    sConnectString: "DEMOP_CITKSERV_WAN",
     //Наименование сервера приложений в сессии БД
     sSessionAppName: "PARUS$ExchangeServer",
     //Подключаемый модуль обслуживания БД (низкоуровневые функции работы с СУБД)
