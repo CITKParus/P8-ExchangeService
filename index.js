@@ -36,6 +36,7 @@ process.on("exit", code => {
     );
 });
 
+//Обработка событий мягкого останова процесса
 ["SIGINT", "SIGQUIT", "SIGTERM"].forEach(sSig => {
     process.once(sSig, async () => {
         await appSrv.logger.warn(`Получен сигнал на останов сервера приложений: ${sSig}`);

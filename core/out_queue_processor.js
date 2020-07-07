@@ -614,7 +614,9 @@ process.on("SIGINT", () => {});
 process.on("SIGQUIT", () => {});
 
 //Перехват мягкого останова процесса
-process.on("SIGTERM", () => {});
+process.on("SIGTERM", () => {
+    process.exit(0);
+});
 
 //Перехват ошибок
 process.on("uncaughtException", e => {
