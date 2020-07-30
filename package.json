@@ -21,13 +21,13 @@
         "body-parser": "^1.19.0",
         "cors": "^2.8.5",
         "express": "^4.17.1",
-        "lodash": "^4.17.15",
+        "lodash": "^4.17.19",
         "module-alias": "^2.2.2",
-        "nodemailer": "^4.7.0",
-        "oracledb": "^3.1.2",
+        "nodemailer": "^6.4.11",
+        "oracledb": "^4.2.0",
         "request": "^2.88.2",
-        "request-promise": "^4.2.5",
-        "validate": "^4.5.1",
+        "request-promise": "^4.2.6",
+        "validate": "^5.1.0",
         "xml2js": "^0.4.23"
     },
     "_moduleAliases": {
