@@ -448,7 +448,7 @@ class InQueue extends EventEmitter {
                 res.status(500).send(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)));
             });
             //Запускаем сервер
-            this.srv = this.webApp.listen(this.inComing.nPort, () => {
+            this.srv = this.webApp.listen(this.inComing.nPort, "0.0.0.0", () => {
                 //И оповещаем всех что запустились
                 this.notifyStarted();
             });

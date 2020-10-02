@@ -36,7 +36,7 @@ exports.SERR_WEB_SERVER = "ERR_WEB_SERVER"; //Ошибка WEB-сервера
 //Типовые коды ошибок пользовательских обработчиков сервера приложений и сервера БД
 exports.SERR_APP_SERVER_BEFORE = "ERR_APP_SERVER_BEFORE"; //Ошибка предобработчика
 exports.SERR_APP_SERVER_AFTER = "ERR_APP_SERVER_AFTER"; //Ошибка постобработчика
-exports.SERR_DB_SERVER = "SERR_DB_SERVER"; //Ошибка обработчика сервера БД
+exports.SERR_DB_SERVER = "ERR_DB_SERVER"; //Ошибка обработчика сервера БД
 
 //Шаблоны подсветки консольных сообщений протокола работы
 exports.SCONSOLE_LOG_COLOR_PATTERN_ERR = "\x1b[31m%s\x1b[0m%s"; //Цвет для ошибок
