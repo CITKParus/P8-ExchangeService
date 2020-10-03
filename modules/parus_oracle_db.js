@@ -43,6 +43,7 @@ const connect = async prms => {
             user: prms.sUser,
             password: prms.sPassword,
             connectString: prms.sConnectString,
+            queueTimeout: 600000,
             sessionCallback: (connection, requestedTag, callback) => {
                 if (prms.sSessionAppName) connection.module = prms.sSessionAppName;
                 connection.execute(`ALTER SESSION SET CURRENT_SCHEMA=${prms.sSchema}`).then(
