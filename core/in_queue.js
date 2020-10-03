@@ -112,6 +112,8 @@ class InQueue extends EventEmitter {
                 //Параметры сообщения и ответа на него
                 let options = {};
                 let optionsResp = {};
+                //Флаг прекращения обработки сообщения
+                let bStopPropagation = false;
                 //Определимся с телом сообщения - для POST сообщений - это тело запроса
                 if (prms.function.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
                     blMsg = prms.req.body && !_.isEmpty(prms.req.body) ? prms.req.body : null;
@@ -154,6 +156,8 @@ class InQueue extends EventEmitter {
                         resBeforePrms.queue.blMsg = blMsg;
                         resBeforePrms.queue.blResp = blResp;
                         resBeforePrms.options = _.cloneDeep(options);
+                        resBeforePrms.dbConn = this.dbConn;
+                        resBeforePrms.res = prms.res;
                         resBefore = await fnBefore(resBeforePrms);
                     } catch (e) {
                         throw new ServerError(SERR_APP_SERVER_BEFORE, e.message);
@@ -199,6 +203,9 @@ class InQueue extends EventEmitter {
                             if (!_.isUndefined(resBefore.bUnAuth))
                                 if (resBefore.bUnAuth === true)
                                     throw new ServerError(SERR_UNAUTH, "Нет аутентификации");
+                            //Если пришел флаг прекращения дальнейшей обработки сообщения - то дальше его обработку прекращаем
+                            if (!_.isUndefined(resBefore.bStopPropagation))
+                                if (resBefore.bStopPropagation === true) bStopPropagation = true;
                         } else {
                             //Или расскажем об ошибке
                             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
@@ -206,7 +213,7 @@ class InQueue extends EventEmitter {
                     }
                 }
                 //Вызываем обработчик со стороны БД (если он есть)
-                if (prms.function.sPrcResp) {
+                if (bStopPropagation === false && prms.function.sPrcResp) {
                     //Фиксируем начало исполнения сервером БД - в статусе сообщения
                     q = await this.dbConn.setQueueState({
                         nQueueId: q.nId,
@@ -244,7 +251,7 @@ class InQueue extends EventEmitter {
                     }
                 }
                 //Выполняем обработчик "После" (если он есть)
-                if (prms.function.sAppSrvAfter) {
+                if (bStopPropagation === false && prms.function.sAppSrvAfter) {
                     //Выставим статус сообщению очереди - исполняется сервером приложений
                     q = await this.dbConn.setQueueState({
                         nQueueId: q.nId,
@@ -303,8 +310,10 @@ class InQueue extends EventEmitter {
                     }
                 }
                 //Всё успешно - отдаём результат клиенту
-                if (optionsResp.headers) prms.res.set(optionsResp.headers);
-                prms.res.status(200).send(blResp);
+                if (bStopPropagation === false) {
+                    if (optionsResp.headers) prms.res.set(optionsResp.headers);
+                    prms.res.status(200).send(blResp);
+                }
                 //Фиксируем успех обработки - в статусе сообщения
                 q = await this.dbConn.setQueueState({
                     nQueueId: q.nId,
