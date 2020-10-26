@@ -157,6 +157,7 @@ class InQueue extends EventEmitter {
                         resBeforePrms.queue.blResp = blResp;
                         resBeforePrms.options = _.cloneDeep(options);
                         resBeforePrms.dbConn = this.dbConn;
+                        resBeforePrms.notifier = this.notifier;
                         resBeforePrms.res = prms.res;
                         resBefore = await fnBefore(resBeforePrms);
                     } catch (e) {
@@ -267,6 +268,8 @@ class InQueue extends EventEmitter {
                         resAfterPrms.queue.blResp = blResp;
                         resAfterPrms.options = _.cloneDeep(options);
                         resAfterPrms.optionsResp = _.cloneDeep(optionsResp);
+                        resAfterPrms.dbConn = this.dbConn;
+                        resAfterPrms.notifier = this.notifier;
                         resAfter = await fnAfter(resAfterPrms);
                     } catch (e) {
                         throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
