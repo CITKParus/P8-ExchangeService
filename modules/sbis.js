@@ -206,6 +206,26 @@ const beforeAttParse = async prms => {
     }
 };
 
+//Обработчик "После" отправки запроса на загрузку вложения
+const afterAttParse = async prms => {
+    let resu = null;
+    if (prms.queue.blResp) {
+        try {
+            resu = JSON.parse(prms.queue.blResp.toString());
+        } catch (e) {
+            return;
+        }
+        if (resu.error.hasOwnProperty("message")) {
+            //Возврат результата
+            throw new Error(`Неожиданный ответ сервера ЭДО "СБИС": ${resu.error.message}`);
+        }
+    } else {
+        throw new Error('Сервер ЭДО "СБИС" не вернул ответ');
+    }
+    //Возврат результата
+    return;
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -215,3 +235,4 @@ exports.afterConnect = afterConnect;
 exports.beforeDocParse = beforeDocParse;
 exports.afterDocParse = afterDocParse;
 exports.beforeAttParse = beforeAttParse;
+exports.afterAttParse = afterAttParse;
