@@ -158,6 +158,8 @@ const appProcess = async prms => {
                     try {
                         let optionsTmp = await parseOptionsXML({ sOptions: prms.queue.sOptions });
                         options = deepMerge(options, optionsTmp);
+                        //При конвертации XML -> JSON пустые тэги приходят как "", а в encoding нужен или null, или правильная кодировка
+                        if (options.encoding === "") options.encoding = null;
                     } catch (e) {
                         await logger.warn(
                             `Указанные для сообщения параметры имеют некорректный формат - использую параметры по умолчанию. Ошибка парсера: ${makeErrorText(
