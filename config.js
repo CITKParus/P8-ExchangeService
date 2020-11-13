@@ -58,11 +58,11 @@ let mail = {
     //Порт сервера SMTP
     nPort: 465,
     //Имя пользователя SMTP-сервера
-    sUser: "some-user",
+    sUser: "appserver@citk-parus.ru",
     //Пароль пользователя SMTP-сервера
-    sPass: "some-password",
+    sPass: "4~1DgTchonHB",
     //Наименование отправителя для исходящих сообщений
-    sFrom: "'Сервис интеграции с WEB-API' <some-user@some-servive.ru>"
+    sFrom: "'Сервис интеграции с WEB-API' <appserver@citk-parus.ru>"
 };
 
 //-----------------
