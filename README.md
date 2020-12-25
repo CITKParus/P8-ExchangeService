@@ -1,5 +1,5 @@
 # ExchangeService
-Parus 8 and WEB API integration platform
+Parus 8 and WEB API integration platform (Сервис интеграции с WEB API)
 
 ### Состав:
 
