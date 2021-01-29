@@ -1,6 +1,6 @@
 /*
   Сервис интеграции ПП Парус 8 с WEB API
-  Дополнительный модуль: Публикация многомерных отчетов (OLAPP)
+  Дополнительный модуль: Публикация аналитических данных (OLAPP)
 */
 
 //------------------------------
@@ -10,10 +10,6 @@
 const { ServerError } = require("./../core/server_errors"); //Типовая ошибка
 const { SERR_APP_SERVER_BEFORE, SERR_DB_SERVER } = require("./../core/constants"); //Общесистемные константы
 const oracledb = require("oracledb"); //Работа с СУБД Oracle
-
-//---------------------
-// Глобальные константы
-//---------------------
 
 //------------
 // Тело модуля
@@ -75,7 +71,7 @@ const before = async prms => {
             throw new ServerError(SERR_DB_SERVER, "Нет подключения к БД");
         }
     } else {
-        throw new ServerError(SERR_APP_SERVER_BEFORE, "Запрос к серверу сформирован не корректно");
+        throw new ServerError(SERR_APP_SERVER_BEFORE, "Запрос к серверу сформирован некорректно");
     }
 };
 
