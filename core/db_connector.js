@@ -530,7 +530,7 @@ class DBConnector extends EventEmitter {
             if (!sCheckResult) {
                 //Подготовим параметры
                 let putQueueData = _.cloneDeep(prms);
-                putQueueData.blMsg = prms.blMsg ? prms.blMsg : new Buffer("");
+                putQueueData.blMsg = prms.blMsg ? prms.blMsg : Buffer.from("");
                 putQueueData.connection = this.connection;
                 //Исполняем действие в БД
                 try {
@@ -666,7 +666,7 @@ class DBConnector extends EventEmitter {
             if (!sCheckResult) {
                 //Подготовим параметры
                 let setQueueMsgData = _.cloneDeep(prms);
-                if (!setQueueMsgData.blMsg) setQueueMsgData.blMsg = new Buffer("");
+                if (!setQueueMsgData.blMsg) setQueueMsgData.blMsg = Buffer.from("");
                 setQueueMsgData.connection = this.connection;
                 //Исполняем действие в БД
                 try {
@@ -770,7 +770,7 @@ class DBConnector extends EventEmitter {
             if (!sCheckResult) {
                 //Подготовим параметры
                 let setQueueRespData = _.cloneDeep(prms);
-                if (!setQueueRespData.blResp) setQueueRespData.blResp = new Buffer("");
+                if (!setQueueRespData.blResp) setQueueRespData.blResp = Buffer.from("");
                 setQueueRespData.connection = this.connection;
                 //Исполняем действие в БД
                 try {

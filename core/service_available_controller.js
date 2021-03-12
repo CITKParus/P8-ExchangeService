@@ -103,21 +103,21 @@ class ServiceAvailableController extends EventEmitter {
             this.bInDetectingLoop = true;
             try {
                 //Обходим список сервисов для проверки
-                for (let i = 0; i < this.services.length; i++) {
+                for (let service of this.services) {
                     //Если сервис надо проверять на доступность и это сервис для отправки исходящих сообщений
                     if (
-                        this.services[i].nUnavlblNtfSign == objServiceSchema.NUNAVLBL_NTF_SIGN_YES &&
-                        this.services[i].nSrvType == objServiceSchema.NSRV_TYPE_SEND
+                        service.nUnavlblNtfSign == objServiceSchema.NUNAVLBL_NTF_SIGN_YES &&
+                        service.nSrvType == objServiceSchema.NSRV_TYPE_SEND
                     ) {
                         try {
                             //Отправляем проверочный запрос
-                            await rqp({ url: this.services[i].sSrvRoot, timeout: NNETWORK_CHECK_TIMEOUT });
+                            await rqp({ url: service.sSrvRoot, timeout: NNETWORK_CHECK_TIMEOUT });
                             //Запрос прошел - фиксируем дату доступности и сбрасываем дату недоступности
-                            this.services[i].dAvailable = new Date();
-                            this.services[i].dUnAvailable = null;
+                            service.dAvailable = new Date();
+                            service.dUnAvailable = null;
                         } catch (e) {
                             //Зафиксируем дату и время недоступности
-                            this.services[i].dUnAvailable = new Date();
+                            service.dUnAvailable = new Date();
                             //Сформируем текст ошибки в зависимости от того, что случилось
                             let sError = "Неожиданная ошибка удалённого сервиса";
                             if (e.error) {
@@ -129,71 +129,61 @@ class ServiceAvailableController extends EventEmitter {
                             if (e.response) {
                                 //Нам нужны только ошибки сервера
                                 if (String(e.response.statusCode).startsWith("5")) {
-                                    sError = `Ошибка работы удалённого сервиса: ${e.response.statusCode} - ${
-                                        e.response.statusMessage
-                                    }`;
+                                    sError = `Ошибка работы удалённого сервиса: ${e.response.statusCode} - ${e.response.statusMessage}`;
                                 } else {
                                     //Остальное - клиентские ошибки, но сервер-то вроде отвечает, поэтому - пропускаем
-                                    this.services[i].dUnAvailable = null;
+                                    service.dUnAvailable = null;
                                 }
                             }
                             //Фиксируем ошибку проверки в протоколе (только если она действительно была)
-                            if (this.services[i].dUnAvailable) {
+                            if (service.dUnAvailable) {
                                 await this.logger.warn(
-                                    `При проверке доступности сервиса ${this.services[i].sCode}: ${makeErrorText(
+                                    `При проверке доступности сервиса ${service.sCode}: ${makeErrorText(
                                         new ServerError(SERR_SERVICE_UNAVAILABLE, sError)
-                                    )} (адрес - ${this.services[i].sSrvRoot})`,
-                                    { nServiceId: this.services[i].nId }
+                                    )} (адрес - ${service.sSrvRoot})`,
+                                    { nServiceId: service.nId }
                                 );
                             }
                         }
                         //Если есть даты - будем проверять
-                        if (this.services[i].dUnAvailable && this.services[i].dAvailable) {
+                        if (service.dUnAvailable && service.dAvailable) {
                             //Выясним как долго он уже недоступен (в минутах)
-                            let nDiffMs = this.services[i].dUnAvailable - this.services[i].dAvailable;
+                            let nDiffMs = service.dUnAvailable - service.dAvailable;
                             let nDiffMins = Math.round(((nDiffMs % 86400000) % 3600000) / 60000);
                             //Если простой больше указанного в настройках - будем оповещать по почте
-                            if (nDiffMins >= this.services[i].nUnavlblNtfTime) {
+                            if (nDiffMins >= service.nUnavlblNtfTime) {
                                 //Подготовим сообщение для уведомления
-                                let sMessage = `Сервис недоступен более ${
-                                    this.services[i].nUnavlblNtfTime
-                                } мин. (${nDiffMins} мин. с момента запуска сервера приложений).\nАдрес сервиса: ${
-                                    this.services[i].sSrvRoot
-                                }`;
+                                let sMessage = `Сервис недоступен более ${service.nUnavlblNtfTime} мин. (${nDiffMins} мин. с момента запуска сервера приложений).\nАдрес сервиса: ${service.sSrvRoot}`;
                                 //Положим уведомление в протокол работы сервера приложений
-                                await this.logger.error(sMessage, { nServiceId: this.services[i].nId });
+                                await this.logger.error(sMessage, { nServiceId: service.nId });
                                 //И в очередь уведомлений
                                 await this.notifier.addMessage({
-                                    sTo: this.services[i].sUnavlblNtfMail,
-                                    sSubject: `Удалённый сервис ${this.services[i].sCode} неотвечает на запросы`,
+                                    sTo: service.sUnavlblNtfMail,
+                                    sSubject: `Удалённый сервис ${service.sCode} неотвечает на запросы`,
                                     sMessage
                                 });
                             }
                         }
                     }
                     //Если сервис надо проверять на доступность то проверим так же - есть ли у него неотработанные сообщения обмена
-                    if (this.services[i].nUnavlblNtfSign == objServiceSchema.NUNAVLBL_NTF_SIGN_YES) {
+                    if (service.nUnavlblNtfSign == objServiceSchema.NUNAVLBL_NTF_SIGN_YES) {
                         try {
                             let res = await this.dbConn.getServiceExpiredQueueInfo({
-                                nServiceId: this.services[i].nId
+                                nServiceId: service.nId
                             });
                             //Если у сервиса есть просроченные сообщения - будет отправлять информацию об этом
                             if (res.nCnt > 0) {
                                 //Отправляем уведомление
                                 await this.notifier.addMessage({
-                                    sTo: this.services[i].sUnavlblNtfMail,
-                                    sSubject: `Для сервиса ${
-                                        this.services[i].sCode
-                                    } зафиксированы просроченные сообщения обмена (${res.nCnt} ед.)`,
+                                    sTo: service.sUnavlblNtfMail,
+                                    sSubject: `Для сервиса ${service.sCode} зафиксированы просроченные сообщения обмена (${res.nCnt} ед.)`,
                                     sMessage: res.sInfoList
                                 });
                             }
                         } catch (e) {
                             await this.logger.error(
-                                `При проверке просроченных сообщений сервиса ${this.services[i].sCode}: ${makeErrorText(
-                                    e
-                                )}`,
-                                { nServiceId: this.services[i].nId }
+                                `При проверке просроченных сообщений сервиса ${service.sCode}: ${makeErrorText(e)}`,
+                                { nServiceId: service.nId }
                             );
                         }
                     }

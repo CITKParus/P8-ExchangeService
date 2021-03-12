@@ -108,28 +108,26 @@ class Notifier extends EventEmitter {
         //Выставим флаг - цикл опроса активен
         this.bInSendLoop = true;
         //Обходим уведомления для отправки
-        for (let i = 0; i < this.messages.length; i++) {
+        for (let message of this.messages) {
             //Работаем только по неотправленным уведомлениям
-            if (!this.messages[i].bSent) {
+            if (!message.bSent) {
                 try {
                     //Отправляем
                     await sendMail({
                         mail: this.mail,
-                        sTo: this.messages[i].sTo,
-                        sSubject: this.messages[i].sSubject,
-                        sMessage: this.messages[i].sMessage
+                        sTo: message.sTo,
+                        sSubject: message.sSubject,
+                        sMessage: message.sMessage
                     });
                     //Протоколируем отправку
-                    await this.logger.info(
-                        `Сообщение с темой "${this.messages[i].sSubject}" отпрвлено ${this.messages[i].sTo}`
-                    );
+                    await this.logger.info(`Сообщение с темой "${message.sSubject}" отпрвлено ${message.sTo}`);
                     //Говорим, что отправлено
-                    this.messages[i].bSent = true;
+                    message.bSent = true;
                 } catch (e) {
                     await this.logger.error(
-                        `Ошибка отправки сообщения с темой "${this.messages[i].sSubject}" для ${
-                            this.messages[i].sTo
-                        }: ${makeErrorText(e)}`
+                        `Ошибка отправки сообщения с темой "${message.sSubject}" для ${message.sTo}: ${makeErrorText(
+                            e
+                        )}`
                     );
                 }
             }

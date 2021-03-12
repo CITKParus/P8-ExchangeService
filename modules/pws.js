@@ -88,7 +88,7 @@ const before = async prms => {
         }
         //Возвращаем отконвертированное в качестве тела запроса
         return {
-            blMsg: new Buffer(requestXML)
+            blMsg: Buffer.from(requestXML)
         };
     }
 };
@@ -125,7 +125,7 @@ const after = async prms => {
                     "content-type": SHEADER_RESP_CONTENT_TYPE_JSON
                 }
             },
-            blResp: new Buffer(parseRes ? JSON.stringify(parseRes) : prms.queue.blResp)
+            blResp: Buffer.from(parseRes ? JSON.stringify(parseRes) : prms.queue.blResp)
         };
     }
 };

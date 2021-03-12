@@ -204,9 +204,7 @@ class OutQueue extends EventEmitter {
                     //Отправим уведомление об ошибке отработки в почту
                     await this.notifier.addMessage({
                         sTo: func.sErrNtfMail,
-                        sSubject: `Ошибка обработки исходящего сообщения ${
-                            prms.queue.nId
-                        } сервером приложений для функции "${func.sCode}" сервиса "${service.sCode}"`,
+                        sSubject: `Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером приложений для функции "${func.sCode}" сервиса "${service.sCode}"`,
                         sMessage: prms.queue.sExecMsg
                     });
             } else {
@@ -372,24 +370,24 @@ class OutQueue extends EventEmitter {
                 //Если есть сообщения
                 if (Array.isArray(outMsgs) && outMsgs.length > 0) {
                     //Обходим их
-                    for (let i = 0; i < outMsgs.length; i++) {
+                    for (let outMsg of outMsgs) {
                         //И запускаем обработчики
-                        if (!this.isInProgress({ nQueueId: outMsgs[i].nId })) {
+                        if (!this.isInProgress({ nQueueId: outMsg.nId })) {
                             try {
-                                this.processMessage({ queue: outMsgs[i] });
+                                this.processMessage({ queue: outMsg });
                             } catch (e) {
                                 //Фиксируем ошибку обработки сервером приложений - статус сообщения
                                 let queue = await this.dbConn.setQueueState({
-                                    nQueueId: outMsgs[i].nId,
+                                    nQueueId: outMsg.nId,
                                     sExecMsg: makeErrorText(e),
                                     nIncExecCnt: NINC_EXEC_CNT_YES,
                                     nExecState:
-                                        outMsgs[i].nExecCnt + 1 < outMsgs[i].nRetryAttempts
-                                            ? outMsgs[i].nExecState
+                                        outMsg.nExecCnt + 1 < outMsg.nRetryAttempts
+                                            ? outMsg.nExecState
                                             : objQueueSchema.NQUEUE_EXEC_STATE_ERR
                                 });
                                 //Фиксируем ошибку обработки сервером приложений - запись в протокол работы сервера приложений
-                                await this.logger.error(makeErrorText(e), { nQueueId: outMsgs[i].nId });
+                                await this.logger.error(makeErrorText(e), { nQueueId: outMsg.nId });
                                 //Если исполнение завершилось полностью и с ошибкой - расскажем об этом
                                 if (queue.nExecState == objQueueSchema.NQUEUE_EXEC_STATE_ERR)
                                     await this.notifyMessageProcessError({ queue });

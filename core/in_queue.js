@@ -119,7 +119,7 @@ class InQueue extends EventEmitter {
                     blMsg = prms.req.body && !_.isEmpty(prms.req.body) ? prms.req.body : null;
                 } else {
                     //Для GET - параметры запроса
-                    if (!_.isEmpty(prms.req.query)) blMsg = new Buffer(JSON.stringify(prms.req.query));
+                    if (!_.isEmpty(prms.req.query)) blMsg = Buffer.from(JSON.stringify(prms.req.query));
                 }
                 //Определимся с параметрами сообщения полученными от внешней системы
                 options = {

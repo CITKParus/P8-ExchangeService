@@ -120,7 +120,7 @@ const afterConnect = async prms => {
     if (!resp.error) {
         //Сохраним полученный токен доступа в контекст сервиса
         return {
-            blResp: new Buffer(resp.result),
+            blResp: Buffer.from(resp.result),
             sCtx: resp.result,
             dCtxExp: addHours(new Date(), 23)
         };
@@ -154,7 +154,7 @@ const beforeDocParse = async prms => {
                 simple: false,
                 func: obj.method
             },
-            blMsg: new Buffer(JSON.stringify(obj))
+            blMsg: Buffer.from(JSON.stringify(obj))
         };
     } catch (e) {
         throw Error(e);
@@ -176,7 +176,7 @@ const afterDocParse = async prms => {
     }
     //Возврат результата
     return {
-        blResp: new Buffer(resu)
+        blResp: Buffer.from(resu)
     };
 };
 

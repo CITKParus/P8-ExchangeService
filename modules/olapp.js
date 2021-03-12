@@ -45,7 +45,7 @@ const before = async prms => {
                 let cnt = 1;
                 let row;
                 while ((row = await rs.getRow())) {
-                    prms.res.write(Buffer(`${cnt > 1 ? "," : ""}${JSON.stringify(row)}`));
+                    prms.res.write(Buffer.from(`${cnt > 1 ? "," : ""}${JSON.stringify(row)}`));
                     cnt++;
                 }
                 //Завершаем передачу

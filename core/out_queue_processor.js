@@ -252,7 +252,7 @@ const appProcess = async prms => {
                     options.resolveWithFullResponse = true;
                     let serverResp = await rqp(options);
                     //Сохраняем полученный ответ
-                    prms.queue.blResp = new Buffer(serverResp.body || "");
+                    prms.queue.blResp = Buffer.from(serverResp.body || "");
                     await dbConn.setQueueResp({
                         nQueueId: prms.queue.nId,
                         blResp: prms.queue.blResp,
