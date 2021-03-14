@@ -10,7 +10,7 @@
 const _ = require("lodash"); //Работа с массивами и коллекциями
 const EventEmitter = require("events"); //Обработчик пользовательских событий
 const { ServerError } = require("./server_errors"); //Типовая ошибка
-const { SERR_OBJECT_BAD_INTERFACE } = require("./constants"); //Общесистемные константы
+const { SERR_OBJECT_BAD_INTERFACE, SERR_MAIL_FAILED } = require("./constants"); //Общесистемные константы
 const { makeErrorText, validateObject, sendMail } = require("./utils"); //Вспомогательные функции
 const prmsNotifierSchema = require("../models/prms_notifier"); //Схемы валидации параметров функций класса
 
@@ -112,17 +112,25 @@ class Notifier extends EventEmitter {
             //Работаем только по неотправленным уведомлениям
             if (!message.bSent) {
                 try {
-                    //Отправляем
-                    await sendMail({
-                        mail: this.mail,
-                        sTo: message.sTo,
-                        sSubject: message.sSubject,
-                        sMessage: message.sMessage
-                    });
-                    //Протоколируем отправку
-                    await this.logger.info(`Сообщение с темой "${message.sSubject}" отпрвлено ${message.sTo}`);
-                    //Говорим, что отправлено
-                    message.bSent = true;
+                    //Если всё в порядке с настройками
+                    if (this.mail.sHost && this.mail.nPort && this.mail.sUser && this.mail.sPass && this.mail.sFrom) {
+                        //Отправляем
+                        await sendMail({
+                            mail: this.mail,
+                            sTo: message.sTo,
+                            sSubject: message.sSubject,
+                            sMessage: message.sMessage
+                        });
+                        //Протоколируем отправку
+                        await this.logger.info(`Сообщение с темой "${message.sSubject}" отпрвлено ${message.sTo}`);
+                        //Говорим, что отправлено
+                        message.bSent = true;
+                    } else {
+                        throw new ServerError(
+                            SERR_MAIL_FAILED,
+                            'Не указаны параметры подключения к SMTP-сервереру (проверьте секцию "mail" в файле конфигурации)'
+                        );
+                    }
                 } catch (e) {
                     await this.logger.error(
                         `Ошибка отправки сообщения с темой "${message.sSubject}" для ${message.sTo}: ${makeErrorText(

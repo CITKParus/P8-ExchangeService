@@ -208,7 +208,7 @@ const mail = new Schema({
     //Адреc сервера SMTP
     sHost: {
         type: String,
-        required: true,
+        required: false,
         message: {
             type: path => `Адреc сервера SMTP (${path}) имеет некорректный тип данных (ожидалось - String)`,
             required: path => `Не указан aдреc сервера SMTP (${path})`
@@ -217,7 +217,7 @@ const mail = new Schema({
     //Порт сервера SMTP
     nPort: {
         type: Number,
-        required: true,
+        required: false,
         message: {
             type: path => `Порт сервера SMTP (${path}) имеет некорректный тип данных (ожидалось - Number)`,
             required: path => `Не указан порт сервера SMTP (${path})`
@@ -226,7 +226,7 @@ const mail = new Schema({
     //Имя пользователя SMTP-сервера
     sUser: {
         type: String,
-        required: true,
+        required: false,
         message: {
             type: path => `Имя пользователя SMTP-сервера (${path}) имеет некорректный тип данных (ожидалось - String)`,
             required: path => `Не указано имя пользователя SMTP-сервера (${path})`
@@ -235,7 +235,7 @@ const mail = new Schema({
     //Пароль пользователя SMTP-сервера
     sPass: {
         type: String,
-        required: true,
+        required: false,
         message: {
             type: path =>
                 `Пароль пользователя SMTP-сервера (${path}) имеет некорректный тип данных (ожидалось - String)`,
@@ -245,7 +245,7 @@ const mail = new Schema({
     //Наименование отправителя для исходящих сообщений
     sFrom: {
         type: String,
-        required: true,
+        required: false,
         message: {
             type: path =>
                 `Наименование отправителя для исходящих сообщений (${path}) имеет некорректный тип данных (ожидалось - String)`,
