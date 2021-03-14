@@ -24,7 +24,7 @@ let appSrv = new app.ParusAppServer(); //Экземпляр сервера пр�
 //----------------------------------------
 
 //Разрешение на TLS (Transport Layer Security) без авторизации
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = cfg.outGoing.bValidateSSL === false ? "0" : "1";
 
 //Обработка события "выход" жизненного цикла процесса
 process.on("exit", code => {
