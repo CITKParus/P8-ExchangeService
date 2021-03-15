@@ -121,11 +121,14 @@ class Notifier extends EventEmitter {
                             sSubject: message.sSubject,
                             sMessage: message.sMessage
                         });
-                        //Протоколируем отправку
-                        await this.logger.info(`Сообщение с темой "${message.sSubject}" отпрвлено ${message.sTo}`);
                         //Говорим, что отправлено
                         message.bSent = true;
+                        //Протоколируем отправку
+                        await this.logger.info(`Сообщение с темой "${message.sSubject}" отпрвлено ${message.sTo}`);
                     } else {
+                        //Пометим, что сообщение отправлено (да, это не так, но эта ошибка не решается повторной отправкой, а если не пометить - попытки отправки будут вечными)
+                        message.bSent = true;
+                        //Показываем ошибку
                         throw new ServerError(
                             SERR_MAIL_FAILED,
                             'Не указаны параметры подключения к SMTP-сервереру (проверьте секцию "mail" в файле конфигурации)'
