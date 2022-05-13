@@ -199,7 +199,14 @@ class ParusAppServer {
                 `Версия сервера приложений: ${prms.config.common.sVersion}, релиз: ${prms.config.common.sRelease}`
             );
             //Создаём подключение к БД
-            this.dbConn = new db.DBConnector({ connectSettings: prms.config.dbConnect });
+            this.dbConn = new db.DBConnector({
+                connectSettings: {
+                    ...prms.config.dbConnect,
+                    nPoolMin: prms.config.inComing.nPoolMin,
+                    nPoolMax: prms.config.inComing.nPoolMax,
+                    nPoolIncrement: prms.config.inComing.nPoolIncrement
+                }
+            });
             //Создаём модуль рассылки уведомлений
             this.notifier = new ntf.Notifier({ logger: this.logger, mail: prms.config.mail });
             //Создаём обработчик очереди исходящих

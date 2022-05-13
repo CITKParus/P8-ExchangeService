@@ -28,9 +28,11 @@ const readCursorData = cursor => {
             rows.push(row);
         });
         queryStream.on("error", err => {
+            queryStream.destroy();
             reject(new Error(err.message));
         });
         queryStream.on("close", () => {
+            queryStream.destroy();
             resolve(rows);
         });
     });
@@ -44,6 +46,9 @@ const connect = async prms => {
             password: prms.sPassword,
             connectString: prms.sConnectString,
             queueTimeout: 600000,
+            poolMin: prms.nPoolMin ? prms.nPoolMin : 4,
+            poolMax: prms.nPoolMax ? prms.nPoolMax : 4,
+            poolIncrement: prms.nPoolIncrement ? prms.nPoolIncrement : 0,
             sessionCallback: (connection, requestedTag, callback) => {
                 if (prms.sSessionAppName) connection.module = prms.sSessionAppName;
                 connection.execute(`ALTER SESSION SET CURRENT_SCHEMA=${prms.sSchema}`).then(

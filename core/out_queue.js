@@ -151,7 +151,12 @@ class OutQueue extends EventEmitter {
             //Отдаём команду дочернему процессу обработчика на старт исполнения
             prms.proc.send({
                 nQueueId: prms.queue.nId,
-                connectSettings: this.dbConn.connectSettings,
+                connectSettings: {
+                    ...this.dbConn.connectSettings,
+                    nPoolMin: this.outGoing.nPoolMin,
+                    nPoolMax: this.outGoing.nPoolMax,
+                    nPoolIncrement: this.outGoing.nPoolIncrement
+                },
                 service: _.find(this.services, { nId: prms.queue.nServiceId }),
                 function: _.find(_.find(this.services, { nId: prms.queue.nServiceId }).functions, {
                     nId: prms.queue.nServiceFnId
@@ -354,7 +359,7 @@ class OutQueue extends EventEmitter {
     async restartDetectingLoop() {
         //Включаем опрос очереди только если установлен флаг работы
         if (this.bWorking) {
-            this.nDetectingLoopTimeOut = await setTimeout(async () => {
+            this.nDetectingLoopTimeOut = setTimeout(async () => {
                 await this.outDetectingLoop();
             }, this.outGoing.nCheckTimeout);
         }
