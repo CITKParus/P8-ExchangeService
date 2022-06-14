@@ -9,23 +9,14 @@
 
 const xml2js = require("xml2js"); //Конвертация XML в JSON и JSON в XML
 const _ = require("lodash"); //Работа с коллекциями и объектами
+const rqp = require("request-promise"); //Работа с HTTP/HTTPS запросами
 
 //---------------------
 // Глобальные константы
 //---------------------
 
 // Список тегов которые должны содержать массив
-const tag = [
-    "Вложение",
-    "Редакция",
-    "ДокументОснование",
-    "ДокументСледствие",
-    "Подпись",
-    "Событие",
-    "Этап",
-    "Действие",
-    "Сертификат"
-];
+const tag = ["Вложение", "Редакция", "ДокументОснование", "ДокументСледствие", "Подпись", "Событие", "Этап", "Действие", "Сертификат"];
 
 //------------
 // Тело модуля
@@ -125,9 +116,7 @@ const afterConnect = async prms => {
             dCtxExp: addHours(new Date(), 23)
         };
     } else {
-        throw new Error(
-            `Сервер ЭДО "СБИС" вернул ошибку: ${resp.error.message ? resp.error.message : "Неожиданная ошибка"}`
-        );
+        throw new Error(`Сервер ЭДО "СБИС" вернул ошибку: ${resp.error.message ? resp.error.message : "Неожиданная ошибка"}`);
     }
 };
 
@@ -208,16 +197,43 @@ const beforeAttParse = async prms => {
 
 //Обработчик "После" отправки запроса на загрузку вложения
 const afterAttParse = async prms => {
-    let resu = null;
     if (prms.queue.blResp) {
-        try {
-            resu = JSON.parse(prms.queue.blResp.toString());
-        } catch (e) {
+        if (prms.optionsResp.statusCode == 200) {
             return;
-        }
-        if (resu.error.hasOwnProperty("message")) {
-            //Возврат результата
-            throw new Error(`Неожиданный ответ сервера ЭДО "СБИС": ${resu.error.message}`);
+        } else {
+            let iterable = [1, 2, 3, 4, 5];
+            //Если не превышает лимита запросов
+            for (let value of iterable) {
+                if (prms.optionsResp.statusCode != 200) {
+                    //Выполним повторный запрос
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    let serverResp = await rqp(prms.options);
+                    //Сохраняем полученный ответ
+                    prms.queue.blResp = Buffer.from(serverResp.body || "");
+                    prms.optionsResp.statusCode = serverResp.statusCode;
+                    //Если пришел ответ
+                    if (prms.queue.blResp && serverResp.statusCode == 200) {
+                        //Вернем загруженный документ
+                        return {
+                            blResp: prms.queue.blResp
+                        };
+                    }
+                }
+            }
+            //Если был ответ от сервера с ошибкой (иначе мы сюда не попадём)
+            if (prms.queue.blResp) {
+                //Разберем сообщение об ошибке
+                let resu = null;
+                try {
+                    resu = JSON.parse(prms.queue.blResp.toString());
+                } catch (e) {
+                    throw new Error(`Неожиданный ответ сервера ЭДО "СБИС": ${prms.queue.blResp.toString()}`);
+                }
+                throw new Error(`Сервер ЭДО "СБИС" вернул ошибку: ${resu?.error?.message}`);
+            } else {
+                //Возврат результата
+                throw new Error('Сервер ЭДО "СБИС" не вернул ответ');
+            }
         }
     } else {
         throw new Error('Сервер ЭДО "СБИС" не вернул ответ');
