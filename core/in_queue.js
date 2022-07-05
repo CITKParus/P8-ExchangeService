@@ -13,15 +13,7 @@ const express = require("express"); //WEB-сервер Express
 const cors = require("cors"); //Управление заголовками безопасности для WEB-сервера Express
 const bodyParser = require("body-parser"); //Модуль для Express (разбор тела входящего запроса)
 const { ServerError } = require("./server_errors"); //Типовая ошибка
-const {
-    makeErrorText,
-    validateObject,
-    buildURL,
-    getAppSrvFunction,
-    buildOptionsXML,
-    parseOptionsXML,
-    deepMerge
-} = require("./utils"); //Вспомогательные функции
+const { makeErrorText, validateObject, buildURL, getAppSrvFunction, buildOptionsXML, parseOptionsXML, deepMerge } = require("./utils"); //Вспомогательные функции
 const { NINC_EXEC_CNT_YES, NIS_ORIGINAL_NO, NIS_ORIGINAL_YES } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 const objInQueueSchema = require("../models/obj_in_queue"); //Схема валидации сообщений обмена с бработчиком очереди входящих сообщений
 const objServiceSchema = require("../models/obj_service"); //Схемы валидации сервиса
@@ -96,11 +88,7 @@ class InQueue extends EventEmitter {
     //Обработка сообщения
     async processMessage(prms) {
         //Проверяем структуру переданного объекта для обработки
-        let sCheckResult = validateObject(
-            prms,
-            prmsInQueueSchema.processMessage,
-            "Параметры функции обработки входящего сообщения"
-        );
+        let sCheckResult = validateObject(prms, prmsInQueueSchema.processMessage, "Параметры функции обработки входящего сообщения");
         //Если структура объекта в норме
         if (!sCheckResult) {
             //Буфер для сообщения очереди
@@ -135,9 +123,10 @@ class InQueue extends EventEmitter {
                 });
                 //Скажем что пришло новое входящее сообщение
                 await this.logger.info(
-                    `Новое входящее сообщение от ${prms.req.connection.address().address} для функции ${
-                        prms.function.sCode
-                    } (${buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL })})`,
+                    `Новое входящее сообщение от ${prms.req.connection.address().address} для функции ${prms.function.sCode} (${buildURL({
+                        sSrvRoot: prms.service.sSrvRoot,
+                        sFnURL: prms.function.sFnURL
+                    })})`,
                     { nQueueId: q.nId }
                 );
                 //Выполняем обработчик "До" (если он есть)
@@ -200,13 +189,11 @@ class InQueue extends EventEmitter {
                                 let sOptionsResp = buildOptionsXML({ options: optionsResp });
                                 q = await this.dbConn.setQueueOptionsResp({ nQueueId: q.nId, sOptionsResp });
                             }
-                            //Если пришел флаг ошибочной аутентификации и он положительный - то это ошибка, дальше ничего не делаем
-                            if (!_.isUndefined(resBefore.bUnAuth))
-                                if (resBefore.bUnAuth === true)
-                                    throw new ServerError(SERR_UNAUTH, "Нет аутентификации");
-                            //Если пришел флаг прекращения дальнейшей обработки сообщения - то дальше его обработку прекращаем
-                            if (!_.isUndefined(resBefore.bStopPropagation))
-                                if (resBefore.bStopPropagation === true) bStopPropagation = true;
+                            //Фиксируем результат исполнения "До" - флаг ошибочной аутентификации - если он поднят, то это ошибка, дальше ничего не делаем
+                            if (!_.isUndefined(resBefore.bUnAuth) && resBefore.bUnAuth === true)
+                                throw new ServerError(SERR_UNAUTH, "Нет аутентификации");
+                            //Фиксируем результат исполнения "До" - флаг прекращения дальнейшей обработки сообщения - если он поднят, то дальше обработку сообщения прекращаем
+                            if (!_.isUndefined(resBefore.bStopPropagation) && resBefore.bStopPropagation === true) bStopPropagation = true;
                         } else {
                             //Или расскажем об ошибке
                             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
@@ -223,8 +210,7 @@ class InQueue extends EventEmitter {
                     //Вызов обработчика БД
                     let prcRes = await this.dbConn.execQueueDBPrc({ nQueueId: q.nId });
                     //Если результат - ошибка пробрасываем её
-                    if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_ERR)
-                        throw new ServerError(SERR_DB_SERVER, prcRes.sMsg);
+                    if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_ERR) throw new ServerError(SERR_DB_SERVER, prcRes.sMsg);
                     //Если результат - ошибка аутентификации, то и её пробрасываем, но с правильным кодом
                     if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_UNAUTH)
                         throw new ServerError(SERR_UNAUTH, prcRes.sMsg || "Нет аутентификации");
@@ -339,10 +325,7 @@ class InQueue extends EventEmitter {
                         nExecState: objQueueSchema.NQUEUE_EXEC_STATE_ERR
                     });
                     //Фиксируем ошибку обработки сервером приложений - в протоколе работы сервиса
-                    await this.logger.error(
-                        `Ошибка обработки входящего сообщения ${q.nId} сервером приложений: ${sMessage}`,
-                        { nQueueId: q.nId }
-                    );
+                    await this.logger.error(`Ошибка обработки входящего сообщения ${q.nId} сервером приложений: ${sMessage}`, { nQueueId: q.nId });
                     //Добавим чуть больше информации в тему сообщения
                     sSubject = `Ошибка обработки входящего сообщения ${q.nId} сервером приложений для функции "${prms.function.sCode}" сервиса "${prms.service.sCode}"`;
                 } else {
@@ -371,11 +354,7 @@ class InQueue extends EventEmitter {
     //Запуск обработки очереди входящих сообщений
     startProcessing(prms) {
         //Проверяем структуру переданного объекта для старта
-        let sCheckResult = validateObject(
-            prms,
-            prmsInQueueSchema.startProcessing,
-            "Параметры функции запуска обработки очереди входящих сообщений"
-        );
+        let sCheckResult = validateObject(prms, prmsInQueueSchema.startProcessing, "Параметры функции запуска обработки очереди входящих сообщений");
         //Если структура объекта в норме
         if (!sCheckResult) {
             //Выставляем флаг работы
@@ -431,18 +410,15 @@ class InQueue extends EventEmitter {
                             }
                         );
                         //...и собственный обработчик ошибок
-                        this.webApp.use(
-                            buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL }),
-                            async (err, req, res, next) => {
-                                //Протоколируем в журнал работы сервера
-                                await this.logger.error(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)), {
-                                    nServiceId: srvs.nId,
-                                    nServiceFnId: fn.nId
-                                });
-                                //Отправим ошибку клиенту
-                                res.status(500).send(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)));
-                            }
-                        );
+                        this.webApp.use(buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL }), async (err, req, res, next) => {
+                            //Протоколируем в журнал работы сервера
+                            await this.logger.error(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)), {
+                                nServiceId: srvs.nId,
+                                nServiceFnId: fn.nId
+                            });
+                            //Отправим ошибку клиенту
+                            res.status(500).send(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)));
+                        });
                     }
                 );
             });

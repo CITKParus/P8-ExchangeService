@@ -12,15 +12,7 @@ const _ = require("lodash"); //Работа с массивами и объек�
 const rqp = require("request-promise"); //Работа с HTTP/HTTPS запросами
 const lg = require("./logger"); //Протоколирование работы
 const db = require("./db_connector"); //Взаимодействие с БД
-const {
-    makeErrorText,
-    validateObject,
-    getAppSrvFunction,
-    buildURL,
-    parseOptionsXML,
-    buildOptionsXML,
-    deepMerge
-} = require("./utils"); //Вспомогательные функции
+const { makeErrorText, validateObject, getAppSrvFunction, buildURL, parseOptionsXML, buildOptionsXML, deepMerge } = require("./utils"); //Вспомогательные функции
 const { ServerError } = require("./server_errors"); //Типовая ошибка
 const objOutQueueProcessorSchema = require("../models/obj_out_queue_processor"); //Схема валидации сообщений обмена с бработчиком очереди исходящих сообщений
 const prmsOutQueueProcessorSchema = require("../models/prms_out_queue_processor"); //Схема валидации параметров функций модуля
@@ -35,12 +27,7 @@ const {
     SERR_WEB_SERVER,
     SERR_UNAUTH
 } = require("./constants"); //Глобальные константы
-const {
-    NINC_EXEC_CNT_YES,
-    NINC_EXEC_CNT_NO,
-    NIS_ORIGINAL_NO,
-    NIS_ORIGINAL_YES
-} = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
+const { NINC_EXEC_CNT_YES, NINC_EXEC_CNT_NO, NIS_ORIGINAL_NO, NIS_ORIGINAL_YES } = require("../models/prms_db_connector"); //Схемы валидации параметров функций модуля взаимодействия с БД
 
 //--------------------------
 // Глобальные идентификаторы
@@ -112,8 +99,7 @@ const appProcess = async prms => {
             //Проверяем аутентификацию
             if (
                 prms.function.nAuthOnly == objServiceFnSchema.NAUTH_ONLY_NO ||
-                (prms.function.nAuthOnly == objServiceFnSchema.NAUTH_ONLY_YES &&
-                    isServiceAuth == objServiceSchema.NIS_AUTH_YES)
+                (prms.function.nAuthOnly == objServiceFnSchema.NAUTH_ONLY_YES && isServiceAuth == objServiceSchema.NIS_AUTH_YES)
             ) {
                 //Фиксируем начало исполнения сервером приложений - в статусе сообщения
                 res = await dbConn.setQueueState({
@@ -122,9 +108,9 @@ const appProcess = async prms => {
                 });
                 //Фиксируем начало исполнения сервером приложений - в протоколе работы сервиса
                 await logger.info(
-                    `Обрабатываю исходящее сообщение сервером приложений: ${prms.queue.nId}, ${prms.queue.sInDate}, ${
-                        prms.queue.sServiceFnCode
-                    }, ${prms.queue.sExecState}, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
+                    `Обрабатываю исходящее сообщение сервером приложений: ${prms.queue.nId}, ${prms.queue.sInDate}, ${prms.queue.sServiceFnCode}, ${
+                        prms.queue.sExecState
+                    }, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
                     { nQueueId: prms.queue.nId }
                 );
                 //Считаем тело сообщения
@@ -141,6 +127,8 @@ const appProcess = async prms => {
                 let options = { method: prms.function.sFnPrmsType, encoding: null };
                 //Инициализируем параметры ответа сервера
                 let optionsResp = {};
+                //Флаг прекращения обработки сообщения
+                let bStopPropagation = false;
                 //Определимся с URL и телом сообщения в зависимости от способа передачи параметров
                 if (prms.function.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
                     options.url = buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL });
@@ -176,6 +164,7 @@ const appProcess = async prms => {
                     try {
                         let resBeforePrms = _.cloneDeep(prms);
                         resBeforePrms.options = _.cloneDeep(options);
+                        resBeforePrms.dbConn = dbConn;
                         resBefore = await fnBefore(resBeforePrms);
                     } catch (e) {
                         throw new ServerError(SERR_APP_SERVER_BEFORE, e.message);
@@ -225,123 +214,123 @@ const appProcess = async prms => {
                                     });
                                     bCtxIsSet = true;
                                 }
+                            //Применим ответ "До" - флаг прекращения дальнейшей обработки сообщения - если он поднят, то дальше обработку сообщения прекращаем
+                            if (!_.isUndefined(resBefore.bStopPropagation) && resBefore.bStopPropagation === true) bStopPropagation = true;
                         } else {
                             //Или расскажем об ошибке в структуре ответа
                             throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
                         }
                     }
                 }
-                //Фиксируем отправку сообщения в протоколе работы сервиса
-                await logger.info(`Отправляю исходящее сообщение ${prms.queue.nId} на URL: ${options.url}`, {
-                    nQueueId: prms.queue.nId
-                });
-                //Отправляем сообщение удалённому серверу
-                try {
-                    //Сохраняем параметры с которыми уходило сообщение
-                    try {
-                        let tmpOptions = _.cloneDeep(options);
-                        delete tmpOptions.body;
-                        let sOptions = buildOptionsXML({ options: tmpOptions });
-                        await dbConn.setQueueOptions({ nQueueId: prms.queue.nId, sOptions });
-                    } catch (e) {
-                        await logger.warn(`Не удалось сохранить параметры отправки сообщения: ${makeErrorText(e)}`, {
-                            nQueueId: prms.queue.nId
-                        });
-                    }
-                    //Ждем ответ от удалённого сервера
-                    options.resolveWithFullResponse = true;
-                    let serverResp = await rqp(options);
-                    //Сохраняем полученный ответ
-                    prms.queue.blResp = Buffer.from(serverResp.body || "");
-                    await dbConn.setQueueResp({
-                        nQueueId: prms.queue.nId,
-                        blResp: prms.queue.blResp,
-                        nIsOriginal: NIS_ORIGINAL_YES
+                //Если флаг прекращения обработки сообщения не установлен
+                if (bStopPropagation === false) {
+                    //Фиксируем отправку сообщения в протоколе работы сервиса
+                    await logger.info(`Отправляю исходящее сообщение ${prms.queue.nId} на URL: ${options.url}`, {
+                        nQueueId: prms.queue.nId
                     });
-                    //Сохраняем заголовки ответа и HTTP-статус
-                    optionsResp.headers = _.cloneDeep(serverResp.headers);
-                    optionsResp.statusCode = serverResp.statusCode;
+                    //Отправляем сообщение удалённому серверу
                     try {
-                        let sOptionsResp = buildOptionsXML({ options: optionsResp });
-                        await dbConn.setQueueOptionsResp({ nQueueId: prms.queue.nId, sOptionsResp });
+                        //Сохраняем параметры с которыми уходило сообщение
+                        try {
+                            let tmpOptions = _.cloneDeep(options);
+                            delete tmpOptions.body;
+                            let sOptions = buildOptionsXML({ options: tmpOptions });
+                            await dbConn.setQueueOptions({ nQueueId: prms.queue.nId, sOptions });
+                        } catch (e) {
+                            await logger.warn(`Не удалось сохранить параметры отправки сообщения: ${makeErrorText(e)}`, {
+                                nQueueId: prms.queue.nId
+                            });
+                        }
+                        //Ждем ответ от удалённого сервера
+                        options.resolveWithFullResponse = true;
+                        let serverResp = await rqp(options);
+                        //Сохраняем полученный ответ
+                        prms.queue.blResp = Buffer.from(serverResp.body || "");
+                        await dbConn.setQueueResp({
+                            nQueueId: prms.queue.nId,
+                            blResp: prms.queue.blResp,
+                            nIsOriginal: NIS_ORIGINAL_YES
+                        });
+                        //Сохраняем заголовки ответа и HTTP-статус
+                        optionsResp.headers = _.cloneDeep(serverResp.headers);
+                        optionsResp.statusCode = serverResp.statusCode;
+                        try {
+                            let sOptionsResp = buildOptionsXML({ options: optionsResp });
+                            await dbConn.setQueueOptionsResp({ nQueueId: prms.queue.nId, sOptionsResp });
+                        } catch (e) {
+                            await logger.warn(`Не удалось сохранить заголовок ответа удалённого сервера: ${makeErrorText(e)}`, {
+                                nQueueId: prms.queue.nId
+                            });
+                        }
                     } catch (e) {
-                        await logger.warn(
-                            `Не удалось сохранить заголовок ответа удалённого сервера: ${makeErrorText(e)}`,
-                            { nQueueId: prms.queue.nId }
-                        );
+                        //Прекращаем исполнение если были ошибки
+                        let sError = "Неожиданная ошибка удалённого сервиса";
+                        if (e.error) {
+                            let sSubError = e.error.code || e.error;
+                            sError = `Ошибка передачи данных: ${sSubError}`;
+                        }
+                        if (e.response) sError = `${e.response.statusCode} - ${e.response.statusMessage}`;
+                        throw new ServerError(SERR_WEB_SERVER, sError);
                     }
-                } catch (e) {
-                    //Прекращаем исполнение если были ошибки
-                    let sError = "Неожиданная ошибка удалённого сервиса";
-                    if (e.error) {
-                        let sSubError = e.error.code || e.error;
-                        sError = `Ошибка передачи данных: ${sSubError}`;
-                    }
-                    if (e.response) sError = `${e.response.statusCode} - ${e.response.statusMessage}`;
-                    throw new ServerError(SERR_WEB_SERVER, sError);
-                }
-                //Выполняем обработчик "После" (если он есть)
-                if (prms.function.sAppSrvAfter) {
-                    const fnAfter = getAppSrvFunction(prms.function.sAppSrvAfter);
-                    let resAfter = null;
-                    try {
-                        let resAfterPrms = _.cloneDeep(prms);
-                        resAfterPrms.options = _.cloneDeep(options);
-                        resAfterPrms.optionsResp = _.cloneDeep(optionsResp);
-                        resAfter = await fnAfter(resAfterPrms);
-                    } catch (e) {
-                        throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
-                    }
-                    //Проверяем структуру ответа функции постобработки
-                    if (resAfter) {
-                        let sCheckResult = validateObject(
-                            resAfter,
-                            objOutQueueProcessorSchema.OutQueueProcessorFnAfter,
-                            "Результат функции постобработки исходящего сообщения"
-                        );
-                        //Если структура ответа в норме
-                        if (!sCheckResult) {
-                            //Применим ответ "После" - обработанный ответ удаленного сервиса
-                            if (!_.isUndefined(resAfter.blResp)) {
-                                prms.queue.blResp = resAfter.blResp;
-                                await dbConn.setQueueResp({
-                                    nQueueId: prms.queue.nId,
-                                    blResp: prms.queue.blResp,
-                                    nIsOriginal: NIS_ORIGINAL_NO
-                                });
-                            }
-                            //Применим ответ "После" - флаг утентификации сервиса
-                            if (!_.isUndefined(resAfter.bUnAuth))
-                                if (resAfter.bUnAuth === true) throw new ServerError(SERR_UNAUTH, "Нет аутентификации");
-                            //Применим ответ "После" - контекст работы сервиса
-                            if (!_.isUndefined(resAfter.sCtx))
-                                if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGIN) {
-                                    prms.service.sCtx = resAfter.sCtx;
-                                    prms.service.dCtxExp = resAfter.dCtxExp;
-                                    await dbConn.setServiceContext({
-                                        nServiceId: prms.service.nId,
-                                        sCtx: prms.service.sCtx,
-                                        dCtxExp: prms.service.dCtxExp
+                    //Выполняем обработчик "После" (если он есть)
+                    if (prms.function.sAppSrvAfter) {
+                        const fnAfter = getAppSrvFunction(prms.function.sAppSrvAfter);
+                        let resAfter = null;
+                        try {
+                            let resAfterPrms = _.cloneDeep(prms);
+                            resAfterPrms.options = _.cloneDeep(options);
+                            resAfterPrms.optionsResp = _.cloneDeep(optionsResp);
+                            resAfter = await fnAfter(resAfterPrms);
+                        } catch (e) {
+                            throw new ServerError(SERR_APP_SERVER_AFTER, e.message);
+                        }
+                        //Проверяем структуру ответа функции постобработки
+                        if (resAfter) {
+                            let sCheckResult = validateObject(
+                                resAfter,
+                                objOutQueueProcessorSchema.OutQueueProcessorFnAfter,
+                                "Результат функции постобработки исходящего сообщения"
+                            );
+                            //Если структура ответа в норме
+                            if (!sCheckResult) {
+                                //Применим ответ "После" - обработанный ответ удаленного сервиса
+                                if (!_.isUndefined(resAfter.blResp)) {
+                                    prms.queue.blResp = resAfter.blResp;
+                                    await dbConn.setQueueResp({
+                                        nQueueId: prms.queue.nId,
+                                        blResp: prms.queue.blResp,
+                                        nIsOriginal: NIS_ORIGINAL_NO
                                     });
-                                    bCtxIsSet = true;
                                 }
-                        } else {
-                            //Или расскажем об ошибке в структуре ответа
-                            throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                                //Применим ответ "После" - флаг утентификации сервиса
+                                if (!_.isUndefined(resAfter.bUnAuth))
+                                    if (resAfter.bUnAuth === true) throw new ServerError(SERR_UNAUTH, "Нет аутентификации");
+                                //Применим ответ "После" - контекст работы сервиса
+                                if (!_.isUndefined(resAfter.sCtx))
+                                    if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGIN) {
+                                        prms.service.sCtx = resAfter.sCtx;
+                                        prms.service.dCtxExp = resAfter.dCtxExp;
+                                        await dbConn.setServiceContext({
+                                            nServiceId: prms.service.nId,
+                                            sCtx: prms.service.sCtx,
+                                            dCtxExp: prms.service.dCtxExp
+                                        });
+                                        bCtxIsSet = true;
+                                    }
+                            } else {
+                                //Или расскажем об ошибке в структуре ответа
+                                throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
+                            }
                         }
                     }
-                }
-                //Если это функция начала сеанса, и нет обработчика на стороне БД и контекст не был установлен до сих пор - то положим в него то, что нам ответил сервер
-                if (
-                    prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGIN &&
-                    !prms.function.sPrcResp &&
-                    !bCtxIsSet
-                ) {
-                    await dbConn.setServiceContext({ nServiceId: prms.service.nId, sCtx: serverResp });
-                }
-                //Если это функция окончания сеанса, и нет обработчика на стороне БД - то сбросим контекст здесь
-                if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGOUT && !prms.function.sPrcResp) {
-                    await dbConn.clearServiceContext({ nServiceId: prms.service.nId });
+                    //Если это функция начала сеанса, и нет обработчика на стороне БД и контекст не был установлен до сих пор - то положим в него то, что нам ответил сервер
+                    if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGIN && !prms.function.sPrcResp && !bCtxIsSet) {
+                        await dbConn.setServiceContext({ nServiceId: prms.service.nId, sCtx: serverResp });
+                    }
+                    //Если это функция окончания сеанса, и нет обработчика на стороне БД - то сбросим контекст здесь
+                    if (prms.function.nFnType == objServiceFnSchema.NFN_TYPE_LOGOUT && !prms.function.sPrcResp) {
+                        await dbConn.clearServiceContext({ nServiceId: prms.service.nId });
+                    }
                 }
                 //Фиксируем успешное исполнение сервером приложений - в статусе сообщения
                 res = await dbConn.setQueueState({
@@ -383,10 +372,9 @@ const appProcess = async prms => {
                 });
             }
             //Фиксируем ошибку обработки сервером приложений - в протоколе работы сервиса
-            await logger.error(
-                `Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером приложений: ${makeErrorText(e)}`,
-                { nQueueId: prms.queue.nId }
-            );
+            await logger.error(`Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером приложений: ${makeErrorText(e)}`, {
+                nQueueId: prms.queue.nId
+            });
         }
     } else {
         //Фатальная ошибка обработки - некорректный объект параметров
@@ -401,11 +389,7 @@ const dbProcess = async prms => {
     //Результат обработки - объект Queue (обработанное сообщение) или ServerError (ошибка обработки)
     let res = null;
     //Проверяем структуру переданного объекта для старта
-    let sCheckResult = validateObject(
-        prms,
-        prmsOutQueueProcessorSchema.dbProcess,
-        "Параметры функции запуска обработки ообщения сервером БД"
-    );
+    let sCheckResult = validateObject(prms, prmsOutQueueProcessorSchema.dbProcess, "Параметры функции запуска обработки ообщения сервером БД");
     //Если структура объекта в норме
     if (!sCheckResult) {
         //Обрабатываем
@@ -417,9 +401,9 @@ const dbProcess = async prms => {
             });
             //Фиксируем начало исполнения сервером БД - в протоколе работы сервиса
             await logger.info(
-                `Обрабатываю исходящее сообщение сервером БД: ${prms.queue.nId}, ${prms.queue.sInDate}, ${
-                    prms.queue.sServiceFnCode
-                }, ${prms.queue.sExecState}, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
+                `Обрабатываю исходящее сообщение сервером БД: ${prms.queue.nId}, ${prms.queue.sInDate}, ${prms.queue.sServiceFnCode}, ${
+                    prms.queue.sExecState
+                }, попытка исполнения - ${prms.queue.nExecCnt + 1}`,
                 { nQueueId: prms.queue.nId }
             );
             //Если обработчик со стороны БД указан
@@ -427,11 +411,9 @@ const dbProcess = async prms => {
                 //Вызываем его
                 let prcRes = await dbConn.execQueueDBPrc({ nQueueId: prms.queue.nId });
                 //Если результат - ошибка пробрасываем её
-                if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_ERR)
-                    throw new ServerError(SERR_DB_SERVER, prcRes.sMsg);
+                if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_ERR) throw new ServerError(SERR_DB_SERVER, prcRes.sMsg);
                 //Если результат - ошибка аутентификации, то и её пробрасываем, но с правильным кодом
-                if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_UNAUTH)
-                    throw new ServerError(SERR_UNAUTH, prcRes.sMsg || "Нет аутентификации");
+                if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_UNAUTH) throw new ServerError(SERR_UNAUTH, prcRes.sMsg || "Нет аутентификации");
             }
             //Фиксируем успешное исполнение (полное - дальше обработки нет) - в статусе сообщения
             res = await dbConn.setQueueState({
@@ -466,10 +448,9 @@ const dbProcess = async prms => {
                 });
             }
             //Фиксируем ошибку обработки сервером БД - в протоколе работы сервиса
-            await logger.error(
-                `Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером БД: ${makeErrorText(e)}`,
-                { nQueueId: prms.queue.nId }
-            );
+            await logger.error(`Ошибка обработки исходящего сообщения ${prms.queue.nId} сервером БД: ${makeErrorText(e)}`, {
+                nQueueId: prms.queue.nId
+            });
         }
     } else {
         //Фатальная ошибка обработки - некорректный объект параметров
@@ -482,11 +463,7 @@ const dbProcess = async prms => {
 //Обработка задачи
 const processTask = async prms => {
     //Проверяем параметры
-    let sCheckResult = validateObject(
-        prms,
-        prmsOutQueueProcessorSchema.processTask,
-        "Параметры функции обработки задачи"
-    );
+    let sCheckResult = validateObject(prms, prmsOutQueueProcessorSchema.processTask, "Параметры функции обработки задачи");
     //Если параметры в норме
     if (!sCheckResult) {
         let q = null;
@@ -629,11 +606,7 @@ process.on("uncaughtException", e => {
 //Приём сообщений
 process.on("message", task => {
     //Проверяем структуру переданного сообщения
-    let sCheckResult = validateObject(
-        task,
-        objOutQueueProcessorSchema.OutQueueProcessorTask,
-        "Задача обработчика очереди исходящих сообщений"
-    );
+    let sCheckResult = validateObject(task, objOutQueueProcessorSchema.OutQueueProcessorTask, "Задача обработчика очереди исходящих сообщений");
     //Если структура объекта в норме
     if (!sCheckResult) {
         //Запускаем обработку

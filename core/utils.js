@@ -197,7 +197,9 @@ const sendMail = prms => {
                 from: prms.mail.sFrom,
                 to: prms.sTo,
                 subject: prms.sSubject,
-                text: prms.sMessage
+                text: prms.sMessage,
+                html: prms.sHTML,
+                attachments: prms.attachments
             };
             //Отправляем сообщение
             transporter.sendMail(mailOptions, (error, info) => {

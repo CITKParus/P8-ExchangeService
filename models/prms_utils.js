@@ -40,8 +40,7 @@ exports.sendMail = new Schema({
         required: true,
         use: { validateTo },
         message: {
-            type: path =>
-                `Список адресов E-Mail для отправки уведомления (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            type: path => `Список адресов E-Mail для отправки уведомления (${path}) имеет некорректный тип данных (ожидалось - String)`,
             required: path => `Не указан cписок адресов E-Mail для отправки уведомления (${path})`,
             validateTo: path =>
                 `Неверный формат списка адресов E-Mail для отправки уведомления (${path}), для указания нескольких адресов следует использовать запятую в качестве разделителя (без пробелов)`
@@ -50,7 +49,7 @@ exports.sendMail = new Schema({
     //Заголовок сообщения
     sSubject: {
         type: String,
-        required: true,
+        required: false,
         message: {
             type: path => `Заголовок сообщения (${path}) имеет некорректный тип данных (ожидалось - String)`,
             required: path => `Не указан заголовок сообщения (${path})`
@@ -59,10 +58,28 @@ exports.sendMail = new Schema({
     //Текст уведомления
     sMessage: {
         type: String,
-        required: true,
+        required: false,
         message: {
             type: path => `Текст уведомления (${path}) имеет некорректный тип данных (ожидалось - String)`,
             required: path => `Не указан текст уведомления (${path})`
+        }
+    },
+    //HTML текст сообщения
+    sHTML: {
+        type: String,
+        required: false,
+        message: {
+            type: path => `HTML текст сообщения (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан HTML текст сообщения (${path})`
+        }
+    },
+    //Вложения сообщения
+    attachments: {
+        type: Array,
+        required: false,
+        message: {
+            type: path => `Список вложений сообщения (${path}) имеет некорректный тип данных (ожидалось - Array)`,
+            required: path => `Не указан список вложений сообщения (${path})`
         }
     }
 });
@@ -141,8 +158,7 @@ exports.buildOptionsXML = new Schema({
         type: Object,
         required: true,
         message: {
-            type: path =>
-                `Объект параметров сообщения/ответа (${path}) имеет некорректный тип данных (ожидалось - Object)`,
+            type: path => `Объект параметров сообщения/ответа (${path}) имеет некорректный тип данных (ожидалось - Object)`,
             required: path => `Не указан объект параметров сообщения/ответа (${path})`
         }
     }

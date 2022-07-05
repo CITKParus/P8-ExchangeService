@@ -145,6 +145,16 @@ exports.OutQueueProcessorFnBefore = new Schema({
             type: path => `Дата истечения контекста (${path}) имеет некорректный тип данных (ожидалось - Date)`,
             required: path => `Не указана дата истечения контекста (${path})`
         }
+    },
+    //Флаг прекращения дальнейшей обработки сообщения
+    bStopPropagation: {
+        type: Boolean,
+        required: false,
+        message: {
+            type: path =>
+                `Флаг прекращения дальнейшей обработки сообщения  (${path}) имеет некорректный тип данных (ожидалось - Boolean)`,
+            required: path => `Не указан флаг прекращения дальнейшей обработки сообщения (${path})`
+        }
     }
 });
 
