@@ -153,13 +153,32 @@ const before = async prms => {
             res = `Ошибка отправки E-Mail сообщения: ${makeErrorText(e)}`;
         }
     }
-    //Если имеется рег. номер записи очереди отправки E-mail - обновляем информацию о текущем сообщении
-    if (parseRes.mail.nExsextmailId) {
-        if (res === "OK") {
-            await setSendMsg({ connection: prms.dbConn.connection, nRn: parseRes.mail.nExsextmailId, sErrMsg: "", nStatus: NSTATUS_DONE });
-        } else {
-            await setSendMsg({ connection: prms.dbConn.connection, nRn: parseRes.mail.nExsextmailId, sErrMsg: res, nStatus: NSTATUS_ERR });
+    //Если сообщение отправилось
+    if (res === "OK") {
+        //Если имеется рег. номер записи очереди отправки E-mail - обновляем информацию о текущем сообщении
+        if (parseRes.mail.nExsextmailId) {
+            await setSendMsg({
+                connection: prms.dbConn.connection,
+                nRn: parseRes.mail.nExsextmailId,
+                sErrMsg: "",
+                nStatus: NSTATUS_DONE
+            });
         }
+    } else {
+        //Если количество попыток не указано или это последняя попытка
+        if (prms.queue.nRetryAttempts === 0 || (prms.queue.nRetryAttempts !== 0 && prms.queue.nExecCnt + 1 === prms.queue.nRetryAttempts)) {
+            //Если имеется рег. номер записи очереди отправки E-mail - обновляем информацию о текущем сообщении
+            if (parseRes.mail.nExsextmailId) {
+                await setSendMsg({
+                    connection: prms.dbConn.connection,
+                    nRn: parseRes.mail.nExsextmailId,
+                    sErrMsg: res,
+                    nStatus: NSTATUS_ERR
+                });
+            }
+        }
+        //Выдаем ошибку
+        throw new Error(res);
     }
     //Возвращаем результат и флаг того, что дальше отрабатывать это сообщение не надо
     return {
