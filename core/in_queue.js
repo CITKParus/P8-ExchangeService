@@ -102,11 +102,15 @@ class InQueue extends EventEmitter {
                 let optionsResp = {};
                 //Флаг прекращения обработки сообщения
                 let bStopPropagation = false;
-                //Определимся с телом сообщения - для POST сообщений - это тело запроса
-                if (prms.function.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
+                //Определимся с телом сообщения - для POST, PATCH и PUT сообщений - это тело запроса
+                if (
+                    [objServiceFnSchema.NFN_PRMS_TYPE_POST, objServiceFnSchema.NFN_PRMS_TYPE_PATCH, objServiceFnSchema.NFN_PRMS_TYPE_PUT].includes(
+                        prms.function.nFnPrmsType
+                    )
+                ) {
                     blMsg = prms.req.body && !_.isEmpty(prms.req.body) ? prms.req.body : null;
                 } else {
-                    //Для GET - параметры запроса
+                    //Для GET, HEAD, DELETE, CONNECT, OPTIONS и TRACE - параметры запроса
                     if (!_.isEmpty(prms.req.query)) blMsg = Buffer.from(JSON.stringify(prms.req.query));
                 }
                 //Определимся с параметрами сообщения полученными от внешней системы
@@ -392,23 +396,20 @@ class InQueue extends EventEmitter {
                     _.filter(srvs.functions, fn => !fn.sFnURL.startsWith("@")),
                     fn => {
                         //...собственный обработчик, в зависимости от указанного способа передачи параметров
-                        this.webApp[fn.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST ? "post" : "get"](
-                            buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL }),
-                            async (req, res) => {
-                                try {
-                                    //Вызываем обработчик
-                                    await this.processMessage({ req, res, service: srvs, function: fn });
-                                } catch (e) {
-                                    //Протоколируем в журнал работы сервера
-                                    await this.logger.error(makeErrorText(e), {
-                                        nServiceId: srvs.nId,
-                                        nServiceFnId: fn.nId
-                                    });
-                                    //Отправим ошибку клиенту
-                                    res.status(500).send(makeErrorText(e));
-                                }
+                        this.webApp[fn.sFnPrmsType.toLowerCase()](buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL }), async (req, res) => {
+                            try {
+                                //Вызываем обработчик
+                                await this.processMessage({ req, res, service: srvs, function: fn });
+                            } catch (e) {
+                                //Протоколируем в журнал работы сервера
+                                await this.logger.error(makeErrorText(e), {
+                                    nServiceId: srvs.nId,
+                                    nServiceFnId: fn.nId
+                                });
+                                //Отправим ошибку клиенту
+                                res.status(500).send(makeErrorText(e));
                             }
-                        );
+                        });
                         //...и собственный обработчик ошибок
                         this.webApp.use(buildURL({ sSrvRoot: srvs.sSrvRoot, sFnURL: fn.sFnURL }), async (err, req, res, next) => {
                             //Протоколируем в журнал работы сервера

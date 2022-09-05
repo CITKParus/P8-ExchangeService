@@ -25,8 +25,22 @@ const SFN_TYPE_LOGOUT = "LOGOUT"; //Завершение сеанса (стро�
 //Способы передачи параметров функциям сервиса
 const NFN_PRMS_TYPE_POST = 0; //POST-запрос
 const NFN_PRMS_TYPE_GET = 1; //GET-запрос
+const NFN_PRMS_TYPE_HEAD = 2; //HEAD-запрос
+const NFN_PRMS_TYPE_PUT = 3; //PUT-запрос
+const NFN_PRMS_TYPE_DELETE = 4; //DELETE-запрос
+const NFN_PRMS_TYPE_CONNECT = 5; //CONNECT-запрос
+const NFN_PRMS_TYPE_OPTIONS = 6; //OPTIONS-запрос
+const NFN_PRMS_TYPE_TRACE = 7; //TRACE-запрос
+const NFN_PRMS_TYPE_PATCH = 8; //PATCH-запрос
 const SFN_PRMS_TYPE_POST = "POST"; //POST-запрос
 const SFN_PRMS_TYPE_GET = "GET"; //GET-запрос
+const SFN_PRMS_TYPE_HEAD = "HEAD"; //HEAD-запрос
+const SFN_PRMS_TYPE_PUT = "PUT"; //PUT-запрос
+const SFN_PRMS_TYPE_DELETE = "DELETE"; //DELETE-запрос
+const SFN_PRMS_TYPE_CONNECT = "CONNECT"; //CONNECT-запрос
+const SFN_PRMS_TYPE_OPTIONS = "OPTIONS"; //OPTIONS-запрос
+const SFN_PRMS_TYPE_TRACE = "TRACE"; //TRACE-запрос
+const SFN_PRMS_TYPE_PATCH = "PATCH"; //PATCH-запрос
 
 //Расписание повторного исполнения функции
 const NRETRY_SCHEDULE_UNDEF = 0; //Не определено
@@ -87,8 +101,22 @@ exports.SFN_TYPE_LOGIN = SFN_TYPE_LOGIN;
 exports.SFN_TYPE_LOGOUT = SFN_TYPE_LOGOUT;
 exports.NFN_PRMS_TYPE_POST = NFN_PRMS_TYPE_POST;
 exports.NFN_PRMS_TYPE_GET = NFN_PRMS_TYPE_GET;
+exports.NFN_PRMS_TYPE_HEAD = NFN_PRMS_TYPE_HEAD;
+exports.NFN_PRMS_TYPE_PUT = NFN_PRMS_TYPE_PUT;
+exports.NFN_PRMS_TYPE_DELETE = NFN_PRMS_TYPE_DELETE;
+exports.NFN_PRMS_TYPE_CONNECT = NFN_PRMS_TYPE_CONNECT;
+exports.NFN_PRMS_TYPE_OPTIONS = NFN_PRMS_TYPE_OPTIONS;
+exports.NFN_PRMS_TYPE_TRACE = NFN_PRMS_TYPE_TRACE;
+exports.NFN_PRMS_TYPE_PATCH = NFN_PRMS_TYPE_PATCH;
 exports.SFN_PRMS_TYPE_POST = SFN_PRMS_TYPE_POST;
 exports.SFN_PRMS_TYPE_GET = SFN_PRMS_TYPE_GET;
+exports.SFN_PRMS_TYPE_HEAD = SFN_PRMS_TYPE_HEAD;
+exports.SFN_PRMS_TYPE_PUT = SFN_PRMS_TYPE_PUT;
+exports.SFN_PRMS_TYPE_DELETE = SFN_PRMS_TYPE_DELETE;
+exports.SFN_PRMS_TYPE_CONNECT = SFN_PRMS_TYPE_CONNECT;
+exports.SFN_PRMS_TYPE_OPTIONS = SFN_PRMS_TYPE_OPTIONS;
+exports.SFN_PRMS_TYPE_TRACE = SFN_PRMS_TYPE_TRACE;
+exports.SFN_PRMS_TYPE_PATCH = SFN_PRMS_TYPE_PATCH;
 exports.NRETRY_SCHEDULE_UNDEF = NRETRY_SCHEDULE_UNDEF;
 exports.NRETRY_SCHEDULE_SEC = NRETRY_SCHEDULE_SEC;
 exports.NRETRY_SCHEDULE_MIN = NRETRY_SCHEDULE_MIN;
@@ -177,7 +205,17 @@ exports.ServiceFunction = new Schema({
     //Способ передачи параметров функции сервиса
     nFnPrmsType: {
         type: Number,
-        enum: [NFN_PRMS_TYPE_GET, NFN_PRMS_TYPE_POST],
+        enum: [
+            NFN_PRMS_TYPE_GET,
+            NFN_PRMS_TYPE_POST,
+            NFN_PRMS_TYPE_HEAD,
+            NFN_PRMS_TYPE_PUT,
+            NFN_PRMS_TYPE_DELETE,
+            NFN_PRMS_TYPE_CONNECT,
+            NFN_PRMS_TYPE_OPTIONS,
+            NFN_PRMS_TYPE_TRACE,
+            NFN_PRMS_TYPE_PATCH
+        ],
         required: true,
         message: {
             type: path =>
@@ -189,7 +227,17 @@ exports.ServiceFunction = new Schema({
     //Способ передачи параметров функции сервиса (строковый код)
     sFnPrmsType: {
         type: String,
-        enum: [SFN_PRMS_TYPE_GET, SFN_PRMS_TYPE_POST],
+        enum: [
+            SFN_PRMS_TYPE_GET,
+            SFN_PRMS_TYPE_POST,
+            SFN_PRMS_TYPE_HEAD,
+            SFN_PRMS_TYPE_PUT,
+            SFN_PRMS_TYPE_DELETE,
+            SFN_PRMS_TYPE_CONNECT,
+            SFN_PRMS_TYPE_OPTIONS,
+            SFN_PRMS_TYPE_TRACE,
+            SFN_PRMS_TYPE_PATCH
+        ],
         required: true,
         message: {
             type: path =>

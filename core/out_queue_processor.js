@@ -129,8 +129,12 @@ const appProcess = async prms => {
                 let optionsResp = {};
                 //Флаг прекращения обработки сообщения
                 let bStopPropagation = false;
-                //Определимся с URL и телом сообщения в зависимости от способа передачи параметров
-                if (prms.function.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
+                //Определимся с URL и телом сообщения в зависимости от способа передачи параметров (для POST, PATCH и PUT - данные в теле, для остальных - в URI)
+                if (
+                    [objServiceFnSchema.NFN_PRMS_TYPE_POST, objServiceFnSchema.NFN_PRMS_TYPE_PATCH, objServiceFnSchema.NFN_PRMS_TYPE_PUT].includes(
+                        prms.function.nFnPrmsType
+                    )
+                ) {
                     options.url = buildURL({ sSrvRoot: prms.service.sSrvRoot, sFnURL: prms.function.sFnURL });
                     options.body = prms.queue.blMsg;
                     options.headers = { "content-type": "application/octet-stream" };
@@ -185,7 +189,13 @@ const appProcess = async prms => {
                                     nQueueId: prms.queue.nId,
                                     blMsg: prms.queue.blMsg
                                 });
-                                if (prms.function.nFnPrmsType == objServiceFnSchema.NFN_PRMS_TYPE_POST) {
+                                if (
+                                    [
+                                        objServiceFnSchema.NFN_PRMS_TYPE_POST,
+                                        objServiceFnSchema.NFN_PRMS_TYPE_PATCH,
+                                        objServiceFnSchema.NFN_PRMS_TYPE_PUT
+                                    ].includes(prms.function.nFnPrmsType)
+                                ) {
                                     options.body = prms.queue.blMsg;
                                 } else {
                                     options.url = buildURL({
