@@ -117,7 +117,12 @@ class InQueue extends EventEmitter {
                 options = {
                     method: prms.req.method,
                     qs: _.cloneDeep(prms.req.query),
-                    headers: _.cloneDeep(prms.req.headers)
+                    headers: _.cloneDeep(prms.req.headers),
+                    ip: prms.req.ip,
+                    hostName: prms.req.hostname,
+                    protocol: prms.req.protocol,
+                    originalUrl: prms.req.originalUrl,
+                    path: prms.req.path
                 };
                 //Кладём сообщение в очередь
                 q = await this.dbConn.putQueue({
@@ -305,7 +310,7 @@ class InQueue extends EventEmitter {
                 //Всё успешно - отдаём результат клиенту
                 if (bStopPropagation === false) {
                     if (optionsResp.headers) prms.res.set(optionsResp.headers);
-                    prms.res.status(200).send(blResp);
+                    prms.res.status(optionsResp.statusCode || 200).send(blResp);
                 }
                 //Фиксируем успех обработки - в статусе сообщения
                 q = await this.dbConn.setQueueState({
