@@ -243,8 +243,13 @@ const appProcess = async prms => {
                         //Сохраняем параметры с которыми уходило сообщение
                         try {
                             let tmpOptions = _.cloneDeep(options);
+                            //Исключим из параметров заведомо бинарные поля (их сохранение не предусмотрено)
                             delete tmpOptions.body;
+                            delete tmpOptions.cert;
+                            delete tmpOptions.key;
+                            //Конвертируем в XML
                             let sOptions = buildOptionsXML({ options: tmpOptions });
+                            //Сохраняемв БД
                             await dbConn.setQueueOptions({ nQueueId: prms.queue.nId, sOptions });
                         } catch (e) {
                             await logger.warn(`Не удалось сохранить параметры отправки сообщения: ${makeErrorText(e)}`, {
