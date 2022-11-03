@@ -227,7 +227,7 @@ const putServiceAuthInQueue = async prms => {
     try {
         pooledConnection = await prms.connection.getConnection();
         await pooledConnection.execute(
-            "BEGIN PKG_EXS.SERVICE_AUTH_PUT_INQUEUE(NEXSSERVICE => :NEXSSERVICE, NFORCE => :NFORCE); END;",
+            "BEGIN PKG_EXS.SERVICE_AUTH_PUT_INQUEUE_AT(NEXSSERVICE => :NEXSSERVICE, NFORCE => :NFORCE); END;",
             { NEXSSERVICE: prms.nServiceId, NFORCE: prms.nForce },
             { autoCommit: true }
         );
