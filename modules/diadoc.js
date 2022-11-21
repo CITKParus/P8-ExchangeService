@@ -10,7 +10,7 @@
 const xml2js = require("xml2js"); //Конвертация XML в JSON и JSON в XML
 const _ = require("lodash"); //Работа с коллекциями и объектами
 const rqp = require("request-promise"); //Работа с HTTP/HTTPS запросами
-const Ddauth_Api_Client_Id = "citk-5d8e1345-3f33-496b-a878-9309011dd6c9"; //Ключ разработчика
+const { SDDAUTH_API_CLIENT_ID } = require("./diadoc_config"); //Ключ разработчика
 
 //---------------------
 // Глобальные константы
@@ -76,21 +76,34 @@ const addHours = (dDate, nHours) => {
     return new Date(dDate);
 };
 
+//Проверка ключа разработчика
+const checkAPIClientId = sAPIClientId => {
+    if (!sAPIClientId) {
+        throw new Error('Не задан ключ разработчика. Запросите его у поставщика услуг ЭДО "ДИАДОК" и укажите в "./modules/diadoc_config.js".');
+    }
+};
+
+//Формиорвание заголовка сообщения
+const buildHeaders = (sAPIClientId, sToken = null) => ({
+    "Content-type": "application/json; charset=utf-8",
+    Authorization: `DiadocAuth ddauth_api_client_id=${sAPIClientId}${sToken ? `,ddauth_token=${sToken}` : ""}`,
+    Accept: "application/json; charset=utf-8"
+});
+
 //Обработчик "До" подключения к сервису
 const beforeConnect = async prms => {
     //Подготовим параметры аутентификации
     const loginAtribute = "login";
     const passAtribute = "password";
+    let surl = prms.options.url;
+    surl = surl + "?" + "type=password";
+    //Проверим ключ разработчика
+    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
     //Сформируем запрос на аутентификацию
     return {
         options: {
-            qs: {
-                type: "password"
-            },
-            headers: {
-                "content-type": "application/json;charset=utf-8",
-                Authorization: "DiadocAuth ddauth_api_client_id=" + Ddauth_Api_Client_Id
-            },
+            headers: buildHeaders(SDDAUTH_API_CLIENT_ID),
+            url: surl,
             body: JSON.stringify({
                 [loginAtribute]: prms.service.sSrvUser,
                 [passAtribute]: prms.service.sSrvPass
@@ -104,7 +117,7 @@ const beforeConnect = async prms => {
 const afterConnect = async prms => {
     //Если пришла ошибка
     if (prms.optionsResp.statusCode != 200) {
-        throw new Error(prms.queue.blRes.toString());
+        throw new Error(prms.queue.blResp.toString());
     } else {
         //Сохраним полученный токен доступа в контекст сервиса
         return {
@@ -117,6 +130,9 @@ const afterConnect = async prms => {
 
 //Обработчик "До" отправки запроса на экспорт документа к сервису "ДИАДОК"
 const beforeMessagePost = async prms => {
+    //Проверим ключ разработчика
+    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    //Формируем запрос
     try {
         //Считаем токен доступа из контекста сервиса
         let sToken = null;
@@ -130,21 +146,25 @@ const beforeMessagePost = async prms => {
         //Формируем запрос для получения FromBoxId
         let rqpoptions = {
             uri: "https://diadoc-api.kontur.ru/GetMyOrganizations",
-            headers: {
-                "Content-type": "application/json; charset=utf-8",
-                Authorization: "DiadocAuth ddauth_api_client_id=" + Ddauth_Api_Client_Id + ",ddauth_token=" + sToken,
-                Accept: "application/json; charset=utf-8"
-            },
+            headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
             json: true
         };
-        //Выполним запрос
-        let serverResp = await rqp(rqpoptions);
-        //Не удалось получить ящик отправителя
-        if (!serverResp.Organizations[0].Boxes[0].BoxId) {
-            throw new Error("Не удалось получить ящик отправителя");
+        let serverResp;
+        try {
+            //Выполним запрос
+            serverResp = await rqp(rqpoptions);
+            //Не удалось получить ящик отправителя
+            if (!serverResp.Organizations[0].Boxes[0].BoxId) {
+                throw new Error("Не удалось получить ящик отправителя");
+            }
+            //Сохраняем полученный ответ
+            obj.FromBoxId = serverResp.Organizations[0].Boxes[0].BoxId;
+        } catch (e) {
+            throw Error(`Не удалось получить ящик отправителя:  ${e.message}`);
         }
-        //Сохраняем полученный ответ
-        obj.FromBoxId = serverResp.Organizations[0].Boxes[0].BoxId;
+        //Очистим предыдущий запрос
+        rqpoptions = null;
+        serverResp = null;
         //Формируем запрос для получения ToBoxId
         rqpoptions = {
             uri: "https://diadoc-api.kontur.ru/GetOrganizationsByInnKpp",
@@ -152,21 +172,21 @@ const beforeMessagePost = async prms => {
                 inn: prms.options.inn,
                 kpp: prms.options.kpp
             },
-            headers: {
-                "Content-type": "application/json; charset=utf-8",
-                Authorization: "DiadocAuth ddauth_api_client_id=" + Ddauth_Api_Client_Id + ",ddauth_token=" + sToken,
-                Accept: "application/json; charset=utf-8"
-            },
+            headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
             json: true
         };
-        //Выполним запрос
-        serverResp = await rqp(rqpoptions);
-        //Не удалось получить ящик получателя
-        if (!serverResp.Organizations[0].Boxes[0].BoxId) {
-            throw new Error("Не удалось получить ящик получателя");
+        try {
+            //Выполним запрос
+            serverResp = await rqp(rqpoptions);
+            //Не удалось получить ящик получателя
+            if (!serverResp.Organizations[0].Boxes[0].BoxId) {
+                throw new Error(`Не удалось получить ящик получателя для контрагента с ИНН: ${prms.options.inn} и КПП: ${prms.options.kpp}`);
+            }
+            //Сохраняем полученный ответ
+            obj.ToBoxId = serverResp.Organizations[0].Boxes[0].BoxId;
+        } catch (e) {
+            throw Error(`Не удалось получить ящик получателя для контрагента с ИНН: ${prms.options.inn} и КПП: ${prms.options.kpp}:  ${e.message}`);
         }
-        //Сохраняем полученный ответ
-        obj.ToBoxId = serverResp.Organizations[0].Boxes[0].BoxId;
         //Если пришел ответ
         if (prms.queue.blResp && serverResp.statusCode == 200) {
             //Вернем загруженный документ
@@ -177,11 +197,7 @@ const beforeMessagePost = async prms => {
         //Собираем и отдаём общий результат работы
         return {
             options: {
-                headers: {
-                    "Content-type": "application/json; charset=utf-8",
-                    Authorization: "DiadocAuth ddauth_api_client_id=" + Ddauth_Api_Client_Id + ",ddauth_token=" + sToken,
-                    Accept: "application/json; charset=utf-8"
-                },
+                headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
                 simple: false
             },
             blMsg: Buffer.from(JSON.stringify(obj))
@@ -218,6 +234,9 @@ const afterMessagePost = async prms => {
 
 //Обработчик "До" отправки запроса на экспорт патча документа к сервису "ДИАДОК"
 const beforeMessagePatchPost = async prms => {
+    //Проверим ключ разработчика
+    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    //Формируем запрос
     try {
         //Считаем токен доступа из контекста сервиса
         let sToken = null;
@@ -231,11 +250,7 @@ const beforeMessagePatchPost = async prms => {
         //Собираем и отдаём общий результат работы
         return {
             options: {
-                headers: {
-                    "Content-type": "application/json; charset=utf-8",
-                    Authorization: "DiadocAuth ddauth_api_client_id=" + Ddauth_Api_Client_Id + ",ddauth_token=" + sToken,
-                    Accept: "application/json; charset=utf-8"
-                },
+                headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
                 simple: false
             },
             blMsg: Buffer.from(JSON.stringify(obj))
@@ -247,11 +262,11 @@ const beforeMessagePatchPost = async prms => {
 
 //Обработчик "После" запроса на экспорт патча документа к сервису "ДИАДОК"
 const afterMessagePatchPost = async prms => {
-    //Преобразуем JSON ответ сервиса "ДИАДОК" в XML, понятный "Парус 8"
     let resu = null;
     //Действие выполнено успешно
     if (prms.optionsResp.statusCode == 200) {
         try {
+            //Преобразуем JSON ответ сервиса "ДИАДОК" в XML, понятный "Парус 8"
             resu = toXML(JSON.parse(prms.queue.blResp.toString()));
         } catch (e) {
             throw new Error(`Неожиданный ответ сервера ЭДО "ДИАДОК". Ошибка интерпретации: ${e.message}`);
@@ -272,6 +287,9 @@ const afterMessagePatchPost = async prms => {
 
 //Обработчик "До" отправки запроса на получение новых событий к сервису "ДИАДОК"
 const beforeEvent = async prms => {
+    //Проверим ключ разработчика
+    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    //Формируем запрос
     try {
         //Считаем токен доступа из контекста сервиса
         let sToken = null;
@@ -283,11 +301,7 @@ const beforeEvent = async prms => {
         //Формируем запрос для получения BoxId
         let rqpoptions = {
             uri: "https://diadoc-api.kontur.ru/GetMyOrganizations",
-            headers: {
-                "Content-type": "application/json; charset=utf-8",
-                Authorization: "DiadocAuth ddauth_api_client_id=" + Ddauth_Api_Client_Id + ",ddauth_token=" + sToken,
-                Accept: "application/json; charset=utf-8"
-            },
+            headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
             json: true
         };
         //Выполним запрос
@@ -317,11 +331,7 @@ const beforeEvent = async prms => {
         //Собираем и отдаём общий результат работы
         return {
             options: {
-                headers: {
-                    "Content-type": "application/json; charset=utf-8",
-                    Authorization: "DiadocAuth ddauth_api_client_id=" + Ddauth_Api_Client_Id + ",ddauth_token=" + sToken,
-                    Accept: "application/json; charset=utf-8"
-                },
+                headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
                 simple: false,
                 url: surl,
                 boxId: serverResp.Organizations[0].Boxes[0].BoxId
@@ -335,16 +345,22 @@ const beforeEvent = async prms => {
 
 //Обработчик "После" запроса на получение новых событий к сервису "ДИАДОК"
 const afterEvent = async prms => {
-    //Преобразуем JSON ответ сервиса "ДИАДОК" в XML, понятный "Парус 8"
     let resu = null;
-    if (prms.queue.blResp) {
+    //Действие выполнено успешно
+    if (prms.optionsResp.statusCode == 200) {
         try {
+            //Преобразуем JSON ответ сервиса "ДИАДОК" в XML, понятный "Парус 8"
             resu = toXML({ root: JSON.parse(prms.queue.blResp.toString()) });
         } catch (e) {
             throw new Error(`Неожиданный ответ сервера ЭДО "ДИАДОК". Ошибка интерпретации: ${e.message}`);
         }
     } else {
-        throw new Error('Сервер ЭДО "ДИАДОК" не вернул ответ');
+        //Если пришел текст ошибки
+        if (prms.queue.blResp) {
+            throw new Error(`Неожиданный ответ сервера ЭДО "ДИАДОК": ${prms.queue.blResp.toString()}`);
+        } else {
+            throw new Error('Сервер ЭДО "ДИАДОК" не вернул ответ');
+        }
     }
     //Возврат результата
     return {
@@ -354,6 +370,9 @@ const afterEvent = async prms => {
 
 //Обработчик "До" отправки запроса на загрузку вложения
 const beforeDocLoad = async prms => {
+    //Проверим ключ разработчика
+    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    //Формируем запрос
     try {
         //Считаем токен доступа из контекста сервиса
         let sToken = null;
@@ -417,11 +436,7 @@ const beforeDocLoad = async prms => {
                     documentVersion: prms.options.documentVersion,
                     titleIndex: prms.options.titleIndex
                 },
-                headers: {
-                    "Content-type": "application/json; charset=utf-8",
-                    Authorization: "DiadocAuth ddauth_api_client_id=" + Ddauth_Api_Client_Id + ",ddauth_token=" + sToken,
-                    Accept: "application/json; charset=utf-8"
-                },
+                headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
                 url: surl,
                 simple: false
             },
@@ -481,6 +496,9 @@ const afterDocLoad = async prms => {
 
 //Обработчик "До" отправки запроса на удаление документа к сервису "ДИАДОК"
 const beforeDocDelete = async prms => {
+    //Проверим ключ разработчика
+    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    //Формируем запрос
     try {
         //Считаем токен доступа из контекста сервиса
         let sToken = null;
@@ -492,11 +510,7 @@ const beforeDocDelete = async prms => {
         //Собираем и отдаём общий результат работы
         return {
             options: {
-                headers: {
-                    "Content-type": "application/json; charset=utf-8",
-                    Authorization: "DiadocAuth ddauth_api_client_id=" + Ddauth_Api_Client_Id + ",ddauth_token=" + sToken,
-                    Accept: "application/json; charset=utf-8"
-                },
+                headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
                 simple: false
             }
         };
