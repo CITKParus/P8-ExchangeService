@@ -38,6 +38,36 @@ const readCursorData = cursor => {
     });
 };
 
+//Проверка допустимого количества воркеров
+const checkWorkers = async prms => {
+    let pooledConnection;
+    try {
+        pooledConnection = await prms.connection.getConnection();
+        let res = await pooledConnection.execute("BEGIN :LIC_CNT := PKG_EXS.UTL_LIC_CLNT_COUNT_GET(); END;", {
+            LIC_CNT: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
+        });
+        let nMaxLic = res.outBinds.LIC_CNT;
+        if (nMaxLic === 0) {
+            throw new Error(`Не определено количество лицензий для приложения "ExchangeServer".`);
+        }
+        if (prms.nMaxWorkers > nMaxLic - 1) {
+            throw new Error(
+                `Недопустимое значение параметра "Количество одновременно обрабатываемых исходящих сообщений" ("outGoing.nMaxWorkers") файла конфигурации сервиса приложений ("config.js"). Максимальное количество одновременно обрабатываемых исходящих сообщений - ${nMaxLic}.`
+            );
+        }
+    } catch (e) {
+        throw new Error(e.message);
+    } finally {
+        if (pooledConnection) {
+            try {
+                await pooledConnection.close();
+            } catch (e) {
+                throw new Error(e.message);
+            }
+        }
+    }
+};
+
 //Подключение к БД
 const connect = async prms => {
     try {
@@ -61,6 +91,7 @@ const connect = async prms => {
                 );
             }
         });
+        await checkWorkers({ nMaxWorkers: prms.nMaxWorkers, connection: pool });
         return pool;
     } catch (e) {
         throw new Error(e.message);
@@ -203,10 +234,10 @@ const isServiceAuth = async prms => {
     let pooledConnection;
     try {
         pooledConnection = await prms.connection.getConnection();
-        let res = await pooledConnection.execute(
-            "BEGIN :RET := PKG_EXS.SERVICE_IS_AUTH(NEXSSERVICE => :NEXSSERVICE); END;",
-            { NEXSSERVICE: prms.nServiceId, RET: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER } }
-        );
+        let res = await pooledConnection.execute("BEGIN :RET := PKG_EXS.SERVICE_IS_AUTH(NEXSSERVICE => :NEXSSERVICE); END;", {
+            NEXSSERVICE: prms.nServiceId,
+            RET: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
+        });
         return res.outBinds.RET;
     } catch (e) {
         throw new Error(e.message);

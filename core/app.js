@@ -204,7 +204,8 @@ class ParusAppServer {
                     ...prms.config.dbConnect,
                     nPoolMin: prms.config.inComing.nPoolMin,
                     nPoolMax: prms.config.inComing.nPoolMax,
-                    nPoolIncrement: prms.config.inComing.nPoolIncrement
+                    nPoolIncrement: prms.config.inComing.nPoolIncrement,
+                    nMaxWorkers: prms.config.outGoing.nMaxWorkers
                 }
             });
             //Создаём модуль рассылки уведомлений
