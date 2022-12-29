@@ -291,8 +291,13 @@ const beforeEvent = async prms => {
     checkAPIClientId(SDDAUTH_API_CLIENT_ID);
     //Формируем запрос
     try {
+        let sToken = null; //Токен доступа
+        let surl = prms.options.url; //Адрес запрос
+        let serverResp; //Результат запроса информации по текущей организации
+        let obj; //Тело запроса (JSON)
+        let rblMsg; //Буфер тела запроса
+        let sDepartmentId; //Идентификатор подразделения
         //Считаем токен доступа из контекста сервиса
-        let sToken = null;
         if (prms.service.sCtx) {
             sToken = prms.service.sCtx;
         }
@@ -304,22 +309,48 @@ const beforeEvent = async prms => {
             headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
             json: true
         };
-        //Выполним запрос
-        let serverResp = await rqp(rqpoptions);
-        //Не удалось получить текущий ящик организации
-        if (!serverResp.Organizations[0].Boxes[0].BoxId) {
-            throw new Error("Не удалось получить ящик текущей организации");
+        try {
+            //Выполним запрос
+            serverResp = await rqp(rqpoptions);
+            //Не удалось получить ящик получателя
+            if (!serverResp.Organizations[0].Boxes[0].BoxId) {
+                throw new Error(`Не удалось получить ящик текущей организации.`);
+            }
+        } catch (e) {
+            throw Error(`Не удалось получить ящик текущей организации:  ${e.message}`);
         }
-        let surl = prms.options.url;
-        let obj;
-        let rblMsg;
+        //Сохраняем полученный ответ
         surl = surl + "?" + "boxId=" + serverResp.Organizations[0].Boxes[0].BoxId;
+        //Если задано подразделение
+        if (prms.options.sdepartment_name) {
+            if (prms.options.sdepartment_name == "Головное подразделение") {
+                sDepartmentId = "00000000-0000-0000-0000-000000000000";
+            } else {
+                //Получим идентификатор подразделения
+                for (let i in serverResp.Organizations[0].Departments) {
+                    //Если нашлось подразделение - запомним идентификато и выходим из цикла
+                    if (serverResp.Organizations[0].Departments[i].Name == prms.options.sdepartment_name) {
+                        sDepartmentId = serverResp.Organizations[0].Departments[i].DepartmentId;
+                        break;
+                    }
+                }
+                //Не удалось получить идентификатор подразделения
+                if (!sDepartmentId) {
+                    throw new Error(`Не удалось получить идентификатор подразделения с наименованием "${prms.options.sdepartment_name}"`);
+                }
+            }
+        }
         //Если действие не "Документооборот"
         if (prms.options.saction != "DOCFLOWS") {
+            //Заполним параметры для отбора последних событий
             if (prms.options.aftereventid) {
                 surl = surl + "&" + "afterEventId=" + prms.options.aftereventid;
             } else {
                 surl = surl + "&" + "timestampFromTicks=" + prms.options.timestampfromticks;
+            }
+            //Заполним идентификатор подразделения
+            if (prms.options.sdepartment_name && sDepartmentId) {
+                surl = surl + "&" + "departmentId=" + sDepartmentId;
             }
         } else {
             if (prms.queue.blMsg) {
