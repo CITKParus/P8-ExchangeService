@@ -153,14 +153,21 @@ const beforeMessagePost = async prms => {
         try {
             //Выполним запрос
             serverResp = await rqp(rqpoptions);
-            //Не удалось получить ящик отправителя
-            if (!serverResp.Organizations[0].Boxes[0].BoxId) {
-                throw new Error("Не удалось получить ящик отправителя");
+            //Получим идентификатор организации по ИНН/КПП поставщика документа
+            for (let i in serverResp.Organizations) {
+                //Если найдена подходящая организация - запомним идентификатор и выходим из цикла
+                if (serverResp.Organizations[i].Inn == prms.options.inn_pr && serverResp.Organizations[i].Kpp == prms.options.kpp_pr) {
+                    //Сохраняем полученный ответ
+                    obj.FromBoxId = serverResp.Organizations[i].Boxes[0].BoxId;
+                    break;
+                }
             }
-            //Сохраняем полученный ответ
-            obj.FromBoxId = serverResp.Organizations[0].Boxes[0].BoxId;
+            //Не удалось получить ящик отправителя
+            if (!obj.FromBoxId) {
+                throw new Error(`Не удалось получить ящик текущей организации с ИНН: ${prms.options.inn_pr} и КПП: ${prms.options.kpp_pr}`);
+            }
         } catch (e) {
-            throw Error(`Не удалось получить ящик отправителя:  ${e.message}`);
+            throw Error(`Ошибка при получении ящика текущей организации:  ${e.message}`);
         }
         //Очистим предыдущий запрос
         rqpoptions = null;
@@ -169,8 +176,8 @@ const beforeMessagePost = async prms => {
         rqpoptions = {
             uri: "https://diadoc-api.kontur.ru/GetOrganizationsByInnKpp",
             qs: {
-                inn: prms.options.inn,
-                kpp: prms.options.kpp
+                inn: prms.options.inn_cs,
+                kpp: prms.options.kpp_cs
             },
             headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
             json: true
@@ -180,12 +187,12 @@ const beforeMessagePost = async prms => {
             serverResp = await rqp(rqpoptions);
             //Не удалось получить ящик получателя
             if (!serverResp.Organizations[0].Boxes[0].BoxId) {
-                throw new Error(`Не удалось получить ящик получателя для контрагента с ИНН: ${prms.options.inn} и КПП: ${prms.options.kpp}`);
+                throw new Error(`Не удалось получить ящик получателя для контрагента с ИНН: ${prms.options.inn_cs} и КПП: ${prms.options.kpp_cs}`);
             }
             //Сохраняем полученный ответ
             obj.ToBoxId = serverResp.Organizations[0].Boxes[0].BoxId;
         } catch (e) {
-            throw Error(`Не удалось получить ящик получателя для контрагента с ИНН: ${prms.options.inn} и КПП: ${prms.options.kpp}:  ${e.message}`);
+            throw Error(`Ошибка при получении ящика получателя:  ${e.message}`);
         }
         //Если пришел ответ
         if (prms.queue.blResp && serverResp.statusCode == 200) {
@@ -296,6 +303,7 @@ const beforeEvent = async prms => {
         let serverResp; //Результат запроса информации по текущей организации
         let obj; //Тело запроса (JSON)
         let rblMsg; //Буфер тела запроса
+        let sBoxId; //Идентификатор ящика текущей организации
         let sDepartmentId; //Идентификатор подразделения
         //Считаем токен доступа из контекста сервиса
         if (prms.service.sCtx) {
@@ -312,34 +320,43 @@ const beforeEvent = async prms => {
         try {
             //Выполним запрос
             serverResp = await rqp(rqpoptions);
-            //Не удалось получить ящик получателя
-            if (!serverResp.Organizations[0].Boxes[0].BoxId) {
-                throw new Error(`Не удалось получить ящик текущей организации.`);
+            //Получим идентификатор организации по ИНН/КПП контрагента организации
+            for (let i in serverResp.Organizations) {
+                //Если найдена подходящая организация - запомним идентификатор и выходим из цикла
+                if (serverResp.Organizations[i].Inn == prms.options.inn && serverResp.Organizations[i].Kpp == prms.options.kpp) {
+                    //Сохраняем полученный ответ
+                    sBoxId = serverResp.Organizations[i].Boxes[0].BoxId;
+                    //Если задано подразделение
+                    if (prms.options.sdepartment_name) {
+                        if (prms.options.sdepartment_name == "Головное подразделение") {
+                            sDepartmentId = "00000000-0000-0000-0000-000000000000";
+                        } else {
+                            //Получим идентификатор подразделения
+                            for (let j in serverResp.Organizations[i].Departments) {
+                                //Если нашлось подразделение - запомним идентификатор и выходим из цикла
+                                if (serverResp.Organizations[i].Departments[j].Name == prms.options.sdepartment_name) {
+                                    sDepartmentId = serverResp.Organizations[i].Departments[j].DepartmentId;
+                                    break;
+                                }
+                            }
+                            //Не удалось получить идентификатор подразделения
+                            if (!sDepartmentId) {
+                                throw new Error(`Не удалось получить идентификатор подразделения с наименованием "${prms.options.sdepartment_name}"`);
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            //Не удалось получить ящик текущей организации
+            if (!sBoxId) {
+                throw new Error(`Не удалось получить ящик текущей организации с ИНН: ${prms.options.inn} и КПП: ${prms.options.kpp}`);
             }
         } catch (e) {
-            throw Error(`Не удалось получить ящик текущей организации:  ${e.message}`);
+            throw Error(`Ошибка при получении ящика текущей организации: ${e.message}`);
         }
-        //Сохраняем полученный ответ
-        surl = surl + "?" + "boxId=" + serverResp.Organizations[0].Boxes[0].BoxId;
-        //Если задано подразделение
-        if (prms.options.sdepartment_name) {
-            if (prms.options.sdepartment_name == "Головное подразделение") {
-                sDepartmentId = "00000000-0000-0000-0000-000000000000";
-            } else {
-                //Получим идентификатор подразделения
-                for (let i in serverResp.Organizations[0].Departments) {
-                    //Если нашлось подразделение - запомним идентификато и выходим из цикла
-                    if (serverResp.Organizations[0].Departments[i].Name == prms.options.sdepartment_name) {
-                        sDepartmentId = serverResp.Organizations[0].Departments[i].DepartmentId;
-                        break;
-                    }
-                }
-                //Не удалось получить идентификатор подразделения
-                if (!sDepartmentId) {
-                    throw new Error(`Не удалось получить идентификатор подразделения с наименованием "${prms.options.sdepartment_name}"`);
-                }
-            }
-        }
+        //Сформируем адрес запроса
+        surl = surl + "?" + "boxId=" + sBoxId;
         //Если действие не "Документооборот"
         if (prms.options.saction != "DOCFLOWS") {
             //Заполним параметры для отбора последних событий
@@ -365,7 +382,7 @@ const beforeEvent = async prms => {
                 headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
                 simple: false,
                 url: surl,
-                boxId: serverResp.Organizations[0].Boxes[0].BoxId
+                boxId: sBoxId
             },
             blMsg: rblMsg
         };
