@@ -76,6 +76,27 @@ const addHours = (dDate, nHours) => {
     return new Date(dDate);
 };
 
+//Получение ключа разработчика по организации/принадлежности
+const getAPIClientId = (nCompany, nJurPers = null) => {
+    //Ключи в diadoc_conf.js заданы
+    if (SDDAUTH_API_CLIENT_ID) {
+        //И это массив
+        if (Array.isArray(SDDAUTH_API_CLIENT_ID)) {
+            //Найдем значение в массиве
+            let keyFound = SDDAUTH_API_CLIENT_ID.find(keyItem => keyItem.nCompany === nCompany && keyItem.nJurPers === nJurPers);
+            //Найдено совпадение в массиве
+            if (keyFound) return keyFound.sAPIClientId;
+            else {
+                //Ищем с принадлежностью по умолчанию
+                keyFound = SDDAUTH_API_CLIENT_ID.find(keyItem => keyItem.nCompany === nCompany && !keyItem.nJurPers);
+                //Найдено совпадение в массиве
+                if (keyFound) return keyFound.sAPIClientId;
+                else return null;
+            }
+        } else return SDDAUTH_API_CLIENT_ID;
+    } else return null;
+};
+
 //Проверка ключа разработчика
 const checkAPIClientId = sAPIClientId => {
     if (!sAPIClientId) {
@@ -97,12 +118,14 @@ const beforeConnect = async prms => {
     const passAtribute = "password";
     let surl = prms.options.url;
     surl = surl + "?" + "type=password";
+    //Получим ключ разработчика
+    let sAPIClientId = getAPIClientId(prms.options.nCompany, prms.options.nJurPers);
     //Проверим ключ разработчика
-    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    checkAPIClientId(sAPIClientId);
     //Сформируем запрос на аутентификацию
     return {
         options: {
-            headers: buildHeaders(SDDAUTH_API_CLIENT_ID),
+            headers: buildHeaders(sAPIClientId),
             url: surl,
             body: JSON.stringify({
                 [loginAtribute]: prms.service.sSrvUser,
@@ -130,8 +153,10 @@ const afterConnect = async prms => {
 
 //Обработчик "До" отправки запроса на экспорт документа к сервису "ДИАДОК"
 const beforeMessagePost = async prms => {
+    //Получим ключ разработчика
+    let sAPIClientId = getAPIClientId(prms.options.nCompany, prms.options.nJurPers);
     //Проверим ключ разработчика
-    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    checkAPIClientId(sAPIClientId);
     //Формируем запрос
     try {
         //Считаем токен доступа из контекста сервиса
@@ -146,7 +171,7 @@ const beforeMessagePost = async prms => {
         //Формируем запрос для получения FromBoxId
         let rqpoptions = {
             uri: "https://diadoc-api.kontur.ru/GetMyOrganizations",
-            headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
+            headers: buildHeaders(sAPIClientId, sToken),
             json: true
         };
         let serverResp;
@@ -179,7 +204,7 @@ const beforeMessagePost = async prms => {
                 inn: prms.options.inn_cs,
                 kpp: prms.options.kpp_cs
             },
-            headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
+            headers: buildHeaders(sAPIClientId, sToken),
             json: true
         };
         try {
@@ -204,7 +229,7 @@ const beforeMessagePost = async prms => {
         //Собираем и отдаём общий результат работы
         return {
             options: {
-                headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
+                headers: buildHeaders(sAPIClientId, sToken),
                 simple: false
             },
             blMsg: Buffer.from(JSON.stringify(obj))
@@ -241,8 +266,10 @@ const afterMessagePost = async prms => {
 
 //Обработчик "До" отправки запроса на экспорт патча документа к сервису "ДИАДОК"
 const beforeMessagePatchPost = async prms => {
+    //Получим ключ разработчика
+    let sAPIClientId = getAPIClientId(prms.options.nCompany, prms.options.nJurPers);
     //Проверим ключ разработчика
-    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    checkAPIClientId(sAPIClientId);
     //Формируем запрос
     try {
         //Считаем токен доступа из контекста сервиса
@@ -257,7 +284,7 @@ const beforeMessagePatchPost = async prms => {
         //Собираем и отдаём общий результат работы
         return {
             options: {
-                headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
+                headers: buildHeaders(sAPIClientId, sToken),
                 simple: false
             },
             blMsg: Buffer.from(JSON.stringify(obj))
@@ -294,8 +321,10 @@ const afterMessagePatchPost = async prms => {
 
 //Обработчик "До" отправки запроса на получение новых событий к сервису "ДИАДОК"
 const beforeEvent = async prms => {
+    //Получим ключ разработчика
+    let sAPIClientId = getAPIClientId(prms.options.nCompany, prms.options.nJurPers);
     //Проверим ключ разработчика
-    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    checkAPIClientId(sAPIClientId);
     //Формируем запрос
     try {
         let sToken = null; //Токен доступа
@@ -314,7 +343,7 @@ const beforeEvent = async prms => {
         //Формируем запрос для получения BoxId
         let rqpoptions = {
             uri: "https://diadoc-api.kontur.ru/GetMyOrganizations",
-            headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
+            headers: buildHeaders(sAPIClientId, sToken),
             json: true
         };
         try {
@@ -379,7 +408,7 @@ const beforeEvent = async prms => {
         //Собираем и отдаём общий результат работы
         return {
             options: {
-                headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
+                headers: buildHeaders(sAPIClientId, sToken),
                 simple: false,
                 url: surl,
                 boxId: sBoxId
@@ -418,8 +447,10 @@ const afterEvent = async prms => {
 
 //Обработчик "До" отправки запроса на загрузку вложения
 const beforeDocLoad = async prms => {
+    //Получим ключ разработчика
+    let sAPIClientId = getAPIClientId(prms.options.nCompany, prms.options.nJurPers);
     //Проверим ключ разработчика
-    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    checkAPIClientId(sAPIClientId);
     //Формируем запрос
     try {
         //Считаем токен доступа из контекста сервиса
@@ -484,7 +515,7 @@ const beforeDocLoad = async prms => {
                     documentVersion: prms.options.documentVersion,
                     titleIndex: prms.options.titleIndex
                 },
-                headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
+                headers: buildHeaders(sAPIClientId, sToken),
                 url: surl,
                 simple: false
             },
@@ -544,8 +575,10 @@ const afterDocLoad = async prms => {
 
 //Обработчик "До" отправки запроса на удаление документа к сервису "ДИАДОК"
 const beforeDocDelete = async prms => {
+    //Получим ключ разработчика
+    let sAPIClientId = getAPIClientId(prms.options.nCompany, prms.options.nJurPers);
     //Проверим ключ разработчика
-    checkAPIClientId(SDDAUTH_API_CLIENT_ID);
+    checkAPIClientId(sAPIClientId);
     //Формируем запрос
     try {
         //Считаем токен доступа из контекста сервиса
@@ -558,7 +591,7 @@ const beforeDocDelete = async prms => {
         //Собираем и отдаём общий результат работы
         return {
             options: {
-                headers: buildHeaders(SDDAUTH_API_CLIENT_ID, sToken),
+                headers: buildHeaders(sAPIClientId, sToken),
                 simple: false
             }
         };
