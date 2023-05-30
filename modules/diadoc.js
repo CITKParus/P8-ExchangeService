@@ -10,7 +10,7 @@
 const xml2js = require("xml2js"); //Конвертация XML в JSON и JSON в XML
 const _ = require("lodash"); //Работа с коллекциями и объектами
 const rqp = require("request-promise"); //Работа с HTTP/HTTPS запросами
-const { SDDAUTH_API_CLIENT_ID } = require("./diadoc_config"); //Ключ разработчика
+const { SDDAUTH_API_CLIENT_ID, SDEPARTMENT_NAME, SDEPARTMENT_ID } = require("./diadoc_config"); //Ключ разработчика
 
 //---------------------
 // Глобальные константы
@@ -31,6 +31,16 @@ const tag = [
 //------------
 // Тело модуля
 //------------
+
+//формирования адреса запроса для получения данных о текущей организации пользователя
+const buildOrganizationURL = srvRoot => {
+    return `${srvRoot.replace(/\/+$/, "")}/GetMyOrganizations`;
+};
+
+//формирования адреса запроса для получения данных о организации по ИНН/КПП
+const buildOrganizationsByInnKppURL = srvRoot => {
+    return `${srvRoot.replace(/\/+$/, "")}/GetOrganizationsByInnKpp`;
+};
 
 //Обернуть содержимое тега в массив
 const toArray = (obj, tags) => {
@@ -111,13 +121,36 @@ const buildHeaders = (sAPIClientId, sToken = null) => ({
     Accept: "application/json; charset=utf-8"
 });
 
+//Отбор организций
+const GetOrganizations = Organizations => {
+    //Параметры отбора
+    let isRoaming = false;
+    //Итоговая выборка
+    let Organization = { Organizations: [] };
+    //Найдем организацию не в роуминге
+    Organization.Organizations[0] = Organizations.Organizations.find(Org => Org.IsRoaming === isRoaming);
+    //Если не удалось получить организацию не в роуминге
+    if (!Organization.Organizations[0]) {
+        //Если нет организации не в роуминге и найдено более одной организации
+        if (Organizations.Organizations.length > 1) {
+            throw Error(`Найдено несколько организаций в роуминге.`);
+        } else {
+            //Вернем единственную найденую организацию
+            return Organizations;
+        }
+    } else {
+        //Вернем найденую организацию
+        return Organization;
+    }
+};
+
 //Обработчик "До" подключения к сервису
 const beforeConnect = async prms => {
     //Подготовим параметры аутентификации
     const loginAtribute = "login";
     const passAtribute = "password";
     let surl = prms.options.url;
-    surl = surl + "?" + "type=password";
+    surl = `${surl}?type=password`;
     //Получим ключ разработчика
     let sAPIClientId = getAPIClientId(prms.options.nCompany, prms.options.nJurPers);
     //Проверим ключ разработчика
@@ -170,7 +203,7 @@ const beforeMessagePost = async prms => {
         let obj = await toJSON(prms.queue.blMsg.toString());
         //Формируем запрос для получения FromBoxId
         let rqpoptions = {
-            uri: "https://diadoc-api.kontur.ru/GetMyOrganizations",
+            uri: buildOrganizationURL(prms.service.sSrvRoot),
             headers: buildHeaders(sAPIClientId, sToken),
             json: true
         };
@@ -199,7 +232,7 @@ const beforeMessagePost = async prms => {
         serverResp = null;
         //Формируем запрос для получения ToBoxId
         rqpoptions = {
-            uri: "https://diadoc-api.kontur.ru/GetOrganizationsByInnKpp",
+            uri: buildOrganizationsByInnKppURL(prms.service.sSrvRoot),
             qs: {
                 inn: prms.options.inn_cs,
                 kpp: prms.options.kpp_cs
@@ -210,6 +243,8 @@ const beforeMessagePost = async prms => {
         try {
             //Выполним запрос
             serverResp = await rqp(rqpoptions);
+            //Получим организацию не в роуминге (или единственную организацию в роуминге)
+            serverResp = GetOrganizations(serverResp);
             //Не удалось получить ящик получателя
             if (!serverResp.Organizations[0].Boxes[0].BoxId) {
                 throw new Error(`Не удалось получить ящик получателя для контрагента с ИНН: ${prms.options.inn_cs} и КПП: ${prms.options.kpp_cs}`);
@@ -342,7 +377,7 @@ const beforeEvent = async prms => {
         if (!sToken) return { bUnAuth: true };
         //Формируем запрос для получения BoxId
         let rqpoptions = {
-            uri: "https://diadoc-api.kontur.ru/GetMyOrganizations",
+            uri: buildOrganizationURL(prms.service.sSrvRoot),
             headers: buildHeaders(sAPIClientId, sToken),
             json: true
         };
@@ -357,8 +392,8 @@ const beforeEvent = async prms => {
                     sBoxId = serverResp.Organizations[i].Boxes[0].BoxId;
                     //Если задано подразделение
                     if (prms.options.sdepartment_name) {
-                        if (prms.options.sdepartment_name == "Головное подразделение") {
-                            sDepartmentId = "00000000-0000-0000-0000-000000000000";
+                        if (prms.options.sdepartment_name == SDEPARTMENT_NAME) {
+                            sDepartmentId = SDEPARTMENT_ID;
                         } else {
                             //Получим идентификатор подразделения
                             for (let j in serverResp.Organizations[i].Departments) {
@@ -385,18 +420,18 @@ const beforeEvent = async prms => {
             throw Error(`Ошибка при получении ящика текущей организации: ${e.message}`);
         }
         //Сформируем адрес запроса
-        surl = surl + "?" + "boxId=" + sBoxId;
+        surl = `${surl}?boxId=${sBoxId}`;
         //Если действие не "Документооборот"
         if (prms.options.saction != "DOCFLOWS") {
             //Заполним параметры для отбора последних событий
             if (prms.options.aftereventid) {
-                surl = surl + "&" + "afterEventId=" + prms.options.aftereventid;
+                surl = `${surl}&afterEventId=${prms.options.aftereventid}`;
             } else {
-                surl = surl + "&" + "timestampFromTicks=" + prms.options.timestampfromticks;
+                surl = `${surl}&timestampFromTicks=${prms.options.timestampfromticks}`;
             }
             //Заполним идентификатор подразделения
             if (prms.options.sdepartment_name && sDepartmentId) {
-                surl = surl + "&" + "departmentId=" + sDepartmentId;
+                surl = `${surl}&departmentId=${sDepartmentId}`;
             }
         } else {
             if (prms.queue.blMsg) {
@@ -492,8 +527,7 @@ const beforeDocLoad = async prms => {
                 break;
             default:
         }
-        surl = surl + "?" + msgId + prms.options.smsgid;
-        surl = surl + "&" + entId + prms.options.sentid;
+        surl = `${surl}?${msgId}${prms.options.smsgid}&${entId}${prms.options.sentid}`;
         let obj;
         let rblMsg;
         if (prms.queue.blMsg && prms.options.type != 5) {
@@ -600,6 +634,61 @@ const beforeDocDelete = async prms => {
     }
 };
 
+//Обработчик "До" отправки запроса на получение списка подразделений контрагента к сервису "ДИАДОК"
+const beforeDepartmentIdGet = async prms => {
+    //Получим ключ разработчика
+    let sAPIClientId = getAPIClientId(prms.options.nCompany, prms.options.nJurPers);
+    //Проверим ключ разработчика
+    checkAPIClientId(sAPIClientId);
+    //Формируем запрос
+    try {
+        //Считаем токен доступа из контекста сервиса
+        let sToken = null;
+        if (prms.service.sCtx) {
+            sToken = prms.service.sCtx;
+        }
+        //Если не достали из контекста токен доступа - значит нет аутентификации на сервере
+        if (!sToken) return { bUnAuth: true };
+        //Собираем и отдаём общий результат работы
+        return {
+            options: {
+                headers: buildHeaders(sAPIClientId, sToken),
+                simple: false
+            }
+        };
+    } catch (e) {
+        throw Error(e);
+    }
+};
+
+//Обработчик "После" отправки запроса на получение списка подразделений контрагента к сервису "ДИАДОК"
+const afterDepartmentIdGet = async prms => {
+    let resu = null;
+    let Organization = {};
+    //Действие выполнено успешно
+    if (prms.optionsResp.statusCode == 200) {
+        try {
+            //Получим организацию не в роуминге (или единственную организацию в роуминге)
+            Organization = GetOrganizations(JSON.parse(prms.queue.blResp.toString()));
+            //Преобразуем JSON ответ сервиса "ДИАДОК" в XML, понятный "Парус 8"
+            resu = toXML({ root: Organization });
+        } catch (e) {
+            throw new Error(`Неожиданный ответ сервера ЭДО "ДИАДОК". Ошибка интерпретации: ${e.message}`);
+        }
+    } else {
+        //Если пришел текст ошибки
+        if (prms.queue.blResp) {
+            throw new Error(`Неожиданный ответ сервера ЭДО "ДИАДОК": ${prms.queue.blResp.toString()}`);
+        } else {
+            throw new Error('Сервер ЭДО "ДИАДОК" не вернул ответ');
+        }
+    }
+    //Возврат результата
+    return {
+        blResp: Buffer.from(resu)
+    };
+};
+
 //-----------------
 // Интерфейс модуля
 //-----------------
@@ -615,3 +704,5 @@ exports.afterEvent = afterEvent;
 exports.beforeDocLoad = beforeDocLoad;
 exports.afterDocLoad = afterDocLoad;
 exports.beforeDocDelete = beforeDocDelete;
+exports.beforeDepartmentIdGet = beforeDepartmentIdGet;
+exports.afterDepartmentIdGet = afterDepartmentIdGet;
