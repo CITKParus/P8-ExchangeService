@@ -202,6 +202,8 @@ class ParusAppServer {
             this.dbConn = new db.DBConnector({
                 connectSettings: {
                     ...prms.config.dbConnect,
+                    sRelease: prms.config.common.sRelease,
+                    bControlSystemVersion: prms.config.common.bControlSystemVersion,
                     nPoolMin: prms.config.inComing.nPoolMin,
                     nPoolMax: prms.config.inComing.nPoolMax,
                     nPoolIncrement: prms.config.inComing.nPoolIncrement,
