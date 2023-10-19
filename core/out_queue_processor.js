@@ -145,6 +145,10 @@ const appProcess = async prms => {
                         sQuery: prms.queue.blMsg === null ? "" : prms.queue.blMsg.toString()
                     });
                 }
+                /* Установим прокси, если требуется */
+                if (prms.service.sProxyURL) {
+                    options.proxy = prms.service.sProxyURL;
+                }
                 //Дополним получившиеся параметры переданными в сообщении
                 if (prms.queue.sOptions) {
                     try {
