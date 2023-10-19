@@ -64,6 +64,8 @@ class OutQueue extends EventEmitter {
             this.logger = prms.logger;
             //Запомним уведомитель
             this.notifier = prms.notifier;
+            //Запомним глобальный адрес прокси-сервера
+            this.sProxy = prms.sProxy;
             //Список обрабатываемых в текущий момент сообщений очереди
             this.inProgress = [];
             //Привяжем методы к указателю на себя для использования в обработчиках событий
@@ -160,7 +162,8 @@ class OutQueue extends EventEmitter {
                 service: _.find(this.services, { nId: prms.queue.nServiceId }),
                 function: _.find(_.find(this.services, { nId: prms.queue.nServiceId }).functions, {
                     nId: prms.queue.nServiceFnId
-                })
+                }),
+                sProxy: this.sProxy
             });
             //Уменьшаем количество доступных обработчиков
             this.nWorkersLeft--;

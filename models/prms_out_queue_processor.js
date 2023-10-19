@@ -37,7 +37,7 @@ exports.appProcess = new Schema({
         schema: Queue,
         required: true,
         message: {
-            required: path => `Не указано обрабатываемое сообщение очреди (${path})`
+            required: path => `Не указано обрабатываемое сообщение очереди (${path})`
         }
     },
     //Cервис-обработчик
@@ -54,6 +54,15 @@ exports.appProcess = new Schema({
         required: true,
         message: {
             required: path => `Не указана функция сервиса для обработки сообщения очереди (${path})`
+        }
+    },
+    //Глобальный адрес прокси-сервера
+    sProxy: {
+        type: String,
+        required: false,
+        message: {
+            type: path => `Глобальный адрес прокси-сервера (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан глобальный адрес прокси-сервера (${path})`
         }
     }
 });
