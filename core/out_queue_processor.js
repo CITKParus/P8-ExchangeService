@@ -435,15 +435,15 @@ const dbProcess = async prms => {
                 //Если результат - ошибка аутентификации, то и её пробрасываем, но с правильным кодом
                 if (prcRes.sResult == objQueueSchema.SPRC_RESP_RESULT_UNAUTH) throw new ServerError(SERR_UNAUTH, prcRes.sMsg || "Нет аутентификации");
             }
+            //Фиксируем успешное исполнение сервером БД - в протоколе работы сервиса
+            await logger.info(`Исходящее сообщение ${prms.queue.nId} успешно отработано сервером БД`, {
+                nQueueId: prms.queue.nId
+            });
             //Фиксируем успешное исполнение (полное - дальше обработки нет) - в статусе сообщения
             res = await dbConn.setQueueState({
                 nQueueId: prms.queue.nId,
                 nIncExecCnt: prms.queue.nExecCnt == 0 ? NINC_EXEC_CNT_YES : NINC_EXEC_CNT_NO,
                 nExecState: objQueueSchema.NQUEUE_EXEC_STATE_OK
-            });
-            //Фиксируем успешное исполнение сервером БД - в протоколе работы сервиса
-            await logger.info(`Исходящее сообщение ${prms.queue.nId} успешно отработано сервером БД`, {
-                nQueueId: prms.queue.nId
             });
         } catch (e) {
             //Если была ошибка аутентификации - возвращаем на повторную обработку сервером приложений

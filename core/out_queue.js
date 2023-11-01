@@ -247,8 +247,11 @@ class OutQueue extends EventEmitter {
                 const proc = ChildProcess.fork("core/out_queue_processor", { silent: false });
                 //Перехват сообщений обработчика
                 proc.on("message", async result => {
-                    //Считываем сообщение изменённое обработчиком
-                    prms.queue = await self.dbConn.getQueue({ nQueueId: prms.queue.nId });
+                    //Перечитывание не требуется, если выполнено успешно
+                    if (result.sResult !== objOutQueueProcessorSchema.STASK_RESULT_OK) {
+                        //Перечитываем запись очереди с учетом изменения статуса
+                        prms.queue = await self.dbConn.getQueue({ nQueueId: prms.queue.nId });
+                    }
                     //Проверяем структуру полученного сообщения
                     let sCheckResult = validateObject(
                         result,

@@ -312,14 +312,14 @@ class InQueue extends EventEmitter {
                     if (optionsResp.headers) prms.res.set(optionsResp.headers);
                     prms.res.status(optionsResp.statusCode || 200).send(blResp);
                 }
+                //Фиксируем успех обработки - в протоколе работы сервиса
+                await this.logger.info(`Входящее сообщение ${q.nId} успешно отработано`, { nQueueId: q.nId });
                 //Фиксируем успех обработки - в статусе сообщения
                 q = await this.dbConn.setQueueState({
                     nQueueId: q.nId,
                     nIncExecCnt: NINC_EXEC_CNT_YES,
                     nExecState: objQueueSchema.NQUEUE_EXEC_STATE_OK
                 });
-                //Фиксируем успех обработки - в протоколе работы сервиса
-                await this.logger.info(`Входящее сообщение ${q.nId} успешно отработано`, { nQueueId: q.nId });
             } catch (e) {
                 //Тема и текст уведомления об ошибке
                 let sSubject = `Ошибка обработки входящего сообщения сервером приложений для функции "${prms.function.sCode}" сервиса "${prms.service.sCode}"`;
