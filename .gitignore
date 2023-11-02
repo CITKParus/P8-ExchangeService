@@ -1,5 +1,10 @@
-# Dependency directories
+# Зависимости
 node_modules/
 
 # VS Code
 .vscode/
+
+# В модулях надо брать всё
+!modules/
+!modules/*/
+!modules/*/node_modules
