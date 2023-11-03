@@ -16,7 +16,7 @@ let common = {
     //Таймаут останова сервера (мс)
     nTerminateTimeout: 60000,
     //Контролировать версию Системы
-    bControlSystemVersion: false
+    bControlSystemVersion: true
 };
 
 //Параметры подключения к БД
@@ -78,7 +78,7 @@ let mail = {
     //Имя пользователя SMTP-сервера
     sUser: "appserver@citk-parus.ru",
     //Пароль пользователя SMTP-сервера
-    sPass: "4~1DgTchonHB",
+    sPass: "",
     //Наименование отправителя для исходящих сообщений
     sFrom: "'Сервис интеграции с WEB-API' <appserver@citk-parus.ru>"
 };

@@ -16,7 +16,7 @@ let common = {
     //Таймаут останова сервера (мс)
     nTerminateTimeout: 60000,
     //Контролировать версию Системы
-    bControlSystemVersion: false
+    bControlSystemVersion: true
 };
 
 //Параметры подключения к БД
