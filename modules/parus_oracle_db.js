@@ -70,6 +70,31 @@ const checkWorkers = async prms => {
     }
 };
 
+//Проверка соответствия релизов сервера приложений и системы
+const checkRelease = async prms => {
+    let pooledConnection;
+    try {
+        pooledConnection = await prms.connection.getConnection();
+        let res = await pooledConnection.execute("BEGIN :DB_RELEASE := PKG_EXS.UTL_PRODUCT_RELEASE_GET(); END;", {
+            DB_RELEASE: { dir: oracledb.BIND_OUT, type: oracledb.DB_TYPE_VARCHAR }
+        });
+        let sDB_RELEASE = res.outBinds.DB_RELEASE;
+        if (sDB_RELEASE !== prms.sRelease) {
+            throw new Error(`Версия сервера приложений (${prms.sRelease}) не соответствует версии системы (${sDB_RELEASE}).`);
+        }
+    } catch (e) {
+        throw new Error(e.message);
+    } finally {
+        if (pooledConnection) {
+            try {
+                await pooledConnection.close();
+            } catch (e) {
+                throw new Error(e.message);
+            }
+        }
+    }
+}
+
 //Подключение к БД
 const connect = async prms => {
     try {
@@ -93,6 +118,9 @@ const connect = async prms => {
                 );
             }
         });
+        if (prms.bControlSystemVersion) {
+            await checkRelease({ sRelease: prms.sRelease, connection: pool });
+        }
         await checkWorkers({ nMaxWorkers: prms.nMaxWorkers, connection: pool });
         return pool;
     } catch (e) {

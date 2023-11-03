@@ -14,7 +14,9 @@ let common = {
     //Релиз сервера приложений
     sRelease: "2023.10.10",
     //Таймаут останова сервера (мс)
-    nTerminateTimeout: 60000
+    nTerminateTimeout: 60000,
+    //Контролировать версию Системы
+    bControlSystemVersion: false
 };
 
 //Параметры подключения к БД
