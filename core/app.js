@@ -93,7 +93,7 @@ class ParusAppServer {
     async onOutQStarted() {
         //Сообщим, что запустили обработчик
         await this.logger.info("Обработчик очереди исходящих сообщений запущен");
-        //Запускаем бслуживание очереди входящих
+        //Запускаем обслуживание очереди входящих
         await this.logger.info("Запуск обработчика очереди входящих сообщений...");
         try {
             this.inQ.startProcessing({ services: this.services });
@@ -217,7 +217,8 @@ class ParusAppServer {
                 outGoing: prms.config.outGoing,
                 dbConn: this.dbConn,
                 logger: this.logger,
-                notifier: this.notifier
+                notifier: this.notifier,
+                sProxy: prms.config.outGoing.sProxy
             });
             //Создаём обработчик очереди входящих
             this.inQ = new iq.InQueue({
@@ -231,7 +232,8 @@ class ParusAppServer {
             this.srvAvlCtrl = new sac.ServiceAvailableController({
                 logger: this.logger,
                 notifier: this.notifier,
-                dbConn: this.dbConn
+                dbConn: this.dbConn,
+                sProxy: prms.config.outGoing.sProxy
             });
             //Скажем что инициализировали
             await this.logger.info("Сервер приложений инициализирован");

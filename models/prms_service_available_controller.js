@@ -48,6 +48,16 @@ exports.ServiceAvailableController = new Schema({
                 `Объект для взаимодействия с БД (${path}) имеет некорректный тип данных (ожидалось - DBConnector)`,
             required: path => `Не указан объект для взаимодействия с БД (${path})`
         }
+    },
+    //Глобальный адрес прокси-сервера
+    sProxy: {
+        type: String,
+        required: false,
+        message: {
+            type: path =>
+                `Глобальный адрес прокси-сервера (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан глобальный адрес прокси-сервера (${path})`
+        }
     }
 });
 

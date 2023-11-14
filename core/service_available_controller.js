@@ -67,6 +67,8 @@ class ServiceAvailableController extends EventEmitter {
             this.logger = prms.logger;
             //Запомним подключение к БД
             this.dbConn = prms.dbConn;
+            //Запомним глобальный адрес прокси-сервера
+            this.sProxy = prms.sProxy;
             //Привяжем методы к указателю на себя для использования в обработчиках событий
             this.serviceDetectingLoop = this.serviceDetectingLoop.bind(this);
         } else {
@@ -110,8 +112,18 @@ class ServiceAvailableController extends EventEmitter {
                         service.nSrvType == objServiceSchema.NSRV_TYPE_SEND
                     ) {
                         try {
+                            // Инициализируем параметры запроса
+                            let options = {};
+                            // Устанавливаем параметры запроса
+                            options.url = service.sSrvRoot;
+                            options.timeout = NNETWORK_CHECK_TIMEOUT;
+                            // Если у сервиса указан прокси, либо у приложения установлен глобальный прокси
+                            if (service.sProxyURL || this.sProxy) {
+                                // Добавляем прокси с приоритетом сервиса
+                                options.proxy = service.sProxyURL ?? this.sProxy;
+                            }
                             //Отправляем проверочный запрос
-                            await rqp({ url: service.sSrvRoot, timeout: NNETWORK_CHECK_TIMEOUT });
+                            await rqp(options);
                             //Запрос прошел - фиксируем дату доступности и сбрасываем дату недоступности
                             service.dAvailable = new Date();
                             service.dUnAvailable = null;

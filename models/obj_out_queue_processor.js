@@ -65,6 +65,15 @@ exports.OutQueueProcessorTask = new Schema({
         message: {
             required: path => `Не указана функция сервиса для обработки сообщения очереди (${path})`
         }
+    },
+    //Глобальный адрес прокси-сервера
+    sProxy: {
+        type: String,
+        required: false,
+        message: {
+            type: path => `Глобальный адрес прокси-сервера (${path}) имеет некорректный тип данных (ожидалось - String)`,
+            required: path => `Не указан глобальный адрес прокси-сервера (${path})`
+        }
     }
 });
 
