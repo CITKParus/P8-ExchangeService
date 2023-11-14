@@ -113,10 +113,10 @@ class ParusAppServer {
         else await this.onInQStopped();
     }
     //При запуске обработчика входящих сообщений
-    async onInQStarted(nPort) {
+    async onInQStarted(nPort, sHost) {
         //Сообщим, что запустили обработчик
         await this.logger.info(
-            `Обработчик очереди входящих сообщений запущен (порт - ${nPort}, доступные IP - ${getIPs().join("; ")})`
+            `Обработчик очереди входящих сообщений запущен (порт - ${nPort}, доступные IP - ${sHost === "0.0.0.0" ? getIPs().join("; ") : sHost})`
         );
         //Запускаем модуль отправки уведомлений
         await this.logger.info("Запуск модуля отправки уведомлений...");
