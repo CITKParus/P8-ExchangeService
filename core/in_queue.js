@@ -78,7 +78,7 @@ class InQueue extends EventEmitter {
     //Уведомление о запуске обработчика очереди
     notifyStarted() {
         //Оповестим подписчиков о запуске
-        this.emit(SEVT_IN_QUEUE_STARTED, this.inComing.nPort);
+        this.emit(SEVT_IN_QUEUE_STARTED, this.inComing.nPort, this.inComing.sHost);
     }
     //Уведомление об остановке обработчика очереди
     notifyStopped() {
@@ -442,7 +442,7 @@ class InQueue extends EventEmitter {
                 res.status(500).send(makeErrorText(new ServerError(SERR_WEB_SERVER, err.message)));
             });
             //Запускаем сервер
-            this.srv = this.webApp.listen(this.inComing.nPort, "0.0.0.0", () => {
+            this.srv = this.webApp.listen(this.inComing.nPort, this.inComing.sHost, () => {
                 //И оповещаем всех что запустились
                 this.notifyStarted();
             });
