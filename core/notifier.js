@@ -113,7 +113,7 @@ class Notifier extends EventEmitter {
             if (!message.bSent) {
                 try {
                     //Если всё в порядке с настройками
-                    if (this.mail.sHost && this.mail.nPort && this.mail.sUser && this.mail.sPass && this.mail.sFrom) {
+                    if (this.mail.sHost && this.mail.nPort && this.mail.sFrom && this.mail.hasOwnProperty('bSecure') && this.mail.hasOwnProperty('bRejectUnauthorized')) {
                         //Отправляем
                         await sendMail({
                             mail: this.mail,

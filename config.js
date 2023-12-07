@@ -77,10 +77,14 @@ let mail = {
     sHost: "smtp.mail.ru",
     //Порт сервера SMTP
     nPort: 465,
+    //Использовать безопасное соединение SMTP (true - использование TLS/SSL, false - использование только в случае наличия STARTTLS)
+    bSecure: true,
     //Имя пользователя SMTP-сервера
     sUser: "appserver@citk-parus.ru",
     //Пароль пользователя SMTP-сервера
     sPass: "",
+    //Отображать ошибку о некорректном сертификате при проверке безопасности
+    bRejectUnauthorized: true,
     //Наименование отправителя для исходящих сообщений
     sFrom: "'Сервис интеграции с WEB-API' <appserver@citk-parus.ru>"
 };
