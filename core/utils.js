@@ -182,16 +182,24 @@ const sendMail = prms => {
         );
         //Если структура объекта в норме
         if (!sCheckResult) {
-            //Параметры подключения к SMTP-серверу
-            let transporter = nodemailer.createTransport({
+            //Формируем параметры для подключения к SMTP
+            let transpOptions = {
                 host: prms.mail.sHost,
                 port: prms.mail.nPort,
-                secure: prms.mail.nPort == 465,
-                auth: {
+                secure: prms.mail.bSecure,
+                tls: {
+                    rejectUnauthorized: prms.mail.bRejectUnauthorized
+                }
+            };
+            //Если есть информация о пользователе - добавляем
+            if (prms.mail.sUser) {
+                transpOptions.auth = {
                     user: prms.mail.sUser,
                     pass: prms.mail.sPass
                 }
-            });
+            }
+            //Настраиваем подключение к SMTP-серверу
+            let transporter = nodemailer.createTransport(transpOptions);
             //Параметры отправляемого сообщения
             let mailOptions = {
                 from: prms.mail.sFrom,
@@ -230,8 +238,8 @@ const buildURL = prms => {
     let sCheckResult = validateObject(prms, prmsUtilsSchema.buildURL, "Параметры функции формирования URL");
     //Если структура объекта в норме
     if (!sCheckResult) {
-        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! КОНТРОЛЬ КОРРЕКТНОСТИ
-        return `${prms.sSrvRoot}/${prms.sFnURL}${prms.sQuery ? `?${prms.sQuery}` : ""}`;
+        //Формируем URL с учетом лишних "/"
+        return `${prms.sSrvRoot.replace(/\/+$/, '')}/${prms.sFnURL.replace(/^\/+/, '')}${prms.sQuery ? `?${prms.sQuery}` : ""}`;
     } else {
         throw new ServerError(SERR_OBJECT_BAD_INTERFACE, sCheckResult);
     }
